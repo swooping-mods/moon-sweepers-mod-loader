@@ -51,11 +51,23 @@ does not establish any of those conditions. An arbitrary MonoBehaviour Update
 order is not a guarantee of same-frame legend delivery. Clear on disable/world
 change on the admitted thread; a cleared key slot is not reclaimed.
 
+The framework's separate 0.2 candidate also owns `HintsPresentation.cs` and
+the `hints-framework.presentation` ABI 1 / 24-byte service. Its late callback
+runs immediately before the native legend selects current hints, after the
+provider admits its Unity thread and live world. This is an ordinary optional
+domain service, not an extension to core startup registration. Consumers bind
+once, retry subscription on that component thread, publish synchronously with
+the callback's borrowed walker, and unsubscribe before disposing callback state.
+Active subscriptions explicitly root their managed delegate and closure until
+successful unsubscribe; a refusal must retain those roots. Host reverse-call,
+GC, exception and allocation checks pass. The candidate's loaded-world legend
+proof remains separate; existing Hints consumers require only the original API.
+
 Native table/code storage lasts until process exit. Do not unload a native
 module, retain borrowed Unity pointers, assume a table is thread-safe, pass
 unrooted delegates or marshal raw managed object references as native objects.
-This client only binds and calls; it does not register managed callbacks or
-change the native startup registration transaction.
+The core RuntimeClient only binds and calls; framework wrappers own any late
+callback contract. Such a service does not reopen the native startup transaction.
 
 With an installed SDK/runtime, the optional compiled FFI checks are included in
 `MOON_API_DOTNET=/absolute/path/to/dotnet python3 tools/check.py`. They compile
