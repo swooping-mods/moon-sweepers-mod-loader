@@ -2,7 +2,7 @@
 
 A desktop mod loader for Moon Sweepers, with local `.msmod` installation, dependency and compatibility checks, private game copies and separate modded profiles.
 
-Target repository: `swooping-mods/moon-sweepers-mod-loader`. Prepared locally for inspection; no organization repository or remote has been created. The detailed [repository split proposal](design/repository-split.md) explains the three repositories, issue routing and Nexus release flow.
+Repository: [swooping-mods/moon-sweepers-mod-loader](https://github.com/swooping-mods/moon-sweepers-mod-loader). The reviewed source is hosted privately on GitHub. The detailed [repository split proposal](design/repository-split.md) explains the three repositories, issue routing and Nexus release flow.
 
 The extracted adapter supports the previously pinned Steam Windows x64 IL2CPP 1.0.5 build (app 5335510). Exact executable hashes, rather than the version label alone, determine acceptance. Windows launches the native game; Linux uses the user's installed Steam/Proton Experimental. Other game builds and storefront runtimes require separate qualification.
 

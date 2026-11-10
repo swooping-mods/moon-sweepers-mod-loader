@@ -43,6 +43,6 @@ Nexus descriptions should link to the corresponding GitHub source and issue trac
 
 ## Local preparation versus future rollout
 
-Prepared: three independent local repositories, focused docs/specs, first-party API extraction, a pinned loader snapshot, native build, existing loader tests, catalog metadata migration and CI candidate definitions. All migrated catalog entries are explicitly development entries, with no invented source/Nexus release links. The generated public index is therefore initially empty.
+Prepared: three independent local repositories, focused docs/specs, first-party API extraction, a pinned loader snapshot, native build, existing loader tests, catalog metadata migration and CI candidate definitions. The API and loader source repositories are now hosted privately under `swooping-mods`, with `main` tracking their respective `origin/main`. The index remains local. All migrated catalog entries are explicitly development entries, with no invented mod source/Nexus release links. The generated public index is therefore initially empty.
 
-Deferred: organization repository creation, remote configuration, push, branch protections, choosing Nexus pages/file IDs, initial Nexus uploads, uploader intake/credentials and loader integration with a hosted index. No website, network updater, repository creation or publication is implied by this proposal.
+Deferred: creating/pushing the index repository, branch protections, choosing Nexus pages/file IDs, initial Nexus uploads, uploader intake/credentials and loader integration with a hosted index. The source push does not publish a Nexus release, website or network updater.
