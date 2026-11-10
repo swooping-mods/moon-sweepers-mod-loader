@@ -35,4 +35,4 @@ Checks cover the package/API snapshot, dependency resolution, deployment recover
 
 Nexus Mods is the intended main player portal. GitHub Issues/PRs own code and review. CI validates changes and can create a release candidate; publishing and remote catalog discovery are not enabled in this preparation. Importing a local package is the current supported install path. See [release plan](design/nexus-release.md).
 
-Read [specs/_readme.md](specs/_readme.md), [third-party notices](vendored/THIRD_PARTY_NOTICES.md) and [HANDOFF.md](HANDOFF.md). The repository split has not rerun game, Wine, native Windows or co-op qualification. No project license is assigned.
+Read [specs/_readme.md](specs/_readme.md) and [third-party notices](vendored/THIRD_PARTY_NOTICES.md). The repository split has not rerun game, Wine, native Windows or co-op qualification. No project license is assigned.

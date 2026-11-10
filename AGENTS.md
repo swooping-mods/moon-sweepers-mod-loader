@@ -1,7 +1,7 @@
 # Repository instructions
 
-Read README.md, specs/_readme.md and HANDOFF.md first. Work in this checkout on main and preserve existing work.
-Keep current contracts in specs/; design/ owns planned choices. Replace HANDOFF.md milestone state rather than appending a diary.
+Read README.md and specs/_readme.md first. Work in this checkout on main and preserve existing work.
+Keep current contracts in specs/; design/ owns planned choices. Keep local milestone notes outside the repository.
 Use installed Python 3.11+ and the documented installed compiler/runtime. Do not download dependencies automatically.
 Run python3 tools/check.py before reporting completion; report skipped gates and failures accurately.
 Keep game binaries, extracted assets, saves, credentials and generated output under ignored local/ or artifacts/.
