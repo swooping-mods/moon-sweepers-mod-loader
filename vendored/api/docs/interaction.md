@@ -74,3 +74,9 @@ and native interception. Another adapter can reuse that core without using the
 Moon Sweepers engine binding. Domain raycasts, purchases, carrying and other
 gameplay remain independently owned; this contract does not grant world,
 save, multiplayer or presentation compatibility to arbitrary mods.
+
+
+SDK 0.6.1 bounds physical snapshot polling to registered input bindings,
+modifiers and outstanding captured keys. Rebinding while held does not discard
+the original native control before release. This reduces unused-key polling;
+it does not change the table ABI or make a game frame-time guarantee.

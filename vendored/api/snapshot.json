@@ -1,7 +1,7 @@
 {
   "schema": "moon-api-snapshot/v1",
   "repository": "moon-sweepers-api",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "files": {
     "include/moon_sweepers/build_menu/bootstrap.h": "9b132b47e65ca9ef89a9ef51c88e89c6baf4d61bba4f23ba38c3b701515c80bd",
     "include/moon_sweepers/build_menu/build_menu.h": "77da2f004cc2480f6debb3aa30ddde401fb0c373e7f20ee34d64e558b0693683",
@@ -15,12 +15,12 @@
     "include/moon_sweepers/input_host.h": "8d3f59ed3e21bdb7c7528737dd263b234c65e05b481a142eaf5f33f70604e0cb",
     "include/moon_sweepers/input_registry.h": "53cf344e49ff195b3f0a4f35078d6dde84693a895eb4030734d218cc692bc7fe",
     "include/moon_sweepers/interaction.h": "27a4bba9124f712995eb712d5c28bdeeb11e805322de82fe69379f1fc9b558b0",
-    "include/moon_sweepers/interaction_registry.h": "c234e3c622305ebc49b5b1a621449ec66a261b6faffd5e13028747fe59daace3",
+    "include/moon_sweepers/interaction_registry.h": "3cbb44f895929d8669ee68e7edf8cbda83b560f8bfc1174d6276005dbaf65648",
     "include/moon_sweepers/runtime.h": "4eb6c9d333038dfc55fdd0e5d2cbbdcc256865b8bfb9a24b616a2e01b70e0001",
     "include/moon_sweepers/services.h": "72de584c98cf0ca6367f5decd4416c78fa4eeea44b4b48401d0737a44b2c7a2b",
     "include/moon_sweepers/services_client.h": "17f670371f5798457301b14c046daa99632c9685cc2c5f78921c3fe53d095479",
     "include/moon_sweepers/vehicle_input.h": "6af332b456ff9fb74e96a6e963a8cf9627bd51a8edca55f07b6e5a829b9da790",
-    "python/moon_mod_api/__init__.py": "aa1750d83da7ee5df989f671f5ba86bea983f73530049918630a9c03f4770641",
+    "python/moon_mod_api/__init__.py": "15916d191e64eae80dc5cad393425f6dc9d99948384d6bc31ad765fa4210d259",
     "python/moon_mod_api/__main__.py": "4ffd4c62bdbbd2f5aa7c33c55d0dfa01e25846cb7ebcdead17f114bdd95e9eb1",
     "python/moon_mod_api/build_items.py": "9df0615d48678cd3a8c169e1a5302a7a98b1ea4afdcd29ecb49ec5fbb871bf04",
     "python/moon_mod_api/interfaces.py": "16cdf0b046807d5425febd138557e0144676dd9f5dd180f5e22cec3afbded0f7",
@@ -33,11 +33,12 @@
     "docs/building-api.md": "b677b998266099009966dc33c4820bcb72cb6fd8c92714ecaefa76b9a211a1d9",
     "docs/conventions.md": "8f11b3c00bb36134ab871fe33346e7397cdbd11829c8e0f8bd9fb82735e409ef",
     "docs/hooks.md": "6b590506c918ae3b043b46b32646231f78e6ac88352d0d93172a0753feee687b",
-    "docs/interaction.md": "d9489afba717382fb33993f0d8ff3ac1b5e4ea472b4337e1f65a976ffeb0175d",
+    "docs/interaction.md": "38db979bd60b0b5e5343fccfb7a55c651ae463f8dc081408fca16239b5bb9555",
     "docs/interfaces.md": "d9969d1efd74e009342dc3bc9831f3add0a7c276c503f080de842f2c18912cb5",
     "docs/managed-services.md": "c785a8a130a4a1d6b15e305863710074ba3134cd673942d60e04f6c60424d036",
     "docs/mod-ci.md": "a07d961d5628fb773ea61d3278b300d4aab357578c677a7cf2e3c16c03c0af4a",
-    "docs/packages.md": "7fdffc7e235cc0106891ada68e5723f024c4fe3c23b6339e801bf236c32baec9",
+    "docs/native-authoring.md": "a0f67fcfcf5f0c86142ca5c4d362284f264f81f8a41e51e1e8976ae512a20075",
+    "docs/packages.md": "d31ba7355533e73bba4f40da47585de8bc3195487d2154d9f93a56433a8ba564",
     "docs/registries/buildings.json": "e1c796453e075bb8651dd545bcf391ac27fecd9b9499df47c314462c7d86cf71",
     "docs/runtime-services.md": "b832d597456032daf6bd372a56501587723731b3792e3b99818ee99b5b6e2ab0"
   }

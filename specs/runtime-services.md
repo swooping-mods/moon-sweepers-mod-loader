@@ -123,3 +123,45 @@ receipt is `artifacts/build-receipt.json`; it is not the older game-qualified
 b36 runtime. Its interaction engine/world, native Windows and co-op behavior
 require their own exact candidate receipts. Default workshop runtime 51549 is
 preserved; no library or seed promotion accompanies this source integration.
+
+
+SDK 0.6.1 limits the coherent physical snapshot to registered input bindings,
+modifier families and latched captures. The native adapter also retains the
+original captured control when its action is rebound. A production E-held to
+Q-remap fixture fails before the fix under both compilers and passes afterward,
+including the original E release epoch. Interaction/Input table ABIs and generic
+frame delivery remain unchanged. With the independent native-adapter transfer,
+the API snapshot is 38 files and the workshop runtime source pin is 43 files;
+the native author SDK remains 37 headers. The expanded full gate passes 113 tests.
+
+### Core cost attribution
+
+`python3 tools/profile_runtime.py` is an explicitly selected CPU-only profile;
+ordinary checks run only its small sanitized parity/count fixture. Actual loader
+publication, owner commit, sealed lookup, typed Update dispatch and the public
+interaction core execute in separate host/consumer translation units without
+LTO. Independent digests check every batch, counting builds check actual calls,
+and a deliberately wrong cached owner must reject. Timing uses separate clean
+builds, one verified warmup, 15 counterbalanced trials, CPU0 affinity and both
+thread CPU/monotonic wall clocks with raw p50/p95/p99 samples retained.
+
+The checked i7-6700K/Linux fixture records 255 to 4 physical polls per interaction
+epoch for 3, 16 and 128 E-bound actions; query counts stay exactly action-count
+per epoch. Its portable mask/alias/release cases pass under both sanitized
+compilers. The actual native-adapter fixture records 6 OS polls for its configured
+E/mouse/W scenario. These are operation counts, not frame-time percentages.
+
+The before/after clean receipts are `artifacts/runtime-profile/core-sdk06-clean/receipt.json`
+and `artifacts/runtime-profile/core-sdk061-clean/receipt.json`. In the cheap
+array-poll fixture, the small-case mask can add CPU work: three-action Clang
+median 1.139 to 1.427 microseconds, GCC 0.863 to 0.952. At 128 actions the sampled
+medians are Clang 14.691 to 8.694 and GCC 20.579 to 15.776 microseconds. These are
+scoped host samples with shared-host frequency/load limits, not game speedups.
+The new 256-service fixture's cached typed call medians are 1.56/2.09 ns versus
+1536/1519 ns for repeated last-entry lookup (Clang/GCC); callers should keep
+lookup at binding time rather than replace the bounded startup registry.
+
+This profile omits real Win64 exception trapping/thread checks, Unity/physics,
+managed transitions, rendering and display cadence. Domain callbacks use cheap
+deterministic data. Publication setup excludes DLL/game startup. No unmodded,
+native-only, managed-only or mixed frame-time acceptance is inferred.

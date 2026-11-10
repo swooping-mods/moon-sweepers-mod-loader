@@ -44,6 +44,9 @@ static void li_snapshot(void){
         const MoonInputChord *c=&moon_input_host_registry.actions[loader_interactions.entries[i].action-1].chord;li_mark(c->key);
         unsigned modifiers=c->required|c->forbidden;if(modifiers&1)li_mark(17);if(modifiers&2)li_mark(16);if(modifiers&4)li_mark(18);
     }
+    /* A rebind changes the action chord before the old capture retires. Keep
+     * the original control/Unity state through its release epoch as well. */
+    for(unsigned k=1;k<256;k++)if(loader_interactions.captured[k])li_mark(k);
     PTR keyboard=0,mouse=0,seen[256];unsigned char held[256],pressed[256];unsigned count=0;
     for(unsigned k=1;k<256;k++)if(li.needed[k]){
         li.known[k]=1;unsigned button=k==1?1:k==2?2:k==4?3:k==5?4:k==6?5:0;

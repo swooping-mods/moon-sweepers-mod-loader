@@ -12,7 +12,7 @@ The archive and unpacked payload are limited to 64 MiB, 128 payload files and a 
 
 `resolve` requires explicit dependency selection and yields deterministic dependency-first order across native/managed game mods. It rejects missing dependencies, cycles, declared conflicts, exclusive hook overlap, duplicate input/physics owners and multiple camera overrides. The capacity is 64 selected game mods; capacity does not imply combined gameplay qualification.
 
-The extraction retains the existing package schema and `MoonLab_*` exported symbols. API package version 0.6.0, C hook ABI 1, native package ABIs v6/v7 and the mod's own version are separate version domains.
+The extraction retains the existing package schema and `MoonLab_*` exported symbols. API package version 0.6.1, C hook ABI 1, native package ABIs v6/v7 and the mod's own version are separate version domains.
 
 Optional `build_items` entries declare each saved building `kind` and stable
 namespaced `key`. They require the native `build-menu-framework` dependency.

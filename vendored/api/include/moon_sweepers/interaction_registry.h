@@ -49,12 +49,29 @@ static inline void mir_capture(MoonInteractionRegistry *r,unsigned action,unsign
     for(unsigned k=left;k<=left+1;k++)if(r->down[k]||(pressed&&pressed[k])){r->captured[k]=action;sides=1;}
     if(!sides)r->captured[key]=action;
 }
+/* Capture bindings, modifier aliases and old held captures before any query. */
+static inline void mir_snapshot_key(unsigned needed[8],unsigned key){
+    if(!key||key>=256)return;
+    needed[key>>5]|=1u<<(key&31);
+    unsigned family=mir_family(key);
+    if(family){
+        unsigned left=mir_left(family);
+        needed[family>>5]|=1u<<(family&31);
+        needed[left>>5]|=1u<<(left&31);
+        needed[(left+1)>>5]|=1u<<((left+1)&31);
+    }
+}
 static inline void mir_begin_events(MoonInteractionRegistry *r,MoonInputRegistry *input,unsigned long long frame,void *walker,const unsigned char *pressed){
     if(r->busy||(r->initialized&&r->frame==frame))return;
     r->busy=1;r->frame=frame;r->initialized=1;
     /* Poll once before callbacks. Query cost or physical changes during a query
      * cannot split claim retirement and edge delivery into different snapshots. */
-    for(unsigned k=0;k<256;k++)r->down[k]=(unsigned char)mi_down(input,k);
+    /* Preserve coherent registered-action reads while avoiding OS polls for
+     * every unused virtual key. Captures survive rebinds until release. */
+    unsigned needed[8]={(1u<<16)|(1u<<17)|(1u<<18),0,0,0,0,0,0,0};
+    for(unsigned i=0;i<input->count;i++)mir_snapshot_key(needed,input->actions[i].chord.key);
+    for(unsigned k=1;k<256;k++)if(r->captured[k])mir_snapshot_key(needed,k);
+    for(unsigned k=0;k<256;k++)r->down[k]=(needed[k>>5]&(1u<<(k&31)))?(unsigned char)mi_down(input,k):0;
     const unsigned char *previous_snapshot=input->snapshot;input->snapshot=r->down;
     unsigned order[MOON_INTERACTION_CAPACITY],count=0,modifiers=mi_modifiers(input);
     unsigned char active[MOON_INTERACTION_CAPACITY];
