@@ -57,3 +57,17 @@ unknown plugins/config and plugin/allowlist transaction rollback. Ordinary
 native, installed-mode, GUI, C registry and AMD64 build gates remain required.
 Loaded-game qualification of this standalone integration is separate from the
 workshop adapter's retained live tests and native Windows/co-op qualification.
+The explicitly packaged candidate has now passed its original managed-only
+probe and a fresh Mars solo world plus a second-process retained-save replay
+through its own Python loader and pinned SDK. Both world runs include movement,
+real save files, menu/badge, reload and normal exit; private profiles/prefixes
+restore and original game bytes are preserved. Exact inputs and limits are in
+the API project's existing
+[qualification record](../../moon-sweepers-api/verification/local-preparation.md).
+This does not extend support to arbitrary game profiles or qualify every native/
+managed combination.
+An additional retained-save replay with current native v6 Item Stacking passes
+terminal/stacking shortcut arbitration, save/reload and normal exit. This is a
+mixed-backend request test, not cargo placement or general hook-composition
+qualification. The initial historical-package shortcut timeout is preserved
+as a failed attempt in that record.
