@@ -94,7 +94,8 @@ they do not add special framework IDs or alter owner-scoped service discovery.
 
 The capability change passes the complete 101-test loader gate with no skips or
 exclusions. New checks cover actual v7 archive intake, missing/null/malformed or
-incompatible runtime capabilities before game copying, a cached selection after
+incompatible runtime capabilities in both installed/private modes before copying
+or deployment, a cached selection after
 runtime replacement, and production v7 native provider/consumer calls under
 Clang/GCC ASan/UBSan. The new adapter's engine behavior remains separately owned
 and must qualify its final runtime bytes.

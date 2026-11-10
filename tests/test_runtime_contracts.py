@@ -124,25 +124,27 @@ class RuntimeContractChecks(unittest.TestCase):
             for name, data in files.items():
                 archive.writestr(name, data)
         service.import_package(source, select=True)
-        with patch("subprocess.Popen") as spawn:
-            for actual in (None, {}, {"interaction": 2}, {"interaction": True}, {"other": 1}):
-                receipt["host_capabilities"] = actual
+        for mode in ("private", "installed"):
+            service.set_mode(installation, mode)
+            with patch("subprocess.Popen") as spawn:
+                for actual in (None, {}, {"interaction": 2}, {"interaction": True}, {"other": 1}):
+                    receipt["host_capabilities"] = actual
+                    write(receipt_path, receipt)
+                    with self.subTest(mode=mode, actual=actual), self.assertRaisesRegex(ValueError, "[Hh]ost capabilit"):
+                        service.prepare(installation)
+                    self.assertFalse(service.install_root(installation).exists())
+                    self.assertFalse((Path(installation.path) / "MoonLab").exists())
+                receipt["host_capabilities"] = {"interaction": 1}
                 write(receipt_path, receipt)
-                with self.subTest(actual=actual), self.assertRaisesRegex(ValueError, "[Hh]ost capabilit"):
-                    service.prepare(installation)
+                order, library = service.selected(installation)
+                self.assertIn(value["id"], order)
+                receipt.pop("host_capabilities")
+                write(receipt_path, receipt)
+                with patch.object(service, "selected", return_value=(order, library)):
+                    with self.assertRaisesRegex(ValueError, "Host capability interaction"):
+                        service.prepare(installation)
                 self.assertFalse(service.install_root(installation).exists())
-                self.assertFalse((Path(installation.path) / "MoonLab").exists())
-            receipt["host_capabilities"] = {"interaction": 1}
-            write(receipt_path, receipt)
-            order, library = service.selected(installation)
-            self.assertIn(value["id"], order)
-            receipt.pop("host_capabilities")
-            write(receipt_path, receipt)
-            with patch.object(service, "selected", return_value=(order, library)):
-                with self.assertRaisesRegex(ValueError, "Host capability interaction"):
-                    service.prepare(installation)
-            self.assertFalse(service.install_root(installation).exists())
-            spawn.assert_not_called()
+                spawn.assert_not_called()
 
     def test_v6_plan_is_deployed_with_payloads_and_unknown_edits_are_preserved(self):
         service, installation = self.prepared_fixture()
