@@ -14,7 +14,7 @@ from moonloader.discovery import PIN
 from pe import PE
 
 
-def main():
+def find_tools():
     tools = {}
     for tool in ("clang", "lld-link", "llvm-dlltool"):
         installed = shutil.which(tool) or next((path for major in range(30, 13, -1)
@@ -22,6 +22,11 @@ def main():
         if not installed:
             raise ValueError("Missing installed tool: " + tool + "; no download attempted")
         tools[tool] = installed
+    return tools
+
+
+def main():
+    tools = find_tools()
     out = ROOT / "artifacts"
     work = out / "build"
     work.mkdir(parents=True, exist_ok=True)

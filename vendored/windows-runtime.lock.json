@@ -1,0 +1,93 @@
+{
+  "python_tag": "python313",
+  "python": "3.13.17",
+  "pyside": "6.8.3",
+  "files": [
+    {
+      "name": "PySide6_Essentials-6.8.3-cp39-abi3-win_amd64.whl",
+      "role": "wheel",
+      "sha256": "3c0fae5550aff69f2166f46476c36e0ef56ce73d84829eac4559770b0c034b07",
+      "url": "https://files.pythonhosted.org/packages/8e/0f/5d8c6da7586e57ee032643e0c0e62335ef1a1add1a980160ddd1654f1d8d/PySide6_Essentials-6.8.3-cp39-abi3-win_amd64.whl",
+      "publisher_digest_verified": true
+    },
+    {
+      "name": "Visual-Studio-2022-Community-License.docx",
+      "role": "license",
+      "sha256": "41a207b10c8ab91d0d2f10a854715f73dca54509581692d2fe179aa3ffcb8540",
+      "url": "https://visualstudio.microsoft.com/wp-content/uploads/2021/11/Visual-Studio-2022-Community-License-EN.docx"
+    },
+    {
+      "name": "qtbase-everywhere-src-6.8.3.tar.xz",
+      "role": "source",
+      "sha256": "56001b905601bb9023d399f3ba780d7fa940f3e4861e496a7c490331f49e0b80",
+      "url": "https://download.qt.io/archive/qt/6.8/6.8.3/submodules/qtbase-everywhere-src-6.8.3.tar.xz"
+    },
+    {
+      "name": "pyside-setup-everywhere-src-6.8.3.tar.xz",
+      "role": "source",
+      "sha256": "d2c896f7f1a6a7ea4c9f98cfe317272fd139703ddf612b86999f09e48aeef0e6",
+      "url": "https://download.qt.io/official_releases/QtForPython/pyside6/PySide6-6.8.3-src/pyside-setup-everywhere-src-6.8.3.tar.xz"
+    },
+    {
+      "name": "python-3.13.17-embed-amd64.zip",
+      "role": "python",
+      "sha256": "9e35319bffedab8b36ad44d8f377cb4f1733bcec257a0b6d04d94f01486ddb38",
+      "url": "https://www.python.org/ftp/python/3.13.17/python-3.13.17-embed-amd64.zip"
+    },
+    {
+      "name": "qtsvg-everywhere-src-6.8.3.tar.xz",
+      "role": "source",
+      "sha256": "35eb516460f00f264eb504baa253432384351cf23fb9980a5857190e8deef438",
+      "url": "https://download.qt.io/archive/qt/6.8/6.8.3/submodules/qtsvg-everywhere-src-6.8.3.tar.xz"
+    },
+    {
+      "name": "shiboken6-6.8.3-cp39-abi3-win_amd64.whl",
+      "role": "wheel",
+      "sha256": "bca3a94513ce9242f7d4bbdca902072a1631888e0aa3a8711a52cc5dbe93588f",
+      "url": "https://files.pythonhosted.org/packages/aa/29/e77f3fba5337f2d98f977eece0fd24cda6cf7d83be2699514d2ca1d34f6c/shiboken6-6.8.3-cp39-abi3-win_amd64.whl",
+      "publisher_digest_verified": true
+    },
+    {
+      "name": "Visual-C-Runtime-2015-2022-License-1.docx",
+      "role": "license",
+      "sha256": "f1e3d56ceb2ad68aae0711b910375009e651ac5530fa0760f0dea6e81e54fae1",
+      "url": "https://visualstudio.microsoft.com/wp-content/uploads/2021/09/Visual-C-Runtime-2015-2022-License-1.docx"
+    }
+  ],
+  "wheel_members": [
+    "PySide6/Qt6Core.dll",
+    "PySide6/Qt6Gui.dll",
+    "PySide6/Qt6Svg.dll",
+    "PySide6/Qt6Widgets.dll",
+    "PySide6/QtCore.pyd",
+    "PySide6/QtGui.pyd",
+    "PySide6/QtWidgets.pyd",
+    "PySide6/__init__.py",
+    "PySide6/_config.py",
+    "PySide6/_git_pyside_version.py",
+    "PySide6/msvcp140.dll",
+    "PySide6/msvcp140_1.dll",
+    "PySide6/msvcp140_2.dll",
+    "PySide6/plugins/iconengines/qsvgicon.dll",
+    "PySide6/plugins/imageformats/qsvg.dll",
+    "PySide6/plugins/platforms/qoffscreen.dll",
+    "PySide6/plugins/platforms/qwindows.dll",
+    "PySide6/plugins/styles/qmodernwindowsstyle.dll",
+    "PySide6/pyside6.abi3.dll",
+    "PySide6/support/__init__.py",
+    "PySide6/support/deprecated.py",
+    "PySide6/support/generate_pyi.py",
+    "PySide6/vcruntime140.dll",
+    "PySide6/vcruntime140_1.dll",
+    "shiboken6/Shiboken.pyd",
+    "shiboken6/__init__.py",
+    "shiboken6/_config.py",
+    "shiboken6/_git_shiboken_module_version.py",
+    "shiboken6/msvcp140.dll",
+    "shiboken6/msvcp140_1.dll",
+    "shiboken6/msvcp140_2.dll",
+    "shiboken6/shiboken6.abi3.dll",
+    "shiboken6/vcruntime140.dll",
+    "shiboken6/vcruntime140_1.dll"
+  ]
+}

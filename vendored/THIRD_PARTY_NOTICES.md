@@ -1,9 +1,26 @@
 # Third-party notices
 
-The desktop UI uses host-installed [Qt for Python / PySide6](https://doc.qt.io/qtforpython-6/), under its applicable LGPL/GPL/commercial terms. Python, PySide6, Qt, Steam and Proton binaries are not bundled. A future standalone GUI package must carry the notices for its actual dependency closure.
+The Windows portable bundle includes **Python 3.13.17** and **Qt for Python /
+PySide6, Shiboken and Qt 6.8.3**. Python uses the PSF license and included
+third-party terms. PySide6, Shiboken and the selected Qt libraries use LGPLv3;
+Qt's embedded third-party components retain their own licenses. Microsoft Visual
+C++ runtime DLLs from the publisher distributions retain Microsoft's terms.
 
-The native bootstrap, diagnostic, application source and included SVG are original project code/artwork. `vendored/api/` is a first-party content-pinned snapshot from `swooping-mods/moon-sweepers-api`, not an external dependency acquisition. It retains the existing MoonLab ABI.
+The portable archive's `LICENSES/` directory contains license texts, copyright
+notices, upstream attribution files and matching library source archives.
+See `LICENSES/README.md` for component details and how to replace LGPL libraries.
+The application does not restrict replacement or debugging of these libraries.
+`vendored/windows-runtime.lock.json` pins the exact distribution inputs.
+Source-only use continues to use host-installed Python/PySide6.
 
-GitHub Actions are referenced by immutable revisions and remain subject to their upstream terms; they are not included in this source tree. No Nexus uploader is bundled or activated. Game binaries, extracted game assets, third-party mod assets and dependency runtimes are excluded.
+The native bootstrap, diagnostic, application source, launcher and included SVG
+are original project code/artwork. `vendored/api/` is a first-party content-pinned
+snapshot from `swooping-mods/moon-sweepers-api`. It retains the MoonLab ABI.
 
-No project license is assigned by this preparation. Source extraction provenance is recorded in `extraction.json`.
+GitHub Actions are referenced by immutable revisions and remain subject to their
+upstream terms; they are not included in this source tree. No Nexus uploader is
+bundled or activated. Steam, Proton, game binaries, extracted game assets and
+third-party mods/assets are excluded.
+
+No project license is assigned. Source extraction provenance is recorded in
+`extraction.json`.

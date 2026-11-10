@@ -6,13 +6,69 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   host:
+    name: Host checks and Windows portable build
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      - name: Focused offline checks
+      - name: Use installed LLVM tools
+        run: |
+          echo /usr/lib/llvm-18/bin >> "$GITHUB_PATH"
+          export PATH="/usr/lib/llvm-18/bin:$PATH"
+          python3 -c 'import sys; sys.path.insert(0, "tools"); import build; print(build.find_tools())'
+      - name: Focused host checks
         run: python3 tools/check.py --host-only
+      - name: Stage exact reviewed runtime inputs
+        run: python3 tools/fetch_windows_inputs.py --output local/windows-inputs
+      - name: Build portable Windows bundle offline
+        run: python3 tools/build_windows.py --inputs local/windows-inputs
+      - name: Check Windows package and licenses
+        run: python3 tools/check_windows_bundle.py
+      - name: Retain portable ZIP and verification receipts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: moon-sweepers-mod-loader-windows-x64
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+          path: |
+            artifacts/*.zip
+            artifacts/SHA256SUMS
+            artifacts/*checks.json
+            artifacts/*receipt.json
+  windows:
+    name: Windows bundled runtime and EXE smoke check
+    needs: host
+    runs-on: windows-2022
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Download this run's verified bundle
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download "$env:GITHUB_RUN_ID" --repo "$env:GITHUB_REPOSITORY" --name moon-sweepers-mod-loader-windows-x64 --dir incoming
+      - name: Verify ZIP and extract into a path containing spaces
+        run: |
+          $receipt = Get-Content incoming/windows-build-receipt.json -Raw | ConvertFrom-Json
+          $zip = Join-Path incoming $receipt.archive
+          if ((Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant() -ne $receipt.sha256) { throw 'ZIP checksum mismatch' }
+          Expand-Archive -LiteralPath $zip -DestinationPath 'Portable loader test'
+      - name: Exercise bundled Python, Qt Widgets and SVG
+        run: |
+          & '.\Portable loader test\python\python.exe' '.\Portable loader test\loader\check_portable_windows.py'
+          if ($LASTEXITCODE -ne 0) { throw "Bundled runtime smoke check failed: $LASTEXITCODE" }
+      - name: Exercise Mod Loader.exe and argument forwarding
+        run: |
+          $exe = (Resolve-Path '.\Portable loader test\Mod Loader.exe').Path
+          $process = Start-Process -FilePath $exe -ArgumentList '--smoke-test' -PassThru
+          if (-not $process.WaitForExit(60000)) { $process.Kill(); throw 'EXE smoke check timed out' }
+          if ($process.ExitCode -ne 0) { throw "EXE smoke check failed: $($process.ExitCode)" }
