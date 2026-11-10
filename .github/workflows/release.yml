@@ -1,4 +1,4 @@
-name: Publish release
+name: Publish prerelease
 on:
   push:
     tags: ['v*']
@@ -14,7 +14,7 @@ jobs:
       contents: read
       actions: read
   publish:
-    name: Publish checked GitHub release assets
+    name: Publish checked GitHub prerelease assets
     needs: checks
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -39,5 +39,5 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
           mapfile -t assets < release-assets.txt
-          gh release create "$RELEASE_TAG" "${assets[@]}" --repo "$GITHUB_REPOSITORY" --verify-tag --draft --title "Moon Sweepers Mod Loader $RELEASE_TAG" --generate-notes
-          gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+          gh release create "$RELEASE_TAG" "${assets[@]}" --repo "$GITHUB_REPOSITORY" --verify-tag --draft --prerelease --latest=false --title "Moon Sweepers Mod Loader $RELEASE_TAG (prerelease)" --generate-notes
+          gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease --latest=false

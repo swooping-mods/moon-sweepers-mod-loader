@@ -13,21 +13,22 @@ See [Windows packaging](specs/windows-packaging.md) for the bundled Windows buil
 and [CI](specs/ci.md) for runner behavior. Dependency updates require a new review;
 builds never resolve unpinned packages.
 
-## Releases
+## Prereleases
 
 1. Set `__version__` in `loader/moonloader/__init__.py` to the intended `MAJOR.MINOR.PATCH`.
    Both ZIP filenames and build receipts use that value.
 2. Merge the intended source onto `main` and let **Checks** pass, including the
    Windows bundled-runtime and actual EXE smoke tests.
 3. Create a `vMAJOR.MINOR.PATCH` tag at that reviewed commit and push the tag.
-   **Publish release** checks that tag against the package version, rebuilds and
+   **Publish prerelease** checks that tag against the package version, rebuilds and
    verifies both ZIPs, runs Windows smoke checks, then publishes those exact
-   assets and `SHA256SUMS` to GitHub Releases.
+   assets and `SHA256SUMS` to a GitHub prerelease, explicitly excluded from the
+   stable/latest release channel.
 
 The release job uses GitHub's scoped token; no personal token or Nexus credentials
 are required. Pull requests and branch pushes cannot publish releases. Only the
 final publishing job has `contents: write`. Assets are uploaded to a draft before
-it becomes a published release. Existing releases are never overwritten; if upload
+it becomes a published prerelease. Existing releases are never overwritten; if upload
 fails, inspect/remove the incomplete draft before rerunning the failed publishing
 job. Do not move a released tag to different source.
 

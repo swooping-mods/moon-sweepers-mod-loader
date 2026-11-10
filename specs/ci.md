@@ -1,4 +1,4 @@
-# GitHub Actions checks and publishing
+# GitHub Actions checks and prerelease publishing
 
 `.github/workflows/check.yml` runs on main pushes, pull requests, manual dispatch
 and reusable workflow calls. Checkout/upload actions retain their reviewed
@@ -24,7 +24,7 @@ The artifact `moon-sweepers-mod-loader-windows-x64` retains source/Windows ZIPs,
 SHA256SUMS and build/check receipts for 14 days. The manual release-candidate
 workflow reuses both build and Windows smoke jobs without publishing.
 
-## GitHub Releases
+## GitHub prereleases
 
 `.github/workflows/release.yml` runs only on pushed `v*` tags. It calls the same
 Checks workflow and waits for both jobs. Tags must exactly equal `v` plus the
@@ -40,11 +40,14 @@ by the reusable job result, not inferred from static receipts.
 
 Only the publishing job receives `contents: write`. It uses installed `gh` and
 `GITHUB_TOKEN` to upload the source ZIP, Windows ZIP and SHA256SUMS into a draft
-release for the existing tag, then publishes the completed release. Existing
-releases/assets are not overwritten. A failed upload may leave a draft requiring
+release for the existing tag, then publishes the completed prerelease. Both create
+and edit explicitly set
+`--prerelease --latest=false`, so tested candidates never become stable/latest
+releases through this workflow. Existing releases/assets are not overwritten. A failed upload may leave a draft requiring
 inspection/removal before retry. Per-tag concurrency never cancels an active
 publication. No Nexus upload, catalog update or signing occurs.
 
-See [contributing](../CONTRIBUTING.md) for the release procedure. CI configuration
-alone creates no tag or release. Windows/game/co-op are distinct qualifications;
+See [contributing](../CONTRIBUTING.md) for the release procedure. Publication requires
+an explicitly authorized version tag; branch pushes and CI configuration alone
+create no tag or release. Windows/game/co-op are distinct qualifications;
 these workflows do not claim gameplay compatibility.
