@@ -6,6 +6,7 @@ from pathlib import Path
 import subprocess
 import zipfile
 from pe import PE
+from build import VERSION
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -13,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def main():
     folder = ROOT / 'artifacts/moon-sweepers-mod-loader-windows-x64'
     lock = json.loads((ROOT / 'vendored/windows-runtime.lock.json').read_text())
-    archive = ROOT / 'artifacts/moon-sweepers-mod-loader-0.1.0-windows-x64.zip'
+    archive = ROOT / f'artifacts/moon-sweepers-mod-loader-{VERSION}-windows-x64.zip'
     required = ['Mod Loader.exe', 'python/pythonw.exe', 'python/python.exe',
                 'loader/main.py', 'loader/runtime/windows-x64/version.dll',
                 'loader/runtime/windows-x64/MoonLab.LoaderCheck.exe',

@@ -10,6 +10,7 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "loader"))
+from moonloader import __version__ as VERSION
 from moonloader.discovery import PIN
 from pe import PE
 
@@ -60,7 +61,7 @@ def main():
     files["loader/runtime/windows-x64/version.dll"] = (work / "version.dll").read_bytes()
     files["loader/runtime/windows-x64/MoonLab.LoaderCheck.exe"] = (work / "MoonLab.LoaderCheck.exe").read_bytes()
     files["loader/runtime/receipt.json"] = (json.dumps(receipt, indent=2) + "\n").encode()
-    archive = out / "moon-sweepers-mod-loader-0.1.0-source.zip"
+    archive = out / f"moon-sweepers-mod-loader-{VERSION}-source.zip"
     with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as target:
         for name, data in sorted(files.items()):
             info = zipfile.ZipInfo(name, (2026, 11, 10, 0, 0, 0))
@@ -68,7 +69,7 @@ def main():
             info.external_attr = (0o100755 if name.endswith(".sh") else 0o100644) << 16
             target.writestr(info, data)
     (out / "SHA256SUMS").write_text(hashlib.sha256(archive.read_bytes()).hexdigest() + "  " + archive.name + "\n")
-    (out / "build-receipt.json").write_text(json.dumps({"runtime": receipt, "pe_exports_valid": True,
+    (out / "build-receipt.json").write_text(json.dumps({"version": VERSION, "runtime": receipt, "pe_exports_valid": True,
         "archive": archive.name, "sha256": hashlib.sha256(archive.read_bytes()).hexdigest(),
         "limits": ["Host Python/PySide6 required", "No mod binaries bundled", "No game, Wine or native Windows execution"]}, indent=2) + "\n")
     print(archive)

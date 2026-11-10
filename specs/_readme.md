@@ -6,4 +6,4 @@
 | [Windows portable packaging](windows-packaging.md) | `tools/build_windows.py`, `runtime/loader/desktop.c`, `vendored/windows-runtime.lock.json` | Changing bundled dependencies, launcher, licenses or package checks |
 | [Desktop, bootstrap and API ownership](loader.md) | `loader/`, `runtime/`, `vendored/api/`, `tools/`, `tests/` | Changing install/launch, native dispatch, pinned API or build/check behavior |
 
-[Repository split](../design/repository-split.md) and [Nexus rollout](../design/nexus-release.md) are design proposals. `verification/local-preparation.md` owns the focused evidence summary.
+Contributor and release instructions are in [CONTRIBUTING.md](../CONTRIBUTING.md).

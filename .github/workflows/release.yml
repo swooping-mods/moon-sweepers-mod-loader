@@ -1,0 +1,43 @@
+name: Publish release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  checks:
+    uses: ./.github/workflows/check.yml
+    permissions:
+      contents: read
+      actions: read
+  publish:
+    name: Publish checked GitHub release assets
+    needs: checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Download this run's Windows-tested artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name moon-sweepers-mod-loader-windows-x64 --dir incoming
+      - name: Verify tag, receipts and every release asset
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: python3 tools/release.py verify-artifacts "$RELEASE_TAG" --artifacts incoming > release-assets.txt
+      - name: Upload complete assets before publishing
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          mapfile -t assets < release-assets.txt
+          gh release create "$RELEASE_TAG" "${assets[@]}" --repo "$GITHUB_REPOSITORY" --verify-tag --draft --title "Moon Sweepers Mod Loader $RELEASE_TAG" --generate-notes
+          gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest

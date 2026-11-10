@@ -2,13 +2,13 @@
 
 A desktop mod loader for Moon Sweepers, with local `.msmod` installation, dependency and compatibility checks, private game copies and separate modded profiles.
 
-Repository: [swooping-mods/moon-sweepers-mod-loader](https://github.com/swooping-mods/moon-sweepers-mod-loader). The reviewed source is hosted privately on GitHub. The detailed [repository split proposal](design/repository-split.md) explains the three repositories, issue routing and Nexus release flow.
+Repository: [swooping-mods/moon-sweepers-mod-loader](https://github.com/swooping-mods/moon-sweepers-mod-loader).
 
 The extracted adapter supports the previously pinned Steam Windows x64 IL2CPP 1.0.5 build (app 5335510). Exact executable hashes, rather than the version label alone, determine acceptance. Windows launches the native game; Linux uses the user's installed Steam/Proton Experimental. Other game builds and storefront runtimes require separate qualification.
 
 ## Windows portable download
 
-Extract `artifacts/moon-sweepers-mod-loader-0.1.0-windows-x64.zip` completely and
+Download the Windows x64 ZIP from [GitHub Releases](https://github.com/swooping-mods/moon-sweepers-mod-loader/releases), extract it completely, and
 double-click **Mod Loader.exe**. Python, PySide6/Qt and the native bootstrap are
 included; no Python installation or administrator access is needed. This is a
 Windows x64 portable folder, not a single-file executable. The launcher is unsigned.
@@ -29,7 +29,7 @@ builds the bundled Windows ZIP, then tests the bundled Qt runtime and actual EXE
 on a Windows runner. After both jobs pass, download the
 `moon-sweepers-mod-loader-windows-x64` artifact from the run's Actions page; artifacts
 are retained for 14 days. Manual **Release candidate** builds remain available.
-Neither workflow publishes a release or uploads to Nexus.
+Tagged versions also run these checks before the **Publish release** workflow publishes the verified ZIPs and SHA-256 checksums to GitHub Releases.
 
 ## Run locally
 
@@ -80,6 +80,8 @@ the Linux host checks do not establish it.
 
 ## Downloads and contributions
 
-Nexus Mods is the intended main player portal. GitHub Issues/PRs own code and review. CI validates changes and can create a release candidate; publishing and remote catalog discovery are not enabled in this preparation. Importing a local package is the current supported install path. See [release plan](design/nexus-release.md).
+Download versioned builds from [GitHub Releases](https://github.com/swooping-mods/moon-sweepers-mod-loader/releases). Import local `.msmod` packages through **Install mod package**. Hosted mod discovery is not implemented.
 
-Read [specs/_readme.md](specs/_readme.md) and [third-party notices](vendored/THIRD_PARTY_NOTICES.md). The repository split has not rerun game, Wine, native Windows or co-op qualification. No project license is assigned.
+Report desktop, installation, profile, compatibility-check and launch problems in this repository's [issue tracker](https://github.com/swooping-mods/moon-sweepers-mod-loader/issues). Gameplay mod issues belong with the mod author. See [contributing](CONTRIBUTING.md) for development and release instructions.
+
+Read [specs/_readme.md](specs/_readme.md) and [third-party notices](vendored/THIRD_PARTY_NOTICES.md). The launcher is unsigned. Windows CI checks the bundled GUI and launcher; gameplay and co-op require separate qualification. No project license is assigned.

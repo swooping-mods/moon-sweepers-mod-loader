@@ -44,7 +44,7 @@ def main():
     dest.mkdir()
     (dest / 'LICENSES').mkdir()
     # Retain the source layout for SDK resolution and user-replaceable LGPL libraries.
-    with zipfile.ZipFile(out / 'moon-sweepers-mod-loader-0.1.0-source.zip') as z:
+    with zipfile.ZipFile(out / f'moon-sweepers-mod-loader-{build.VERSION}-source.zip') as z:
         for n in z.namelist():
             if n.startswith(('loader/', 'vendored/')):
                 put(dest, n, z.read(n))
@@ -84,7 +84,7 @@ def main():
     shutil.copy2(ROOT / 'vendored/windows-runtime.lock.json', dest / 'LICENSES/runtime-manifest.json')
     shutil.copy2(ROOT / 'vendored/WINDOWS-LICENSES.md', dest / 'LICENSES/README.md')
     put(dest, 'README.txt', b'Moon Sweepers Mod Loader - Windows x64\r\n\r\nExtract the entire ZIP, then double-click Mod Loader.exe. No Python install needed.\r\nImport .msmod packages, select your supported game installation, Prepare files, then Launch.\r\nThe game and mods are not included. Application data uses LOCALAPPDATA/MoonLab/Loader.\r\nFor UI inspection: "Mod Loader.exe" --no-launch\r\n\r\nBundled Python, PySide6/Shiboken and Qt notices, licenses and source: LICENSES/.\r\nQt/PySide use LGPLv3. You may replace these libraries and debug their modifications.\r\nSee THIRD_PARTY_NOTICES.md and LICENSES/README.md.\r\n')
-    archive = out / 'moon-sweepers-mod-loader-0.1.0-windows-x64.zip'
+    archive = out / f'moon-sweepers-mod-loader-{build.VERSION}-windows-x64.zip'
     with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as z:
         for p in sorted(dest.rglob('*')):
             if p.is_file():
@@ -92,9 +92,9 @@ def main():
                 info.compress_type = zipfile.ZIP_DEFLATED
                 info.external_attr = 0o100644 << 16
                 z.writestr(info, p.read_bytes())
-    receipt = {'archive': archive.name, 'sha256': hashlib.sha256(archive.read_bytes()).hexdigest(), 'bytes': archive.stat().st_size, 'input_lock': lock, 'limits': ['Native Windows GUI/game execution not performed on Linux build host', 'Unsigned launcher; no signing certificate supplied']}
+    receipt = {'version': build.VERSION, 'archive': archive.name, 'sha256': hashlib.sha256(archive.read_bytes()).hexdigest(), 'bytes': archive.stat().st_size, 'input_lock': lock, 'limits': ['Native Windows GUI/game execution not performed on Linux build host', 'Unsigned launcher; no signing certificate supplied']}
     (out / 'windows-build-receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
-    (out / 'SHA256SUMS').write_text(''.join(hashlib.sha256(p.read_bytes()).hexdigest() + '  ' + p.name + '\n' for p in sorted(out.glob('*.zip'))))
+    (out / 'SHA256SUMS').write_text(''.join(hashlib.sha256(p.read_bytes()).hexdigest() + '  ' + p.name + '\n' for p in [out / f'moon-sweepers-mod-loader-{build.VERSION}-source.zip', archive]))
     print(archive)
 
 

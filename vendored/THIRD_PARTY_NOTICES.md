@@ -22,5 +22,4 @@ upstream terms; they are not included in this source tree. No Nexus uploader is
 bundled or activated. Steam, Proton, game binaries, extracted game assets and
 third-party mods/assets are excluded.
 
-No project license is assigned. Source extraction provenance is recorded in
-`extraction.json`.
+No project license is assigned.
