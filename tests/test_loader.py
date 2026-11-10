@@ -215,6 +215,7 @@ class LoaderChecks(unittest.TestCase):
 
     def test_plan_windows_is_explicit_no_spawn(self):
         service=Service(self.root/'data',self.root/'bundle');installation=discovery.Installation(str(self.root/'source'),'steam','C:/Steam')
+        service.set_mode(installation, 'private')
         with patch.object(service,'selected',return_value=(['test-mod'],{})),patch('subprocess.Popen') as spawn:
             record=launch.plan(service,installation,platform='win32')
         spawn.assert_not_called();self.assertEqual(record['env']['SteamAppId'],'5335510')
@@ -223,6 +224,7 @@ class LoaderChecks(unittest.TestCase):
 
     def test_nonsteam_linux_requires_separate_adapter(self):
         service=Service(self.root/'data',self.root/'bundle')
+        service.state['default_mode'] = 'private'
         with patch.object(service,'selected',return_value=(['test-mod'],{})):
             with self.assertRaisesRegex(ValueError,'another storefront'):launch.plan(service,discovery.Installation(str(self.root/'source'),'epic'))
 
@@ -245,6 +247,7 @@ class LoaderChecks(unittest.TestCase):
             archive.writestr('manifest.json',json.dumps(manifest));archive.writestr('mod.dll',b'MZ fixture');archive.writestr('icon.png',PNG)
         service=Service(self.root/'data',bundle);service.import_package(pkg,True)
         installation=discovery.Installation(str(source),'steam',str(self.root/'Steam'))
+        service.set_mode(installation, 'private')
         return service,installation
 
     def test_shared_package_requires_updated_runtime_before_copy(self):

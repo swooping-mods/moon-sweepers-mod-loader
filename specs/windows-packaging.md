@@ -21,8 +21,10 @@ The CPython embeddable runtime uses an isolated `python313._pth` that includes
 only its standard-library ZIP, runtime directory, loader and pinned API paths.
 No site initialization or dependency installer is included. `python/qt.conf` points
 Qt at the adjacent PySide6 plugin directory. The app's profile
-and save data policy remains unchanged: LOCALAPPDATA/MoonLab/Loader by default;
-`--data` explicitly selects another path. Portable means no installation is required.
+and private-profile application data uses LOCALAPPDATA/MoonLab/Loader by default;
+`--data` explicitly selects another path. [Installed-game mode](public-deployment.md)
+uses normal Steam saves and keeps mutable mod settings under the game's MoonLab
+directory. Portable means no system installation of this desktop app is required.
 
 The runtime is CPython 3.13.17 with PySide6/Shiboken 6.8.3 and Qt 6.8.3 Core,
 Gui, Widgets and Svg. Windows platform/style, SVG plugins and the offscreen test platform are included.

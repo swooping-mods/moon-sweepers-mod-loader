@@ -2,6 +2,7 @@
 import json
 from pathlib import Path
 import subprocess
+import sys
 from PySide6.QtCore import Qt, QSize, QRect, QThread, Signal, QTimer
 from PySide6.QtGui import QColor, QFont, QIcon, QImageReader, QPainter, QPen, QDesktopServices
 from PySide6.QtCore import QUrl
@@ -146,6 +147,15 @@ class Window(QMainWindow):
         self.browse = QPushButton('Browse…'); self.browse.clicked.connect(self.browse_game); row.addWidget(self.browse)
         self.rescan = QPushButton('Rescan'); self.rescan.clicked.connect(self.scan); row.addWidget(self.rescan); setup_layout.addLayout(row)
         self.game_status = label('Looking for Steam installations…', 'path'); self.game_status.setWordWrap(True); setup_layout.addWidget(self.game_status); layout.addWidget(setup)
+        mode_row = QHBoxLayout(); mode_row.addWidget(label('Installation'))
+        self.deployment_mode = QComboBox(); self.deployment_mode.addItem('Existing Steam game', 'installed'); self.deployment_mode.addItem('Private game copy', 'private')
+        self.deployment_mode.currentIndexChanged.connect(self.mode_changed); mode_row.addWidget(self.deployment_mode, 1)
+        self.disable_button = QPushButton('Disable mods'); self.disable_button.clicked.connect(lambda:self.toggle_installed(False)); mode_row.addWidget(self.disable_button)
+        self.enable_button = QPushButton('Enable mods'); self.enable_button.clicked.connect(lambda:self.toggle_installed(True)); mode_row.addWidget(self.enable_button)
+        self.uninstall_button = QPushButton('Uninstall loader'); self.uninstall_button.clicked.connect(self.uninstall_loader); mode_row.addWidget(self.uninstall_button)
+        setup_layout.addLayout(mode_row)
+        self.proton_hint = label('Steam launch options: WINEDLLOVERRIDES="version=n,b" %command%\nMerge the version override with your existing options; keep other wrappers and arguments.', 'muted')
+        self.proton_hint.setWordWrap(True); self.proton_hint.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse); setup_layout.addWidget(self.proton_hint)
         toolbar, bar = frame('toolbar', True, (16, 8, 16, 8))
         self.search = QLineEdit(); self.search.setPlaceholderText('Search mods'); self.search.setAccessibleName('Search installed mods'); self.search.setClearButtonEnabled(True); self.search.textChanged.connect(self.render); bar.addWidget(self.search, 1)
         self.filter = QComboBox(); self.filter.addItems(['All mods', 'Enabled']); self.filter.currentIndexChanged.connect(self.render); bar.addWidget(self.filter)
@@ -204,12 +214,49 @@ class Window(QMainWindow):
     def game_changed(self, *_):
         installation = self.current_installation(); self.inspection = None
         if installation:
+            self.deployment_mode.blockSignals(True); self.deployment_mode.setCurrentIndex(0 if self.service.mode(installation) == 'installed' else 1); self.deployment_mode.blockSignals(False)
             self.service.state['installation'] = installation.path; self.service.save()
             try:
                 self.inspection = discovery.inspect(installation); self.game_status.setText(self.inspection['reason'])
             except (ValueError, OSError) as error: self.game_status.setText(str(error))
         else: self.game_status.setText('Steam detection checks native and Flatpak libraries. Browse to its installation folder to add a game manually.')
         self.update_actions()
+
+    def mode_changed(self, *_):
+        installation = self.current_installation()
+        if installation:
+            self.service.set_mode(installation, self.deployment_mode.currentData()); self.update_actions()
+
+    def toggle_installed(self, enabled):
+        installation = self.current_installation()
+        self.work('Updating next-launch mod state…', lambda:self.service.set_enabled(installation, enabled),
+                  lambda _:self.notice('Mods ' + ('enabled' if enabled else 'disabled') + ' on the next launch.'))
+
+    def uninstall_loader(self):
+        installation = self.current_installation()
+        if QMessageBox.question(self, 'Uninstall loader', 'Remove this loader’s unchanged installed files? Saves and settings are kept. Modded saves may require their frameworks.') != QMessageBox.StandardButton.Yes: return
+        self.work('Removing owned installed files…', lambda:self.service.uninstall(installation), lambda _:self.notice('Loader removed. Saves/settings kept; Steam launch options were not changed automatically.'))
+
+    def confirm_save_policy(self, installation):
+        if self.service.mode(installation) != 'installed' or not self.service.state['selected']: return True
+        try:
+            if self.service.save_policy_ready(installation): return True
+        except (ValueError, OSError) as error: self.notice(str(error)); return False
+        dialog = QMessageBox(self); dialog.setWindowTitle('Normal Steam saves')
+        dialog.setText('Installed mods use your normal Steam saves. Back up the save folder and sidecars before enabling mods that change saved worlds. Removing DLLs does not restore saves.')
+        backup = dialog.addButton('Back up Steam save folder…', QMessageBox.ButtonRole.AcceptRole)
+        existing = dialog.addButton('Already backed up', QMessageBox.ButtonRole.AcceptRole)
+        fresh = dialog.addButton('Fresh Steam profile', QMessageBox.ButtonRole.AcceptRole)
+        dialog.addButton(QMessageBox.StandardButton.Cancel); dialog.exec()
+        chosen = dialog.clickedButton()
+        if chosen == backup:
+            source = QFileDialog.getExistingDirectory(self, 'Choose your Steam save folder, including sidecars')
+            if not source: return False
+            try: self.service.backup_saves(installation, source)
+            except (ValueError, OSError) as error: self.notice(str(error)); return False
+        elif chosen in (existing, fresh): self.service.accept_normal_saves(installation, 'backed-up' if chosen == existing else 'fresh')
+        else: return False
+        return True
 
     def browse_game(self):
         path = QFileDialog.getExistingDirectory(self, 'Choose Moon Sweepers game folder')
@@ -310,13 +357,14 @@ class Window(QMainWindow):
 
     def remove_mod(self):
         mod = self.current_mod()
-        if mod: self.service.remove(mod['id']); self.refresh_library(); self.notice(mod['name'] + ' removed from the library. Package files are retained for recovery.')
+        if mod: self.service.remove(mod['id']); self.refresh_library(); self.notice(mod['name'] + ' removed from the library. Prepared game files remain until the next Prepare files or installed-loader uninstall. Package files are retained for recovery.')
 
     def update_actions(self):
         selected = self.service.state['selected']; self.count.setText(f'{len(selected)} selected · {len(self.mods)} installed')
-        installation = self.current_installation(); ready = bool(installation and self.inspection and self.inspection['compatible'] and selected)
+        installation = self.current_installation(); installed = bool(installation and self.service.mode(installation) == 'installed')
+        ready = bool(installation and self.inspection and self.inspection['compatible'] and (selected or installed))
         reason = ''
-        if ready:
+        if ready and selected:
             try:
                 from .packages import resolve
                 resolve({name:pair[0] for name,pair in self.mods.items()}, selected, self.inspection['hashes'],
@@ -327,9 +375,13 @@ class Window(QMainWindow):
         self.select_all_button.setEnabled(not active and bool(native - set(selected)))
         self.deselect_all_button.setEnabled(not active and bool(selected))
         self.launch_button.setEnabled(ready and not active and not self.no_launch)
+        self.launch_button.setText('Launch via Steam' if installed else 'Launch modded game')
         self.prepare_button.setEnabled(ready and not active); self.plan_button.setEnabled(ready and not active)
-        self.launch_button.setToolTip('Game starts are disabled in this UI inspection session.' if self.no_launch else reason or 'Prepare a private game copy and launch the checked mods.')
-        for widget in [self.game,self.browse,self.rescan,self.import_button,self.list,self.remove_button]: widget.setEnabled(not active)
+        self.launch_button.setToolTip('Game starts are disabled in this UI inspection session.' if self.no_launch else reason or ('Apply mods to the installed game and request Steam launch.' if installed else 'Prepare a private game copy and launch the checked mods.'))
+        self.save_info.setText('Normal Steam saves · back up before save-affecting mods' if installed else 'Fresh private saves')
+        self.proton_hint.setVisible(installed and sys.platform == 'linux')
+        for widget in [self.disable_button, self.enable_button, self.uninstall_button]: widget.setVisible(installed); widget.setEnabled(not active)
+        for widget in [self.game,self.browse,self.rescan,self.import_button,self.list,self.remove_button,self.deployment_mode]: widget.setEnabled(not active)
         if reason or self._validation and self.message.text() == self._validation: self.notice(reason)
         self._validation = reason
 
@@ -347,16 +399,19 @@ class Window(QMainWindow):
 
     def prepare_files(self):
         installation=self.current_installation()
-        self.work('Preparing private game files… This may take a few minutes.', lambda:self.service.prepare(installation), lambda root:self.notice('Files ready. Private saves: '+str(root / 'profile/AppData/LocalLow/DragDropGames/MoonSweepers')))
+        if not self.confirm_save_policy(installation): return
+        installed = self.service.mode(installation) == 'installed'
+        self.work('Applying selected mods…' if installed else 'Preparing private game files… This may take a few minutes.', lambda:self.service.prepare(installation), lambda root:self.notice('Installed mods ready. Normal Steam saves are in use.' if installed else 'Files ready. Private saves: '+str(root / 'profile/AppData/LocalLow/DragDropGames/MoonSweepers')))
 
     def start_game(self):
         if self.no_launch: return
         installation=self.current_installation()
+        if not self.confirm_save_policy(installation): return
         self.work('Preparing selected mods and starting the game…', lambda:launch.start(self.service,installation), self.started)
 
     def started(self, result):
         self.process,self.launch_record=result; self.timer.start(1000)
-        self.notice('Game running · '+self.launch_record['runtime']+' · close it normally with Save & Quit.' + (' Log error: '+self.launch_record['diagnostic_error'] if self.launch_record.get('diagnostic_error') else ''))
+        self.notice('Steam launch requested; game startup is not yet confirmed.' if self.launch_record.get('mode') == 'installed' else 'Game running · '+self.launch_record['runtime']+' · close it normally with Save & Quit.' + (' Log error: '+self.launch_record['diagnostic_error'] if self.launch_record.get('diagnostic_error') else ''))
 
     def poll_process(self):
         if self.process and self.process.poll() is not None:
@@ -364,7 +419,7 @@ class Window(QMainWindow):
             if hasattr(self.process,'_moon_lease'): self.process._moon_lease.__exit__(None,None,None)
             self.process=None
             detail=launch.failure_detail(self.launch_record)
-            self.notice((detail+'. ' if detail else 'Game closed. ')+'Exit code '+str(code)+'. Logs: '+self.launch_record['run']); self.update_actions()
+            self.notice(('Steam request finished; Steam owns the game process. ' if self.launch_record.get('mode') == 'installed' else detail+'. ' if detail else 'Game closed. ')+'Exit code '+str(code)+'. Logs: '+self.launch_record['run']); self.update_actions()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)

@@ -69,8 +69,9 @@ not make duplicate saved kinds compatible. Existing packages without
 `build_api` retain the Build Menu Framework dependency and 224 historical
 capacity fallback. No saved identity is reallocated.
 
-**Current scope:** SDK 0.3 implements these package declarations and preflight
-checks. `runtime_api_abi: 1` requires a matching runtime receipt before private
-deployment. The native API registry, framework publication and managed wrappers
-are separate implementation work; metadata acceptance alone does not enable
-calls or qualify new gameplay.
+SDK 0.4 adds the [native runtime protocol](runtime-services.md). A matching
+runtime receipt is required before deployment. Actual tables must match these
+declarations during dependency-ordered startup; a successful provider becomes
+visible before its consumer starts. Domain headers and implementations remain
+with their owning frameworks. Managed wrappers and loaded-world qualification
+remain separate work.

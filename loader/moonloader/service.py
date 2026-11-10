@@ -1,5 +1,8 @@
 """State, package selection and read-only source/private deployment ownership."""
 import os
+from datetime import datetime, timezone
+import hashlib
+import json
 from pathlib import Path
 import shutil
 import tempfile
@@ -40,7 +43,7 @@ class Service:
         contained(self.root, 'state.json')
         self.bundle = Path(bundle).absolute()
         self.root.mkdir(parents=True, exist_ok=True)
-        self.state = load(self.root / 'state.json', {'schema': 'moon-loader-state/v1', 'library': {}, 'selected': [], 'view': 'grid', 'installations': [], 'installation': ''})
+        self.state = load(self.root / 'state.json', {'schema': 'moon-loader-state/v1', 'library': {}, 'selected': [], 'view': 'grid', 'installations': [], 'installation': '', 'default_mode': 'installed', 'deployment_modes': {}})
         if self.state.get('schema') != 'moon-loader-state/v1': raise ValueError('Unsupported loader state')
 
     def save(self):
@@ -111,12 +114,87 @@ class Service:
         library, errors = self.library()
         for name in self.state['selected']:
             if name in errors: raise ValueError(errors[name])
+        if not self.state['selected'] and self.mode(installation) == 'installed': return [], library
         order = packages.resolve({name: pair[0] for name, pair in library.items()}, self.state['selected'], result['hashes'],
                                  available_runtimes=self.available_runtimes(), runtime_api_abi=self.runtime_api_abi())
         return order, library
 
     def install_root(self, installation):
-        return contained(self.root / 'installs', installation.store + '-' + installation.identity)
+        suffix = '-installed' if self.mode(installation) == 'installed' else ''
+        return contained(self.root / 'installs', installation.store + '-' + installation.identity + suffix)
+
+    def mode(self, installation):
+        # Missing fields are legacy private installations, never write consent.
+        mode = self.state.get('deployment_modes', {}).get(installation.identity, self.state.get('default_mode', 'private'))
+        if mode not in ('private', 'installed'): raise ValueError('Unknown deployment mode')
+        return mode
+
+    def set_mode(self, installation, mode):
+        if mode not in ('private', 'installed'): raise ValueError('Unknown deployment mode')
+        self.state.setdefault('deployment_modes', {})[installation.identity] = mode
+        self.save()
+
+    def accept_normal_saves(self, installation, basis):
+        if basis not in ('backed-up', 'fresh'):
+            raise ValueError('Confirm backed-up Steam saves or a fresh Steam profile')
+        order, library = self.selected(installation)
+        self.state.setdefault('save_policy', {})[installation.identity] = {'basis': basis, 'selection': self.save_selection(order, library)}
+        self.save()
+
+    @staticmethod
+    def save_selection(order, library):
+        return hashlib.sha256(json.dumps([(name, library[name][0]) for name in order], sort_keys=True).encode()).hexdigest()
+
+    def save_policy_ready(self, installation, order=None, library=None):
+        if order is None: order, library = self.selected(installation)
+        policy = self.state.get('save_policy', {}).get(installation.identity, {})
+        return isinstance(policy, dict) and policy.get('basis') in ('backed-up', 'fresh') and policy.get('selection') == self.save_selection(order, library)
+
+    def backup_saves(self, installation, source):
+        """An explicit user-chosen Steam folder; never discover or seed profiles."""
+        from . import public
+        if installation.store != 'steam': raise ValueError('Only Steam-origin saves are accepted here')
+        source = Path(source).expanduser().absolute()
+        contained(source, 'save-backup-probe')
+        if not source.is_dir(): raise ValueError('Choose the existing Steam save directory, including its sidecars')
+        game = Path(installation.path)
+        if source.is_relative_to(game) or game.is_relative_to(source) or self.root.is_relative_to(source) or source.is_relative_to(self.root):
+            raise ValueError('Save backups must be separate from game and loader storage')
+        with locked(self.root, 'session.lock'), locked(self.root):
+            public.assert_stopped(); assert_inactive(self.root)
+            before = tree(source)
+            if not before: raise ValueError('Save directory is empty; confirm a fresh profile instead')
+            location = contained(self.install_root(installation), 'save-backups/' + uuid.uuid4().hex)
+            for name in before: copy_file(contained(source, name), contained(location / 'files', name))
+            if tree(location / 'files') != before or tree(source) != before:
+                raise ValueError('Save files changed while backing up; backup is not qualified')
+            for name in before:
+                with contained(location / 'files', name).open('rb') as stream: os.fsync(stream.fileno())
+            for directory, _, _ in os.walk(location / 'files', topdown=False): public.sync_directory(directory)
+            order, library = self.selected(installation)
+            write(location / 'receipt.json', {'store': 'steam', 'source': str(source), 'files': before,
+                  'game_hashes': discovery.inspect(installation)['hashes'], 'mods': order,
+                  'packages': {name: {'version': library[name][0]['version'], 'files': library[name][0]['files']} for name in order},
+                  'created_at': datetime.now(timezone.utc).isoformat(),
+                  'policy': 'Manual Steam-only backup; never automatically restore over newer progress'})
+            public.sync_directory(location)
+            self.state.setdefault('save_policy', {})[installation.identity] = {'basis': 'backed-up', 'selection': self.save_selection(order, library)}
+            write(self.root / 'state.json', self.state)
+            return location
+
+    def set_enabled(self, installation, enabled):
+        if self.mode(installation) != 'installed': raise ValueError('Enable/disable applies to installed-game mode')
+        from . import public
+        with locked(self.root, 'session.lock'):
+            assert_inactive(self.root)
+            public.set_enabled(self, installation, enabled)
+
+    def uninstall(self, installation):
+        if self.mode(installation) != 'installed': raise ValueError('Uninstall applies to installed-game mode; private copies are retained')
+        from . import public
+        with locked(self.root, 'session.lock'):
+            assert_inactive(self.root)
+            public.uninstall(self, installation)
 
     def prepare(self, installation, _session_owner=False):
         """Copy/verify/deploy only. This never starts Steam, Wine or a game."""
@@ -148,6 +226,11 @@ class Service:
             capacity = runtime_receipt.get('max_native_mods', 32)
             if not isinstance(capacity, int) or len(order) > capacity:
                 raise ValueError('Selected mods exceed this loader runtime capacity; rebuild the distribution')
+            if self.mode(installation) == 'installed':
+                if runtime_receipt.get('public_bootstrap_abi') != 1:
+                    raise ValueError('Runtime does not support installed-game startup; rebuild the distribution')
+                from . import public
+                return public.prepare(self, installation, order, library, runtime)
             root.mkdir(parents=True, exist_ok=True)
             game = contained(root, 'game'); baseline_file = root / 'baseline.json'
             if not baseline_file.exists():
@@ -174,6 +257,9 @@ class Service:
                 if sha(source / name) != expected: raise ValueError('Installed game changed; reselect a supported installation')
             self.recover(root)
             files = {'version.dll': runtime.read_bytes()}
+            if runtime_receipt.get('runtime_api_abi') == 1:
+                from moon_mod_api.runtime_plan import encode, PATH
+                files[PATH] = encode({name: library[name][0] for name in order}, order)
             if installation.store == 'steam':
                 # Valve documents this public ID file for a directly started
                 # executable. It prevents RestartAppIfNecessary from replacing

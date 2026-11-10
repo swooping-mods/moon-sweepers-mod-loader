@@ -32,25 +32,28 @@ def main():
     work = out / "build"
     work.mkdir(parents=True, exist_ok=True)
     runtime = ROOT / "runtime/loader"
-    for name in ("kernel32", "ole32", "shell32"):
+    for name in ("kernel32", "ole32", "shell32", "bcrypt"):
         subprocess.run([tools["llvm-dlltool"], "-m", "i386:x86-64", "-d", str(runtime / (name + ".def")), "-l", str(work / (name + ".lib"))], check=True)
     for source in ("proxy", "check"):
         subprocess.run([tools["clang"], "--target=x86_64-pc-windows-msvc", "-O2", "-Wall", "-Wextra", "-Werror", "-ffreestanding", "-fno-builtin", "-fno-stack-protector", "-funwind-tables", "-c", str(runtime / (source + ".c")), "-o", str(work / (source + ".obj"))], check=True)
-    subprocess.run([tools["lld-link"], "/dll", "/entry:DllMain", "/nodefaultlib", "/machine:x64", "/timestamp:0", "/def:" + str(ROOT / "runtime/native/version.def"), "/out:" + str(work / "version.dll"), str(work / "proxy.obj"), str(work / "kernel32.lib"), str(work / "ole32.lib")], check=True)
+    subprocess.run([tools["lld-link"], "/dll", "/entry:DllMain", "/nodefaultlib", "/machine:x64", "/timestamp:0", "/def:" + str(ROOT / "runtime/native/version.def"), "/out:" + str(work / "version.dll"), str(work / "proxy.obj"), str(work / "kernel32.lib"), str(work / "ole32.lib"), str(work / "bcrypt.lib")], check=True)
     subprocess.run([tools["lld-link"], "/entry:mainCRTStartup", "/subsystem:console", "/nodefaultlib", "/machine:x64", "/timestamp:0", "/out:" + str(work / "MoonLab.LoaderCheck.exe"), str(work / "check.obj"), str(work / "kernel32.lib"), str(work / "ole32.lib"), str(work / "shell32.lib")], check=True)
     image = PE(work / "version.dll")
     expected = set((ROOT / "runtime/native/version.def").read_text().splitlines()[2:]) | {
         "MoonLab_LoaderAbi", "MoonLab_RegisterUpdate_v1", "MoonLab_RegisterVehicle_v1",
-        "MoonLab_RegisterLateUpdate_v1", "MoonLab_CameraOverrideActive_v1", "MoonLab_GetHookApi_v1"}
+        "MoonLab_RegisterLateUpdate_v1", "MoonLab_CameraOverrideActive_v1", "MoonLab_GetHookApi_v1",
+        "MoonLab_GetRuntimeApi_v1", "MoonLab_GetInputApi_v1", "MoonLab_GetCameraApi_v1"}
     if image.machine != 0x8664 or not expected.issubset({e["name"] for e in image.exports()}):
         raise ValueError("Loader PE/export surface is incomplete")
     diagnostic = PE(work / "MoonLab.LoaderCheck.exe")
     if diagnostic.machine != 0x8664:
         raise ValueError("Diagnostic must be AMD64")
     receipt = {"schema": "moon-loader-runtime/v1", "sha256": hashlib.sha256((work / "version.dll").read_bytes()).hexdigest(),
-               "game_pins": PIN, "abi": "MoonLab_ModStart/v5", "hook_framework_abi": 1,
+               "game_pins": PIN, "abi": "MoonLab_ModStart/v6", "hook_framework_abi": 1,
+               "runtime_api_abi": 1, "input_api_abi": 1, "camera_api_abi": 1,
+               "runtime_plan_schema": "moon-runtime-plan/v1",
                "late_update_abi": 1, "shared_update_abi": 1, "vehicle_dispatch_abi": 1,
-               "max_native_mods": 64, "runtime_replay": "Not rerun for repository extraction"}
+               "max_native_mods": 64, "public_bootstrap_abi": 1, "runtime_replay": "Installed-game replay not yet qualified"}
     files = {}
     for folder in ("loader", "vendored"):
         for path in sorted((ROOT / folder).rglob("*")):

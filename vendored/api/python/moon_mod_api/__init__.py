@@ -1,2 +1,2 @@
 """Moon Sweepers mod contracts and offline package tools."""
-__version__ = "0.3.0"
+__version__ = "0.4.0"

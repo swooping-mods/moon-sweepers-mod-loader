@@ -14,6 +14,8 @@ ExitProcess
 VirtualProtect
 CreateFileW
 WriteFile
+ReadFile
+GetFileSizeEx
 FlushFileBuffers
 GetStdHandle
 GetCurrentProcess
@@ -22,3 +24,10 @@ FlushInstructionCache
 AddVectoredExceptionHandler
 RemoveVectoredExceptionHandler
 VirtualAlloc
+ReadFile
+SetEnvironmentVariableW
+OutputDebugStringA
+GetFileAttributesW
+CreateDirectoryW
+GetTickCount64
+GetCurrentProcessId

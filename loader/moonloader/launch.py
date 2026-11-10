@@ -21,6 +21,12 @@ def failure_detail(record):
         'mod-library-load-failed':'Could not load mod DLL',
         'mod-entry-missing':'Mod entry point is missing',
         'mod-start-failed':'Mod startup failed',
+        'runtime-registration-scope':'Required mod interface is unavailable',
+        'mod-interface-contract-failed':'Mod did not publish its declared interfaces',
+        'runtime-api-marker':'Mod runtime API version does not match its package',
+        'runtime-plan-missing':'Mod deployment plan is missing; prepare files again',
+        'runtime-plan-invalid':'Mod deployment plan is invalid; prepare files again',
+        'runtime-plan-mod-list':'Selected mods do not match the prepared deployment plan',
         'shared-update-install-failed':'Could not install shared game update',
     }
     for line in reversed(tail.splitlines()):
@@ -49,8 +55,29 @@ def host_pid(steam):
 def plan(service, installation, platform=None, check_client=True):
     """Deterministic preflight with no runtime initialization or directory writes."""
     platform = platform or sys.platform
-    order, _ = service.selected(installation)
+    order, library = service.selected(installation)
     root = service.install_root(installation)
+    if service.mode(installation) == 'installed':
+        from .public import preview
+        if installation.store != 'steam' or not installation.steam_root:
+            raise ValueError('Installed-game launch requires the Steam-discovered installation; rescan Steam')
+        if platform not in ('win32', 'linux'): raise ValueError('Supported hosts are Linux and Windows')
+        if platform == 'win32':
+            command = [str(Path(installation.steam_root) / 'steam.exe'), '-applaunch', APP_ID]
+        elif str(installation.steam_root).startswith(str(Path.home() / '.var/app/com.valvesoftware.Steam/')):
+            command = ['flatpak', 'run', 'com.valvesoftware.Steam', '-applaunch', APP_ID]
+        else:
+            command = ['steam', '-applaunch', APP_ID]
+        return {'mode': 'installed', 'platform': platform, 'command': command, 'env': {},
+                'deployment': preview(service, installation, order, library),
+                'cwd': installation.path, 'run': str(root / 'runs' / uuid.uuid4().hex),
+                'store': 'steam', 'profile': 'Normal Steam saves (not isolated)', 'order': order,
+                'runtime': 'Steam selected compatibility runtime' if platform == 'linux' else 'Steam / Windows',
+                'launch_options': 'WINEDLLOVERRIDES="version=n,b" %command%' if platform == 'linux' else '',
+                'limits': ['Steam launch request is not game-process ownership or startup confirmation',
+                           'Keep existing Steam launch options; merge the version override manually on Proton',
+                           'Back up saves before save-affecting mods; binary uninstall does not restore saves',
+                           'Native Windows gameplay, Cloud and two-account co-op require separate qualification']}
     game = root / 'game'
     run = root / 'runs' / uuid.uuid4().hex
     profile = root / 'profile'
@@ -152,6 +179,17 @@ def start(service, installation):
 def _start_locked(service, installation, lease):
     record = plan(service, installation)
     service.prepare(installation, _session_owner=True)
+    if record.get('mode') == 'installed':
+        run = Path(record['run']); run.mkdir(parents=True, exist_ok=True)
+        write(run / 'launch.json', record)
+        env = {k:v for k,v in os.environ.items() if not k.startswith('MOONLAB_')}
+        with (run / 'process.log').open('wb') as output:
+            process = subprocess.Popen(record['command'], cwd=record['cwd'], env=env,
+                                       stdout=output, stderr=subprocess.STDOUT)
+        # Steam owns the real game, whose lifetime is independent of this
+        # short request process. Never record the client as our game PID.
+        lease.__exit__(None, None, None)
+        return process, record
     if record['platform'] == 'linux': prepare_proton(record)
     run = Path(record['run']); contained(service.root, run.relative_to(service.root).as_posix()).mkdir(parents=True)
     write(run / 'launch.json', record)

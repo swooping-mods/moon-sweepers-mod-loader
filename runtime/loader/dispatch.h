@@ -1,21 +1,31 @@
 /* One registry owns the supported native hooks. Registration is scoped to each
  * ModStart; tables become immutable before any breakpoint is published. */
 #include "../native/hook_context.h"
-#include "../../vendored/api/include/moon_sweepers/hooks.h"
+#include "sdk.h"
 __declspec(dllimport) PTR __stdcall GetCurrentProcess(void);
 __declspec(dllimport) DWORD __stdcall GetCurrentThreadId(void);
 __declspec(dllimport) BOOL __stdcall FlushInstructionCache(PTR,const void *,U64);
 __declspec(dllimport) PTR __stdcall AddVectoredExceptionHandler(DWORD,int (*)(ExceptionPointers *));
 __declspec(dllimport) DWORD __stdcall RemoveVectoredExceptionHandler(PTR);
 #include "../native/hook_engine.h"
+#include "camera.h"
 #define MOONLAB_MAX_NATIVE_MODS 64
 #define MOONLAB_MAX_SUBSCRIPTIONS (2*MOONLAB_MAX_NATIVE_MODS+3)
-typedef struct {MoonHookSubscriptionV1 spec;unsigned int handle,owner;} HookSubscription;
+typedef struct {
+    MoonHookSubscriptionV1 spec;unsigned int handle,owner;
+    MoonFrameCallback frame_callback;void *frame_user;
+} HookSubscription;
 static HookSubscription subscriptions[MOONLAB_MAX_SUBSCRIPTIONS];
 static unsigned int subscription_count,next_subscription,registration_owner;
 static DWORD registration_thread;
 static int update_sealed,late_override_active;
 static PTR update_address,vehicle_address,late_update_address;
+static int registration_thread_matches(void){return GetCurrentThreadId()==__atomic_load_n(&registration_thread,__ATOMIC_ACQUIRE);}
+/* The freestanding proxy links without a C runtime, including implicit memcpy
+ * emitted for larger registry records. Keep these copies explicit. */
+static void registry_copy(void *out,const void *in,U64 size){
+    for(U64 i=0;i<size;i++)((unsigned char *)out)[i]=((const unsigned char *)in)[i];
+}
 
 static PTR hook_address(unsigned int hook){
     switch(hook){case MOON_HOOK_UPDATE:return update_address;
@@ -25,20 +35,22 @@ static PTR hook_address(unsigned int hook){
 static int begin_hook_registration(unsigned int owner){
     if(update_sealed||registration_owner||!owner)return 0;
     DWORD thread=GetCurrentThreadId();
-    if(registration_thread&&registration_thread!=thread)return 0;
-    registration_thread=thread;
+    DWORD registered=__atomic_load_n(&registration_thread,__ATOMIC_ACQUIRE);
+    if(registered&&registered!=thread)return 0;
+    __atomic_store_n(&registration_thread,thread,__ATOMIC_RELEASE);
     registration_owner=owner;return 1;
 }
 static void finish_hook_registration(int success){
+    if(!registration_thread_matches()||!registration_owner)return;
     if(!success)for(unsigned int i=0;i<subscription_count;){
         if(subscriptions[i].owner!=registration_owner){i++;continue;}
-        for(unsigned int j=i+1;j<subscription_count;j++)subscriptions[j-1]=subscriptions[j];
+        for(unsigned int j=i+1;j<subscription_count;j++)registry_copy(&subscriptions[j-1],&subscriptions[j],sizeof(subscriptions[j]));
         subscription_count--;
     }
     registration_owner=0;
 }
-static unsigned int hook_subscribe(const MoonHookSubscriptionV1 *spec){
-    if(GetCurrentThreadId()!=registration_thread)return 0;
+static unsigned int subscribe_observer(const MoonHookSubscriptionV1 *spec,MoonFrameCallback frame,void *user){
+    if(!registration_thread_matches())return 0;
     if(update_sealed||!registration_owner||!spec||spec->size!=sizeof(*spec)
        ||subscription_count>=MOONLAB_MAX_SUBSCRIPTIONS||next_subscription==(unsigned int)-1)return 0;
     PTR address=hook_address(spec->hook);
@@ -46,8 +58,9 @@ static unsigned int hook_subscribe(const MoonHookSubscriptionV1 *spec){
     int observer=spec->role==MOON_ROLE_OBSERVER;
     if(!observer&&(spec->phase!=MOON_PHASE_NORMAL||spec->priority))return 0;
     if(spec->hook==MOON_HOOK_UPDATE||spec->hook==MOON_HOOK_LATE_UPDATE){
-        if(!spec->callback||spec->vehicle_callback
+        if((!spec->callback&&!frame)||(spec->callback&&frame)||spec->vehicle_callback
            ||(!observer&&(spec->hook!=MOON_HOOK_LATE_UPDATE||spec->role!=MOON_ROLE_OVERRIDE)))return 0;
+        if(frame&&(spec->hook!=MOON_HOOK_UPDATE||!observer))return 0;
     }else if(spec->hook==MOON_HOOK_VEHICLE_FIXED){
         if(spec->callback||!spec->vehicle_callback||(spec->role!=MOON_ROLE_INPUT&&spec->role!=MOON_ROLE_PHYSICS))return 0;
     }else return 0;
@@ -56,20 +69,23 @@ static unsigned int hook_subscribe(const MoonHookSubscriptionV1 *spec){
         const MoonHookSubscriptionV1 *other=&subscriptions[i].spec;
         if(other->hook!=spec->hook)continue;
         if((spec->callback&&spec->callback==other->callback)
-           ||(spec->vehicle_callback&&spec->vehicle_callback==other->vehicle_callback))return 0;
+           ||(spec->vehicle_callback&&spec->vehicle_callback==other->vehicle_callback)
+           ||(frame&&frame==subscriptions[i].frame_callback&&user==subscriptions[i].frame_user))return 0;
         if(other->role==spec->role){if(!observer)return 0;count++;}
     }
     if(observer&&count>=MOONLAB_MAX_NATIVE_MODS)return 0;
     HookSubscription *slot=&subscriptions[subscription_count++];
     slot->spec=*spec;slot->owner=registration_owner;slot->handle=++next_subscription;
+    slot->frame_callback=frame;slot->frame_user=user;
     return slot->handle;
 }
+static unsigned int hook_subscribe(const MoonHookSubscriptionV1 *spec){return subscribe_observer(spec,0,0);}
 static int hook_unsubscribe(unsigned int handle){
-    if(GetCurrentThreadId()!=registration_thread)return 0;
+    if(!registration_thread_matches())return 0;
     if(update_sealed||!registration_owner||!handle)return 0;
     for(unsigned int i=0;i<subscription_count;i++)if(subscriptions[i].handle==handle){
         if(subscriptions[i].owner!=registration_owner)return 0;
-        for(unsigned int j=i+1;j<subscription_count;j++)subscriptions[j-1]=subscriptions[j];
+        for(unsigned int j=i+1;j<subscription_count;j++)registry_copy(&subscriptions[j-1],&subscriptions[j],sizeof(subscriptions[j]));
         subscription_count--;return 1;
     }
     return 0;
@@ -77,11 +93,13 @@ static int hook_unsubscribe(unsigned int handle){
 __declspec(dllexport) int MoonLab_CameraOverrideActive_v1(void){return late_override_active;}
 static const MoonHookApiV1 hook_api={sizeof(MoonHookApiV1),1,hook_subscribe,hook_unsubscribe,MoonLab_CameraOverrideActive_v1};
 __declspec(dllexport) const MoonHookApiV1 *MoonLab_GetHookApi_v1(void){return &hook_api;}
+#include "services.h"
 
 static void copy_context(Context *out,const Context *in){
     for(U64 i=0;i<sizeof(*out);i++)((unsigned char *)out)[i]=((const unsigned char *)in)[i];
 }
 static int dispatch_update(int id,Context *context){
+    moon_camera_observe_thread();
     unsigned int hook=(unsigned int)id;int skip=0;
     MoonVehicleInput input={0};
     /* The role boundary is invariant even if registration order is reversed. */
@@ -102,8 +120,12 @@ static int dispatch_update(int id,Context *context){
         const MoonHookSubscriptionV1 *spec=&subscriptions[i].spec;
         if(spec->hook!=hook)continue;
         if(spec->role==MOON_ROLE_OBSERVER){
-            Context copy;copy_context(&copy,context);
-            spec->callback(spec->local_id,&copy);
+            if(subscriptions[i].frame_callback)
+                subscriptions[i].frame_callback((void *)context->rcx,subscriptions[i].frame_user);
+            else{
+                Context copy;copy_context(&copy,context);
+                spec->callback(spec->local_id,&copy);
+            }
         }else if(spec->role==MOON_ROLE_PHYSICS){
             /* Legacy physics owns its return register as well as cancellation. */
             skip=spec->vehicle_callback(spec->local_id,context,&input)!=0;
@@ -130,16 +152,16 @@ __declspec(dllexport) int MoonLab_RegisterVehicle_v1(PTR address,DWORD token,int
 }
 static int seal_updates(void){
     if(update_sealed||registration_owner)return 0;
-    update_sealed=1;
+    __atomic_store_n(&update_sealed,1,__ATOMIC_RELEASE);
     /* Stable insertion ordering: phase, ascending priority, registration order.
      * Default registrations therefore preserve dependency/ID startup order. */
     for(unsigned int i=1;i<subscription_count;i++){
-        HookSubscription value=subscriptions[i];unsigned int j=i;
+        HookSubscription value;registry_copy(&value,&subscriptions[i],sizeof(value));unsigned int j=i;
         while(j&&(subscriptions[j-1].spec.phase>value.spec.phase
               ||(subscriptions[j-1].spec.phase==value.spec.phase&&subscriptions[j-1].spec.priority>value.spec.priority))){
-            subscriptions[j]=subscriptions[j-1];j--;
+            registry_copy(&subscriptions[j],&subscriptions[j-1],sizeof(subscriptions[j]));j--;
         }
-        subscriptions[j]=value;
+        registry_copy(&subscriptions[j],&value,sizeof(value));
     }
     for(unsigned int kind=MOON_HOOK_UPDATE;kind<=MOON_HOOK_VEHICLE_FIXED;kind++){
         int used=0;

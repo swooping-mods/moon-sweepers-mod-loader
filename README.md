@@ -1,6 +1,6 @@
 # Moon Sweepers Mod Loader
 
-A desktop mod loader for Moon Sweepers, with local `.msmod` installation, dependency and compatibility checks, private game copies and separate modded profiles.
+A desktop mod loader for Moon Sweepers, with local `.msmod` installation, dependency and compatibility checks, installation into the existing Steam game, and an optional private-copy mode.
 
 Repository: [swooping-mods/moon-sweepers-mod-loader](https://github.com/swooping-mods/moon-sweepers-mod-loader). The source is public on GitHub.
 
@@ -14,8 +14,9 @@ included; no Python installation or administrator access is needed. This is a
 Windows x64 portable folder, not a single-file executable. The launcher is unsigned.
 
 Import `.msmod` files, select a supported game installation, use **Prepare files**,
-then **Launch**. The game and mod packages are not bundled. Settings and private
+then **Launch**. The game and mod packages are not bundled. Application state and private
 profiles use `%LOCALAPPDATA%/MoonLab/Loader`; pass `--data PATH` for another location.
+Installed-mode mod settings live under the game's `MoonLab/settings/` directory.
 For inspection, run `"Mod Loader.exe" --no-launch`.
 
 `THIRD_PARTY_NOTICES.md` and `LICENSES/` in the ZIP contain bundled component licenses,
@@ -44,7 +45,21 @@ Windows: run `Start-Mod-Loader.cmd`, or `py -3 loader/main.py --no-launch --data
 
 This source checkout opens an empty mod library. Import your `.msmod` files through **Install mod package**. The native bootstrap is produced by the build command below. The separate `artifacts/moon-sweepers-mod-loader-0.1.0-source.zip` includes the native bootstrap and diagnostic but requires host Python/PySide6. The Windows portable ZIP above includes those dependencies and an executable launcher.
 
-Only the explicit Launch action starts a game. **Prepare files** creates a loader-owned private copy; original game installations stay read-only. Fresh private profiles are not seeded from personal Steam/Bottles saves. `--no-launch` disables the launch action for inspection. Avoid choosing an existing development data directory when reviewing this clean copy.
+Only the explicit Launch action requests a game start. New loader data uses **Existing Steam game**: **Prepare files** adds the bootstrap and selected mods without copying the game or Proton or replacing original game DLLs. Existing loader data keeps **Private game copy**, with its existing isolated profiles. Changing the selector never deletes or migrates a private setup. `--no-launch` disables launch for inspection.
+
+Installed mode uses normal Steam saves. Back up the save folder and sidecars before enabling save-affecting mods, or explicitly confirm a fresh Steam profile when prompted. The UI can back up an explicitly chosen Steam save folder. **Disable mods** applies on the next start; **Uninstall loader** removes unchanged owned additions and retains saves/settings. Binary removal cannot make every modded save compatible with vanilla. Conflicting loaders or externally changed files are preserved and reported.
+
+On Proton, merge `WINEDLLOVERRIDES="version=n,b"` into the game's Steam launch options, preserving existing settings; the simple case is `WINEDLLOVERRIDES="version=n,b" %command%`. Use **View launch plan** for the selected mode. Installed mode asks Steam to launch app 5335510 using its chosen runtime/prefix. A successful request is not confirmation that the game or mods started. Steam options are not edited automatically.
+
+CLI examples (all preparation/removal actions start no game):
+
+```sh
+./run.sh --game /path/to/MoonSweepers --mode installed --normal-saves backed-up --prepare
+./run.sh --game /path/to/MoonSweepers --disable
+./run.sh --game /path/to/MoonSweepers --uninstall-loader
+```
+
+Use `--backup-steam-saves PATH` to make a verified copy of an explicitly chosen Steam save folder, including sidecars. Fresh private profiles never use personal Steam/Bottles saves. Creating a new private copy requires a clean source; uninstall the public bootstrap first if needed. See the [deployment contract](specs/public-deployment.md) for recovery, path limits and qualification boundaries. Native Windows gameplay, Cloud and two-account co-op remain separate qualification requirements.
 
 ## Verify and build
 

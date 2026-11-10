@@ -20,6 +20,8 @@ __declspec(dllimport) void __stdcall ExitProcess(DWORD);
 __declspec(dllimport) BOOL __stdcall VirtualProtect(PTR,U64,DWORD,DWORD *);
 __declspec(dllimport) PTR __stdcall CreateFileW(const WCHAR *,DWORD,DWORD,PTR,DWORD,DWORD,PTR);
 __declspec(dllimport) BOOL __stdcall WriteFile(PTR,const void *,DWORD,DWORD *,PTR);
+__declspec(dllimport) BOOL __stdcall ReadFile(PTR,void *,DWORD,DWORD *,PTR);
+__declspec(dllimport) BOOL __stdcall GetFileSizeEx(PTR,U64 *);
 __declspec(dllimport) BOOL __stdcall FlushFileBuffers(PTR);
 __declspec(dllimport) PTR __stdcall CoTaskMemAlloc(U64);
 static char *append(char *out,const char *s){while(*s)*out++=*s++;*out=0;return out;}
@@ -27,8 +29,13 @@ static int equal(const char *a,const char *b){while(*a&&*a==*b){a++;b++;}return 
 #include "forward.h"
 #include "profile.h"
 #include "dispatch.h"
+#include "input.h"
 int _fltused=0;
 __declspec(dllexport) DWORD MoonLab_LoaderAbi(void){return 1;}
+__declspec(dllexport) const MoonInputApiV1 *MoonLab_GetInputApi_v1(void){return moon_input_api_v1();}
+__declspec(dllexport) const MoonCameraApiV1 *MoonLab_GetCameraApi_v1(unsigned int abi,unsigned int size){
+    return abi==MOON_CAMERA_ABI&&size==sizeof(MoonCameraApiV1)?moon_camera_api_v1():0;
+}
 static PTR log_file;
 static char active_mod[65];
 static void event(const char *name,int success){
@@ -42,20 +49,52 @@ static void event(const char *name,int success){
 }
 static void fail(const char *name){event(name,0);ExitProcess(111);}
 static int valid_id(const WCHAR *s){
-    if(!*s)return 0;int n=0;
+    if(*s<'a'||*s>'z')return 0;int n=0;
     while(*s){if(!((*s>='a'&&*s<='z')||(*s>='0'&&*s<='9')||*s=='-')||++n>64)return 0;s++;}
     return 1;
 }
+static void read_service_plan(void){
+    static WCHAR path[1200];DWORD n=GetModuleFileNameW(self_module,path,950);
+    if(!n||n>=950)fail("runtime-plan-path");
+    while(n&&path[n-1]!='\\'&&path[n-1]!='/')n--;
+    const WCHAR *tail=L"MoonLab\\runtime-plan.bin";while(*tail)path[n++]=*tail++;path[n]=0;
+    PTR file=CreateFileW(path,0x80000000,1,0,3,0x80,0);
+    if(file==(PTR)(U64)-1)fail("runtime-plan-missing");
+    U64 size=0;DWORD read=0;
+    if(!GetFileSizeEx(file,&size)||size<12||size>MSP_MAX_BYTES){CloseHandle(file);fail("runtime-plan-size");}
+    /* One bounded allocation on startup, retained as the immutable source of
+     * declared IDs/capacities. There is no allocation on API lookup or frames. */
+    void *data=CoTaskMemAlloc(size);
+    int success=data&&ReadFile(file,data,(DWORD)size,&read,0)&&read==size;
+    CloseHandle(file);
+    if(!success||!msp_init(data,(unsigned int)size))fail("runtime-plan-invalid");
+    event("runtime-plan-ready",1);
+}
+#include "public.h"
 static DWORD __stdcall worker(PTR unused){
-    (void)unused;static WCHAR evidence[1200];DWORD n=GetEnvironmentVariableW(L"MOONLAB_EVIDENCE",evidence,1000);
-    if(!n||n>=1000)ExitProcess(110);
+    (void)unused;
+    if(public_mode&&!public_startup()){
+        OutputDebugStringA("MoonLab: mods disabled (configuration, build or payload validation failed).\n");
+        public_release_inputs();return 0;
+    }
+    static WCHAR evidence[1200];DWORD n=GetEnvironmentVariableW(L"MOONLAB_EVIDENCE",evidence,1000);
+    if(!n||n>=1000){if(public_mode)return 0;ExitProcess(110);}
     const WCHAR *tail=L"\\loader.jsonl";while(*tail)evidence[n++]=*tail++;evidence[n]=0;
     log_file=CreateFileW(evidence,0x40000000,1,0,1,0x80,0);
-    if(log_file==(PTR)(U64)-1)ExitProcess(110);
-    event("loader-ready",1);event("private-profile",1);
+    if(log_file==(PTR)(U64)-1){if(public_mode)return 0;ExitProcess(110);}
+    event("loader-ready",1);event(public_mode?"installed-game":"private-profile",1);
+    if(public_mode){
+        char text[200],*out=append(text,"{\"case\":\"deployment\",\"installation\":\"");
+        out=append(out,public_installation);out=append(out,"\",\"generation\":\"");
+        for(int i=0;i<32;i++)*out++=(char)public_generation[i];
+        append(out,"\",\"success\":true}\n");DWORD size=0,written=0;while(text[size])size++;
+        if(!WriteFile(log_file,text,size,&written,0)||written!=size)fail("deployment-log-failed");
+        FlushFileBuffers(log_file);
+    }
     PTR game=0;for(int i=0;i<1200&&!game;i++){game=GetModuleHandleW(L"GameAssembly.dll");if(!game)Sleep(25);}
     if(!game)fail("gameassembly-timeout");
-    if(!protect_profile(game,0))fail("gameassembly-profile-guard");
+    if(public_mode&&!public_game_module(game)){event("gameassembly-path-mismatch",0);CloseHandle(log_file);public_release_inputs();return 0;}
+    if(!public_mode&&!protect_profile(game,0))fail("gameassembly-profile-guard");
     PTR domain=0;
     for(int i=0;i<1200;i++){
         domain=*(PTR volatile *)((char *)game+0x24f3658);
@@ -107,6 +146,7 @@ static DWORD __stdcall worker(PTR unused){
         if(vehicle_address!=(char *)game+0x4d0c80)fail("dispatch-vehicle-address");
     }
     if((U64)update_address<(U64)game+0x1000||(U64)update_address>=(U64)game+31917844)fail("dispatch-update-address");
+    read_service_plan();
     /* Include every maximum-length ID plus separators and termination. */
     static WCHAR ids[MOONLAB_MAX_NATIVE_MODS*65+1];
     n=GetEnvironmentVariableW(L"MOONLAB_MODS",ids,MOONLAB_MAX_NATIVE_MODS*65+1);
@@ -118,24 +158,33 @@ static DWORD __stdcall worker(PTR unused){
     for(WCHAR *p=ids;;p++)if(*p==';'||!*p){
         int last=!*p;*p=0;if(!valid_id(id)||++loaded>MOONLAB_MAX_NATIVE_MODS)fail("invalid-mod-id");
         DWORD mod_length=0;for(WCHAR *q=id;*q;q++)active_mod[mod_length++]=(char)*q;active_mod[mod_length]=0;
+        if(!msp_identity((unsigned int)loaded,active_mod))fail("runtime-plan-mod-list");
         event("mod-starting",1);
         static WCHAR path[1200];DWORD length=0;while(length<count){path[length]=base[length];length++;}
-        const WCHAR *part=L"MoonLab\\mods\\";while(*part)path[length++]=*part++;
+        const WCHAR *part=L"MoonLab\\";while(*part)path[length++]=*part++;
+        part=L"mods\\";while(*part)path[length++]=*part++;
         for(WCHAR *q=id;*q;q++)path[length++]=*q;
         part=L"\\mod.dll";while(*part)path[length++]=*part++;path[length]=0;
         PTR mod=LoadLibraryW(path);int (*start)(PTR,PTR)=mod?(int(*)(PTR,PTR))GetProcAddress(mod,"MoonLab_ModStart"):0;
         if(!mod)fail("mod-library-load-failed");
         if(!start)fail("mod-entry-missing");
-        if(!begin_hook_registration((unsigned int)loaded))fail("hook-registration-scope");
+        if(service_plan.mods[loaded-1].package_abi==6){
+            int (*abi)(void)=(int(*)(void))GetProcAddress(mod,"MoonLab_RuntimeServicesAbi");
+            if(!abi||abi()!=1)fail("runtime-api-marker");
+        }
+        if(!begin_runtime_registration((unsigned int)loaded,active_mod))fail("runtime-registration-scope");
         int started=start(domain,game);
-        finish_hook_registration(started);
+        int committed=finish_runtime_registration(started);
         if(!started)fail("mod-start-failed");
+        if(!committed)fail("mod-interface-contract-failed");
         event("mod-started",1);if(last)break;id=p+1;
     }
     active_mod[0]=0;
+    if(service_plan.next_owner!=service_plan.count)fail("runtime-plan-mod-list");
     if(!seal_updates())fail("shared-update-install-failed");
     event("shared-update-ready",1);
     event("hook-framework-ready",1);
+    event("runtime-services-ready",1);
     detach(thread);event("load-complete",1);CloseHandle(log_file);return 0;
 }
 BOOL __stdcall DllMain(PTR module,DWORD reason,PTR reserved){
@@ -144,8 +193,12 @@ BOOL __stdcall DllMain(PTR module,DWORD reason,PTR reserved){
     const WCHAR *last=exe;for(WCHAR *p=exe;*p;p++)if(*p=='\\'||*p=='/')last=p+1;
     const WCHAR *expected=L"MoonSweepers.exe";while(*last&&*last==*expected){last++;expected++;}
     if(*last||*expected)return 1;
-    n=GetEnvironmentVariableW(L"MOONLAB_PROFILE_ROOT",profile_root,800);
-    if(!n||n>=800)return 0;
+    n=public_installed_marker()?0:GetEnvironmentVariableW(L"MOONLAB_PROFILE_ROOT",profile_root,800);
+    if(!n){
+        public_mode=1;PTR thread=CreateThread(0,0,worker,0,0,0);
+        if(thread)CloseHandle(thread);return 1;
+    }
+    if(n>=800)return 0;
     /* Synchronous: never let Unity compute its personal persistentDataPath
      * before these required import slots are redirected. A failed guard aborts. */
     if(!protect_profile(GetModuleHandleW(L"UnityPlayer.dll"),1))return 0;

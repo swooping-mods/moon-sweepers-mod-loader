@@ -6,20 +6,22 @@ The repository owns the Python/PySide6 desktop app, its native Windows AMD64 boo
 
 `loader/main.py` is the CLI and desktop entrypoint. Root launchers retain the `loader/` layout so source and portable bundles locate the same pinned SDK. Default application data remains compatible with the prior loader; use `--data local/review` for an isolated review. No source-checkout mod catalog is seeded.
 
-`loader/moonloader/discovery.py` owns supported game executable hashes and Steam discovery (app 5335510). The adapter targets the pinned Steam Windows x64 IL2CPP build. Manual discovery does not establish support for other storefront runtimes. Linux launching uses installed Steam/Proton Experimental; Windows uses the native executable.
+`loader/moonloader/discovery.py` owns supported game executable hashes and Steam discovery (app 5335510). The adapter targets the pinned Steam Windows x64 IL2CPP build. Manual discovery does not establish support for other storefront runtimes. Installed mode requests Steam launch using its selected compatibility runtime on Linux or native game on Windows. Private mode retains installed Proton Experimental and its separate launch route.
 
-`service.py`, `storage.py` and `launch.py` preserve private game-copy deployment, rollback/recovery, selected dependencies, editable per-mod settings, explicit launch plans, operation/session locks and process ownership. Original installations stay read-only. Private profiles start fresh and never use personal Steam/Bottles save data as a fallback. The app starts a game only via the Launch action; `--no-launch` disables it.
+`service.py`, `storage.py` and `launch.py` preserve private game-copy deployment, rollback/recovery, selected dependencies, editable per-mod settings, explicit launch plans, operation/session locks and process ownership. New data defaults to [installed-game deployment](public-deployment.md), which adds owned files to the existing Steam installation without copying game files; legacy data stays private. Private profiles start fresh and never use personal Steam/Bottles save data as a fallback. The app starts a game only via the Launch action; `--no-launch` disables it.
 
 `vendored/api/` is the content-pinned first-party SDK. `moonloader.packages` reexports its validator/resolver, and `moonloader.storage` reexports its portable storage functions while retaining loader locks/process identity locally. `moonloader.__init__` resolves the snapshot relative to the repository, never to a sibling development checkout. `tools/check_snapshot.py` verifies every pinned payload file and rejects extra/changed files and symlinks.
 
-The SDK pin is 0.3.0. It validates native v1–v6, ordinary/external managed mods,
+The SDK pin is 0.4.0. It validates native v1–v6, ordinary/external managed mods,
 and companions; the UI treats managed packages as selectable game mods. This
 standalone distribution currently hosts native mods only. `available_runtimes`
 is passed to both UI readiness and service selection, and preparation repeats
 the runtime check before creating a game copy. A managed package can be stored
 without being routed to native ModStart. Native v6 interface packages require
-`runtime_api_abi: 1`; the current native receipt has no registry capability and
-rejects them before deployment. The development managed host remains a separate
+`runtime_api_abi: 1`; the native receipt advertises the implemented registry,
+typed frame, input and camera tables. The deployment includes a bounded startup
+plan and validates actual publications before committing provider startup; see
+[runtime services](runtime-services.md). The development managed host remains a separate
 integration rather than an implied capability of this distribution.
 
 `runtime/loader/` implements the hook registry, startup sealing, shared Update, camera override/observers and vehicle input/physics ownership. It uses the pinned public SDK. `runtime/native/` retains the private exception bridge, original instruction emulator and version exports. Existing MoonLab symbols and package ABIs retain compatibility. Game pins require separate gameplay qualification.
