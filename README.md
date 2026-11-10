@@ -29,7 +29,8 @@ builds the bundled Windows ZIP, then tests the bundled Qt runtime and actual EXE
 on a Windows runner. After both jobs pass, download the
 `moon-sweepers-mod-loader-windows-x64` artifact from the run's Actions page; artifacts
 are retained for 14 days. Manual **Release candidate** builds remain available.
-Tagged versions also run these checks before the **Publish release** workflow publishes the verified ZIPs and SHA-256 checksums to GitHub Releases.
+Tagged versions also run these checks before the **Publish prerelease** workflow publishes the verified ZIPs and SHA-256 checksums
+as GitHub prerelease assets, excluded from the stable/latest channel.
 
 ## Run locally
 
