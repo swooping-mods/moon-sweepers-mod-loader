@@ -79,6 +79,11 @@ the Linux host checks do not establish it.
 
 `vendored/api/` is the pinned first-party SDK from `moon-sweepers-api`, with a file-hash lock. The loader owns the desktop application, native bootstrap, supported game pins and profile/deployment behavior. Gameplay mod implementations and assets are not bundled. Existing `MoonLab_*` native symbols remain unchanged.
 
+The SDK pin is 0.3.0 and understands managed packages and independently owned
+framework interfaces. This distribution currently hosts native mods; importing
+a managed package does not install its required host. Unsupported backends and
+new native-v6 runtime interface requirements reject before game preparation.
+
 ## Downloads and contributions
 
 Download versioned builds from [GitHub Releases](https://github.com/swooping-mods/moon-sweepers-mod-loader/releases). Import local `.msmod` packages through **Install mod package**. Hosted mod discovery is not implemented.

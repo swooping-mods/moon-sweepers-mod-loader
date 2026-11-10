@@ -357,6 +357,17 @@ class LoaderChecks(unittest.TestCase):
                 self.assertEqual(service.state['selected'],['test-mod'])
             window.search.setText('missing');self.assertFalse(window.list.count());self.assertTrue(window.empty.isVisible())
             window.search.clear();window.resize(760,650);app.processEvents();self.assertFalse(window.details.isVisible())
+            from test_runtime_contracts import managed_package
+            source=self.root/'managed-ui.msmod'
+            managed_package(source,service.library()[0]['test-mod'][0]['game']['hashes'])
+            service.import_package(source,select=False);window.refresh_library();app.processEvents()
+            managed_item=next(window.list.item(i) for i in range(window.list.count())
+                              if window.list.item(i).data(Qt.ItemDataRole.UserRole)['kind']==packages.MANAGED_KIND)
+            window.list.setCurrentItem(managed_item);window.list.setFocus()
+            QTest.keyClick(window.list,Qt.Key.Key_Space);app.processEvents()
+            self.assertIn('independent-managed',service.state['selected'])
+            self.assertFalse(window.prepare_button.isEnabled())
+            self.assertIn('Runtime is unavailable',window.message.text())
             window.close();start.assert_not_called()
 
 

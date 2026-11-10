@@ -12,6 +12,16 @@ The repository owns the Python/PySide6 desktop app, its native Windows AMD64 boo
 
 `vendored/api/` is the content-pinned first-party SDK. `moonloader.packages` reexports its validator/resolver, and `moonloader.storage` reexports its portable storage functions while retaining loader locks/process identity locally. `moonloader.__init__` resolves the snapshot relative to the repository, never to a sibling development checkout. `tools/check_snapshot.py` verifies every pinned payload file and rejects extra/changed files and symlinks.
 
+The SDK pin is 0.3.0. It validates native v1–v6, ordinary/external managed mods,
+and companions; the UI treats managed packages as selectable game mods. This
+standalone distribution currently hosts native mods only. `available_runtimes`
+is passed to both UI readiness and service selection, and preparation repeats
+the runtime check before creating a game copy. A managed package can be stored
+without being routed to native ModStart. Native v6 interface packages require
+`runtime_api_abi: 1`; the current native receipt has no registry capability and
+rejects them before deployment. The development managed host remains a separate
+integration rather than an implied capability of this distribution.
+
 `runtime/loader/` implements the hook registry, startup sealing, shared Update, camera override/observers and vehicle input/physics ownership. It uses the pinned public SDK. `runtime/native/` retains the private exception bridge, original instruction emulator and version exports. Existing MoonLab symbols and package ABIs retain compatibility. Game pins require separate gameplay qualification.
 
 `tools/build.py` requires installed clang, lld-link and llvm-dlltool (unversioned or version-suffixed names). It compiles the original bootstrap and standalone diagnostic with warnings as errors, checks AMD64/export surfaces and creates a deterministic portable source ZIP plus SHA256SUMS. The ZIP retains `loader/` and `vendored/` and includes native binaries under `loader/runtime/`. This source ZIP requires host Python/PySide6 and bundles no mods or game files. `tools/build_windows.py` adds the separate fully bundled Windows portable ZIP; see [Windows packaging](windows-packaging.md).

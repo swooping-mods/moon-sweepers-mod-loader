@@ -8,7 +8,7 @@ from PySide6.QtCore import QUrl
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QFrame, QLabel, QPushButton,
     QLineEdit, QComboBox, QHBoxLayout, QVBoxLayout, QListWidget, QListWidgetItem, QAbstractItemView,
     QStyledItemDelegate, QStyle, QStyleOptionButton, QScrollArea, QFileDialog, QMessageBox, QDialog, QPlainTextEdit)
-from . import discovery, launch
+from . import discovery, launch, packages
 from .theme import STYLE, COLORS
 
 
@@ -76,7 +76,7 @@ class ModDelegate(QStyledItemDelegate):
         hover = bool(option.state & QStyle.StateFlag.State_MouseOver)
         # Checked means included at launch; Qt selection only chooses the details
         # target. Keep the enabled treatment visible when focus moves elsewhere.
-        checked = mod['kind'] == 'native' and index.data(Qt.ItemDataRole.CheckStateRole) in (Qt.CheckState.Checked, Qt.CheckState.Checked.value)
+        checked = packages.game_mod(mod) and index.data(Qt.ItemDataRole.CheckStateRole) in (Qt.CheckState.Checked, Qt.CheckState.Checked.value)
         background = ('checked_selected' if selected else 'checked_hover' if hover else 'checked') if checked else ('selected' if selected else 'hover' if hover else 'surface')
         painter.fillRect(rect, QColor(COLORS[background]))
         painter.setPen(QColor(COLORS['line'])); painter.drawLine(rect.bottomLeft(), rect.bottomRight())
@@ -88,9 +88,9 @@ class ModDelegate(QStyledItemDelegate):
         check = QStyleOptionButton(); check.rect = self.checkbox(rect)
         check.state = QStyle.StateFlag.State_Enabled | (QStyle.StateFlag.State_On if checked else QStyle.StateFlag.State_Off)
         box = check.rect.adjusted(2,2,-2,-2)
-        if mod['kind'] == 'native':
+        if packages.game_mod(mod):
             painter.setPen(QColor(COLORS['checked_accent'] if checked else COLORS['muted'])); painter.setBrush(QColor(COLORS['checked_accent'] if checked else COLORS['control'])); painter.drawRect(box)
-        if mod['kind'] == 'native' and check.state & QStyle.StateFlag.State_On:
+        if packages.game_mod(mod) and check.state & QStyle.StateFlag.State_On:
             painter.setPen(QPen(QColor('#202020'),2)); painter.drawLine(box.left()+3,box.center().y(),box.left()+7,box.bottom()-3); painter.drawLine(box.left()+7,box.bottom()-3,box.right()-2,box.top()+3)
         grid = self.window.view == 'grid'; details = self.window.view == 'details'
         if grid:
@@ -114,7 +114,7 @@ class ModDelegate(QStyledItemDelegate):
         painter.restore()
 
     def editorEvent(self, event, model, option, index):
-        if index.data(Qt.ItemDataRole.UserRole)['kind'] != 'native': return False
+        if not packages.game_mod(index.data(Qt.ItemDataRole.UserRole)): return False
         # PySide 6.8 can store an enum as an opaque QVariant; Qt's checkState()
         # then reads zero. Pass integer role data on both mouse and key paths.
         if event.type() == event.Type.MouseButtonRelease and event.button() == Qt.MouseButton.LeftButton and self.checkbox(option.rect).contains(event.position().toPoint()):
@@ -235,10 +235,10 @@ class Window(QMainWindow):
             enabled = name in self.service.state['selected']
             if query not in (mod['name']+' '+mod['summary']+' '+name).casefold() or self.filter.currentIndex() == 1 and not enabled: continue
             item = QListWidgetItem(QIcon(str(folder / mod['icon'])), mod['name']); item.setData(Qt.ItemDataRole.UserRole, mod)
-            if mod['kind'] == 'native':
+            if packages.game_mod(mod):
                 item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable); item.setCheckState(Qt.CheckState.Checked if enabled else Qt.CheckState.Unchecked)
             else: item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsUserCheckable)
-            item.setToolTip(mod['name'] + '\n' + mod['summary'] + ('\nSpace toggles this mod.' if mod['kind'] == 'native' else '\nCompanion tool. Open its folder from package details.') + ' Double-click for details.')
+            item.setToolTip(mod['name'] + '\n' + mod['summary'] + ('\nSpace toggles this mod.' if packages.game_mod(mod) else '\nCompanion tool. Open its folder from package details.') + ' Double-click for details.')
             self.list.addItem(item)
             if mod['id'] == old_id: self.list.setCurrentItem(item)
         if not self.list.currentItem() and self.list.count(): self.list.setCurrentRow(0)
@@ -247,7 +247,7 @@ class Window(QMainWindow):
         self.show_details(self.list.currentItem()); self.update_actions()
 
     def checked(self, item):
-        if item.data(Qt.ItemDataRole.UserRole)['kind'] != 'native': return
+        if not packages.game_mod(item.data(Qt.ItemDataRole.UserRole)): return
         name = item.data(Qt.ItemDataRole.UserRole)['id']; selected = set(self.service.state['selected'])
         if item.checkState() == Qt.CheckState.Checked: selected.add(name)
         else: selected.discard(name)
@@ -259,7 +259,7 @@ class Window(QMainWindow):
         # Act on the library rather than visible rows so filters cannot leave
         # hidden mods enabled. Companion tools never participate in game startup.
         previous = self.service.state['selected']
-        self.service.state['selected'] = sorted(name for name,(mod,_) in self.mods.items() if mod['kind'] == 'native') if enabled else []
+        self.service.state['selected'] = sorted(name for name,(mod,_) in self.mods.items() if packages.game_mod(mod)) if enabled else []
         try: self.service.save()
         except (ValueError,OSError) as error:
             self.service.state['selected'] = previous; self.notice(str(error)); return
@@ -319,10 +319,11 @@ class Window(QMainWindow):
         if ready:
             try:
                 from .packages import resolve
-                resolve({name:pair[0] for name,pair in self.mods.items()}, selected, self.inspection['hashes'])
+                resolve({name:pair[0] for name,pair in self.mods.items()}, selected, self.inspection['hashes'],
+                        available_runtimes=self.service.available_runtimes(), runtime_api_abi=self.service.runtime_api_abi())
             except ValueError as error: ready=False; reason=str(error)
         active = self._busy or self.process is not None
-        native = {name for name,(mod,_) in self.mods.items() if mod['kind'] == 'native'}
+        native = {name for name,(mod,_) in self.mods.items() if packages.game_mod(mod)}
         self.select_all_button.setEnabled(not active and bool(native - set(selected)))
         self.deselect_all_button.setEnabled(not active and bool(selected))
         self.launch_button.setEnabled(ready and not active and not self.no_launch)

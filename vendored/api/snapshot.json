@@ -1,7 +1,7 @@
 {
   "schema": "moon-api-snapshot/v1",
   "repository": "moon-sweepers-api",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "files": {
     "include/moon_sweepers/build_menu/bootstrap.h": "3093dd2961659084c6cb3642baf3f8b255b809b25e92e1278c04b9c8b373aed8",
     "include/moon_sweepers/build_menu/build_menu.h": "77da2f004cc2480f6debb3aa30ddde401fb0c373e7f20ee34d64e558b0693683",
@@ -9,17 +9,20 @@
     "include/moon_sweepers/context.h": "6c84145cc761550c4943aa10c52242a538e92243f79a1b20c65b6a4ef9e82605",
     "include/moon_sweepers/hooks.h": "7c006f1254dd6a130f56dac499ba8196fb84ee4883443ee4f12d601534df56ec",
     "include/moon_sweepers/vehicle_input.h": "6af332b456ff9fb74e96a6e963a8cf9627bd51a8edca55f07b6e5a829b9da790",
-    "python/moon_mod_api/__init__.py": "1226aac5d07b0495567585b63512aa3e16342872e630bf1ccd55ab25caa2913f",
+    "python/moon_mod_api/__init__.py": "aa4f2a05d9479abfa5276b94d37dfae73fb6f735ca920a56fbaf06b855ac8cbf",
     "python/moon_mod_api/__main__.py": "4ffd4c62bdbbd2f5aa7c33c55d0dfa01e25846cb7ebcdead17f114bdd95e9eb1",
-    "python/moon_mod_api/build_items.py": "2983eb2b4de674cb8d61ceaaaa0b191417721e1f20b7e1eb0b0e714f2c329e29",
+    "python/moon_mod_api/build_items.py": "9df0615d48678cd3a8c169e1a5302a7a98b1ea4afdcd29ecb49ec5fbb871bf04",
+    "python/moon_mod_api/interfaces.py": "ac2df38541039d0709441983ed6294d1ea0c4c2bff57c28bfa244b9cbba04c67",
     "python/moon_mod_api/pack.py": "672e621ba6b1298eb49047705c5bea9b716dcb65c491608eb00dabf5418d207d",
-    "python/moon_mod_api/packages.py": "74a4f5e51c3d79711ece808e454d17253a1687e3bfa0c6680402956b3568a38e",
+    "python/moon_mod_api/packages.py": "f75c662df35f0ae7e5aa8e0874021a6951d61cfbb316ac9aebb743b52ebed6df",
+    "python/moon_mod_api/runtimes.py": "a8d18584a8313fd9f7a2662cef60857b91f492476f2f0160db5e1ce0340b11ba",
     "python/moon_mod_api/storage.py": "473599f465241e1087a49d420fd59be8c3a810d9ae3dc0c2b57be47e48cb2c89",
-    "docs/building-api.md": "254b4ebbad285cd7bf560d3058e553d2eb973570030dc00c116a2dced55e3f3e",
+    "docs/building-api.md": "b677b998266099009966dc33c4820bcb72cb6fd8c92714ecaefa76b9a211a1d9",
     "docs/conventions.md": "8f11b3c00bb36134ab871fe33346e7397cdbd11829c8e0f8bd9fb82735e409ef",
     "docs/hooks.md": "6b590506c918ae3b043b46b32646231f78e6ac88352d0d93172a0753feee687b",
+    "docs/interfaces.md": "dcf0ce9d7ce99bdc232696c29003c5b83c0f2a1a294347cc73ddbc94f5612ac5",
     "docs/mod-ci.md": "a07d961d5628fb773ea61d3278b300d4aab357578c677a7cf2e3c16c03c0af4a",
-    "docs/packages.md": "67bca401fdeb21e15bb0c42e75eeba27f6e76fc02240b9afc6724311787074a7",
+    "docs/packages.md": "5902dfa29f265beb61b52c361f43a76c42133b113394c6113f53ec73f03d9bda",
     "docs/registries/buildings.json": "e1c796453e075bb8651dd545bcf391ac27fecd9b9499df47c314462c7d86cf71"
   }
 }

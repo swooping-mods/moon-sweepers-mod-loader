@@ -40,10 +40,22 @@ def validate_manifest(manifest):
         if (manifest.get("id") != "build-menu-framework" or manifest.get("kind") != "native" or
                 type(limit) is not int or not FIRST_KIND <= limit <= LAST_KIND):
             raise ValueError("Only Build Menu Framework may declare its supported kind range")
+    if "build_api" in manifest:
+        api = manifest["build_api"]
+        if (not isinstance(api, str) or api.count(".") < 1 or
+                not any(isinstance(spec, dict) and spec.get("api") == api and not spec.get("optional", False)
+                        for spec in manifest.get("requires_apis", []))):
+            raise ValueError("build_api needs an explicit required API dependency")
+        if "build_items" not in manifest:
+            raise ValueError("build_api requires building definitions")
     if "build_items" not in manifest:
         return
     validate_items(manifest["id"], manifest["build_items"])
-    if manifest.get("kind") != "native" or "build-menu-framework" not in manifest.get("requires", []):
+    if "build_api" in manifest:
+        provider = manifest["build_api"].split(".", 1)[0]
+        if provider not in manifest.get("requires", []):
+            raise ValueError("Build items need the selected API provider dependency")
+    elif manifest.get("kind") != "native" or "build-menu-framework" not in manifest.get("requires", []):
         raise ValueError("Build items require the native build-menu-framework dependency")
 
 
@@ -62,14 +74,25 @@ def validate_selection(manifests, selected):
             if key in keys:
                 raise ValueError("Building key " + key + " is claimed more than once")
             ids[kind], keys[key] = name, name
+        if manifest.get("build_items") and "build_api" in manifest:
+            api = manifest["build_api"]
+            provider = api.split(".", 1)[0]
+            framework = manifests.get(provider, {}) if provider in selected else {}
+            spec = framework.get("provides", {}).get(api, {})
+            available = spec.get("limits", {}).get("build_menu_max_kind")
+            required = max(item["kind"] for item in manifest["build_items"])
+            if type(available) is not int or not FIRST_KIND <= available <= LAST_KIND or required > available:
+                raise ValueError("Building API " + api + " does not support kinds through " + str(required))
     framework = manifests.get("build-menu-framework") if "build-menu-framework" in selected else None
-    if ids and framework is not None:
+    legacy_ids = [item["kind"] for name in selected for item in manifests.get(name, {}).get("build_items", [])
+                  if "build_api" not in manifests.get(name, {})]
+    if legacy_ids and framework is not None:
         # Existing released framework manifests predate capability metadata and
         # support only the original extension through kind 224.
         available = framework.get("build_menu_max_kind", 224)
-        if max(ids) > available:
+        if max(legacy_ids) > available:
             raise ValueError("Build Menu Framework supports kinds through " + str(available) +
-                             "; selected providers require " + str(max(ids)))
+                             "; selected providers require " + str(max(legacy_ids)))
 
 
 def validate_registry(registry):

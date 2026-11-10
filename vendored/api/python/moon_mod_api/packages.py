@@ -10,11 +10,15 @@ import tempfile
 import zipfile
 from .storage import contained, key, relative, sha, load, write
 from .build_items import validate_manifest as validate_build_items, validate_selection as validate_build_selection
+from .runtimes import (MANAGED_KIND, MANAGED_ABI, game_mod, validate as validate_runtime,
+                       selection as validate_runtime_selection, require_available)
+from .interfaces import validate_manifest as validate_interfaces, selection as interface_selection
 
 SCHEMA = 'moon-mod-package/v1'
 MAX_FILES = 128
 MAX_BYTES = 64 * 1024 * 1024
-MAX_NATIVE_MODS = 64
+MAX_GAME_MODS = 64
+MAX_NATIVE_MODS = MAX_GAME_MODS  # Retained import name for existing loaders.
 
 
 def validate(manifest):
@@ -25,8 +29,6 @@ def validate(manifest):
     for field in ('name', 'summary', 'description', 'author'):
         if not isinstance(manifest.get(field), str) or not manifest[field].strip() or len(manifest[field]) > 8000: raise ValueError('Missing package ' + field)
     runtime = (manifest.get('kind'), manifest.get('abi'))
-    if runtime not in (('native', 'MoonLab_ModStart/v1'), ('native', 'MoonLab_ModStart/v2'), ('native', 'MoonLab_ModStart/v3'), ('native', 'MoonLab_ModStart/v4'), ('native', 'MoonLab_ModStart/v5'), ('companion', 'PythonZipApp/v1')):
-        raise ValueError('Unsupported mod runtime')
     files = manifest.get('files', {})
     if not isinstance(files, dict) or not files or len(files) > MAX_FILES: raise ValueError('Invalid package file table')
     folded = set()
@@ -36,7 +38,7 @@ def validate(manifest):
         folded.add(name.casefold())
         if not isinstance(digest, str) or not re.fullmatch('[a-f0-9]{64}', digest): raise ValueError('Invalid file digest')
     entry = manifest.get('entry', '')
-    extension = '.dll' if manifest['kind'] == 'native' else '.pyz'
+    extension = '.dll' if game_mod(manifest) else '.pyz'
     if entry not in files or not entry.lower().endswith(extension):
         raise ValueError('Missing native entry DLL' if extension == '.dll' else 'Missing companion Python ZIP application')
     if manifest.get('icon') not in files: raise ValueError('Missing package icon')
@@ -50,19 +52,20 @@ def validate(manifest):
     shared = manifest.get('shared_claims', [])
     if not isinstance(shared, list) or any(v not in ('MoonWalker.Update','MoonWalker.LateUpdate') for v in shared) or len(shared) != len(set(shared)) or len(shared) > 2:
         raise ValueError('Unsupported shared hook claim')
-    if shared and (runtime not in (('native', 'MoonLab_ModStart/v2'), ('native', 'MoonLab_ModStart/v3'), ('native', 'MoonLab_ModStart/v4'), ('native', 'MoonLab_ModStart/v5')) or set(shared) & set(manifest['claims'])):
+    if shared and (runtime not in (('native', 'MoonLab_ModStart/v2'), ('native', 'MoonLab_ModStart/v3'), ('native', 'MoonLab_ModStart/v4'), ('native', 'MoonLab_ModStart/v5'), ('native', 'MoonLab_ModStart/v6')) or set(shared) & set(manifest['claims'])):
         raise ValueError('Shared Update requires v2 and cannot also be exclusive')
     vehicle = manifest.get('vehicle_hook')
-    if 'vehicle_hook' in manifest and (vehicle not in ('input', 'physics') or runtime not in (('native', 'MoonLab_ModStart/v3'),('native', 'MoonLab_ModStart/v4'),('native', 'MoonLab_ModStart/v5'))):
+    if 'vehicle_hook' in manifest and (vehicle not in ('input', 'physics') or runtime not in (('native', 'MoonLab_ModStart/v3'),('native', 'MoonLab_ModStart/v4'),('native', 'MoonLab_ModStart/v5'),('native', 'MoonLab_ModStart/v6'))):
         raise ValueError('Vehicle adapter requires v3 and input or physics role')
     if vehicle and 'MoonPrototypeVehicle.FixedUpdate' in manifest['claims']:
         raise ValueError('Vehicle adapter cannot also claim exclusive FixedUpdate')
     late = manifest.get('late_update_hook')
     if 'late_update_hook' in manifest or 'MoonWalker.LateUpdate' in shared:
-        if runtime not in (('native','MoonLab_ModStart/v4'),('native','MoonLab_ModStart/v5')) or late not in ('observer','override') or 'MoonWalker.LateUpdate' not in shared:
+        if runtime not in (('native','MoonLab_ModStart/v4'),('native','MoonLab_ModStart/v5'),('native','MoonLab_ModStart/v6')) or late not in ('observer','override') or 'MoonWalker.LateUpdate' not in shared:
             raise ValueError('Shared LateUpdate requires v4, a shared claim and observer or override role')
-    if 'hook_framework_abi' in manifest or runtime == ('native','MoonLab_ModStart/v5'):
-        if runtime != ('native','MoonLab_ModStart/v5') or type(manifest.get('hook_framework_abi')) is not int or manifest['hook_framework_abi'] != 1 or not (shared or vehicle):
+    if ('hook_framework_abi' in manifest or runtime == ('native','MoonLab_ModStart/v5')
+            or runtime == ('native','MoonLab_ModStart/v6') and (shared or vehicle)):
+        if runtime not in (('native','MoonLab_ModStart/v5'),('native','MoonLab_ModStart/v6')) or type(manifest.get('hook_framework_abi')) is not int or manifest['hook_framework_abi'] != 1 or not (shared or vehicle):
             raise ValueError('Hook framework requires v5, ABI 1 and a declared shared hook role')
     if 'default_selected' in manifest and type(manifest['default_selected']) is not bool:
         raise ValueError('default_selected must be a boolean')
@@ -70,6 +73,8 @@ def validate(manifest):
     if game.get('id') != 'moon-sweepers' or game.get('appid') != '5335510' or not game.get('hashes'): raise ValueError('Missing game compatibility pins')
     for name, digest in game['hashes'].items():
         if name not in ('GameAssembly.dll', 'MoonSweepers.exe', 'UnityPlayer.dll') or not re.fullmatch('[a-f0-9]{64}', digest): raise ValueError('Invalid game pin')
+    validate_runtime(manifest)
+    validate_interfaces(manifest)
     validate_build_items(manifest)
     return manifest
 
@@ -142,18 +147,21 @@ def installed(folder):
     return manifest
 
 
-def resolve(manifests, selected, game_hashes):
-    """Stable dependency order; only explicit v2 Update subscriptions may share."""
+def resolve(manifests, selected, game_hashes, *, available_runtimes=None, runtime_api_abi=None):
+    """Order selected game mods and reject conflicting runtime/API contracts."""
     chosen = set(selected); ordered = []; visiting = set(); done = set(); claims = {}; shared_claims = {}; vehicle_roles = {}; late_override = []
     if not chosen: raise ValueError('Select at least one mod')
-    if len(chosen) > MAX_NATIVE_MODS: raise ValueError('At most ' + str(MAX_NATIVE_MODS) + ' native mods can be loaded')
+    if len(chosen) > MAX_GAME_MODS: raise ValueError('At most ' + str(MAX_GAME_MODS) + ' game mods can be loaded')
+    validate_runtime_selection(manifests, chosen)
+    api_dependencies = interface_selection(manifests, chosen)
     validate_build_selection(manifests, chosen)
     def visit(name):
         if name in visiting: raise ValueError('Circular mod dependency: ' + name)
         if name in done: return
         if name not in manifests: raise ValueError('Missing installed mod: ' + name)
         mod = manifests[name]
-        if mod['kind'] != 'native': raise ValueError(mod['name'] + ' is a companion tool; open its folder instead of selecting it for a game launch')
+        if not game_mod(mod): raise ValueError(mod['name'] + ' is a companion tool; open its folder instead of selecting it for a game launch')
+        require_available(mod, available_runtimes, runtime_api_abi)
         for file, digest in mod['game']['hashes'].items():
             if game_hashes.get(file) != digest: raise ValueError(mod['name'] + ' does not support this game build')
         for other in mod['conflicts']:
@@ -177,6 +185,8 @@ def resolve(manifests, selected, game_hashes):
         visiting.add(name)
         for dependency in mod['requires']:
             if dependency not in chosen: raise ValueError('Also select required mod: ' + dependency)
+            visit(dependency)
+        for dependency in api_dependencies.get(name, []):
             visit(dependency)
         visiting.remove(name); done.add(name); ordered.append(name)
     for name in sorted(chosen): visit(name)

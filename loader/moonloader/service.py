@@ -49,7 +49,7 @@ class Service:
     def import_package(self, path, select=False):
         with locked(self.root):
             location, manifest = packages.install(path, self.root)
-            if select and manifest['kind'] != 'native':
+            if select and not packages.game_mod(manifest):
                 raise ValueError('Companion tools cannot be selected for a game launch')
             self.state['library'][manifest['id']] = location
             if select and manifest['id'] not in self.state['selected']: self.state['selected'].append(manifest['id'])
@@ -60,7 +60,7 @@ class Service:
         for path in sorted((self.bundle / 'packages').glob('*.msmod')):
             manifest = packages.examine(path)
             if manifest['id'] not in self.state['library']:
-                self.import_package(path, select=manifest['kind'] == 'native' and manifest.get('default_selected', True))
+                self.import_package(path, select=packages.game_mod(manifest) and manifest.get('default_selected', True))
 
     def library(self):
         result = {}; errors = {}
@@ -97,13 +97,22 @@ class Service:
         self.save()
         return installation
 
+    def available_runtimes(self):
+        # The SDK can validate managed packages even when this distribution has
+        # no managed host. Never route an imported managed DLL to ModStart.
+        return {('native', abi) for abi in packages.NATIVE_ABIS}
+
+    def runtime_api_abi(self):
+        return load(self.bundle / 'runtime/receipt.json', {}).get('runtime_api_abi', 0)
+
     def selected(self, installation):
         result = discovery.inspect(installation)
         if not result['compatible']: raise ValueError(result['reason'])
         library, errors = self.library()
         for name in self.state['selected']:
             if name in errors: raise ValueError(errors[name])
-        order = packages.resolve({name: pair[0] for name, pair in library.items()}, self.state['selected'], result['hashes'])
+        order = packages.resolve({name: pair[0] for name, pair in library.items()}, self.state['selected'], result['hashes'],
+                                 available_runtimes=self.available_runtimes(), runtime_api_abi=self.runtime_api_abi())
         return order, library
 
     def install_root(self, installation):
@@ -125,6 +134,9 @@ class Service:
             runtime_receipt = load(self.bundle / 'runtime/receipt.json', {})
             if not runtime.is_file() or sha(runtime) != runtime_receipt.get('sha256'):
                 raise ValueError('Loader runtime is missing or changed; rebuild the distribution')
+            for name in order:
+                packages.require_available(library[name][0], self.available_runtimes(),
+                                           runtime_receipt.get('runtime_api_abi', 0))
             if any(library[name][0].get('shared_claims') for name in order) and runtime_receipt.get('shared_update_abi') != 1:
                 raise ValueError('Selected mods require the shared Update runtime; rebuild the distribution')
             if any(library[name][0].get('vehicle_hook') for name in order) and runtime_receipt.get('vehicle_dispatch_abi') != 1:

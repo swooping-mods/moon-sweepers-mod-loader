@@ -53,6 +53,15 @@ Older packages without this optional declaration
 still rely on runtime registry/slot rejection. There is no automatic assignment
 from load order, hashing or whichever mod starts first.
 
+SDK 0.3 also defines a provider-neutral package route: `build_api` names an
+explicit mandatory `requires_apis` entry, and that ordinary provider mod declares
+its range through `provides[api].limits.build_menu_max_kind`. See the
+[interface guide](interfaces.md). Native v6 and matching runtime API support are
+required, so this metadata route cannot yet be launched with an old runtime.
+It does not implement another building framework or permit multiple writers to
+replace the same native arrays/reader. Existing packages and saved IDs keep the
+legacy route above.
+
 ## Shared ownership and saves
 
 One Build Menu Framework owns the native catalog, definition arrays and reader
