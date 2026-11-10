@@ -8,9 +8,16 @@ Importing a package never downloads, attaches or executes a host.
 `loader/moonloader/managed.py` is the canonical deployment implementation. The
 workshop consumes an exact hash-pinned copy through its explicit
 `tools/sync_managed_runtime.py`; it does not maintain another editable adapter.
-The original C# adapter/generator/profile/repair code remains singly owned by
-the workshop's `runtime/bepinex/` and its checked builder. This loader consumes
-that builder's artifact and preserves its upstream notices/source archives.
+The original C# adapter/generator/profile/repair code is singly owned by
+this repository's `runtime/bepinex/`; `source-snapshot.json` and
+`tools/check_managed_sources.py` bind the transferred sources. The workshop
+consumes an explicit pinned source copy for its private harness.
+`tools/build_managed_adapter.py --attachment PATH --dotnet PATH --output
+artifacts/NEW` compiles the adapter from an existing verified host attachment
+and installed SDK, without the workshop. `--target diagnostic` compiles its
+original generator/API-check command. Neither command runs a game/plugin,
+acquires a runtime or executes generated bindings. Adapter output includes a
+fresh hash-checked attachment preserving all supplied upstream notices/sources.
 
 An attachment contains `receipt.json` and `files/`, using
 `moonlab-bepinex-build/v1`, exact version `6.0.0-be.791+b782da4`, portable paths

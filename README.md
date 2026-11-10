@@ -43,7 +43,18 @@ Use installed Python 3.11+ and PySide6 6.x. `loader/requirements.txt` documents 
 
 Windows: run `Start-Mod-Loader.cmd`, or `py -3 loader/main.py --no-launch --data local/review`.
 
-This source checkout opens an empty mod library. Import your `.msmod` files through **Install mod package**. The native bootstrap is produced by the build command below. The separate `artifacts/moon-sweepers-mod-loader-0.1.0-source.zip` includes the native bootstrap and diagnostic but requires host Python/PySide6. The Windows portable ZIP above includes those dependencies and an executable launcher.
+This source checkout opens an empty mod library. Import your `.msmod` files through **Install mod package**. The native bootstrap is produced by the build command below. The separate `artifacts/moon-sweepers-mod-loader-0.2.0-source.zip` includes the native bootstrap, diagnostic, original runtime/build/test sources, specs and native author SDK, and requires host Python/PySide6. The Windows portable ZIP above includes those dependencies and an executable launcher.
+
+Search combines words across names, descriptions, categories and tags. Framework,
+QoL and Additions filters work in Grid, Details and Text views; Enabled retains
+your existing checkmarks.
+
+Mod authors can use the checked game bindings under `sdk/native/` without the
+development workshop. Core contracts remain owned by Moon Sweepers API;
+framework/gameplay implementations remain separate mod repositories. See
+[native authoring](specs/native-adapter.md). The optional original managed
+adapter sources and their explicit offline builder are also included; see
+[managed runtime](specs/managed-runtime.md).
 
 Only the explicit Launch action requests a game start. New loader data uses **Existing Steam game**: **Prepare files** adds the bootstrap and selected mods without copying the game or Proton or replacing original game DLLs. Existing loader data keeps **Private game copy**, with its existing isolated profiles. Changing the selector never deletes or migrates a private setup. `--no-launch` disables launch for inspection.
 

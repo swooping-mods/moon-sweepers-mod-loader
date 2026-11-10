@@ -27,11 +27,32 @@ def find_tools():
     return tools
 
 
+def source_payload():
+    files = {}
+    for folder in ('loader', 'vendored', 'sdk', 'runtime', 'tools', 'tests', 'specs', '.github'):
+        for path in sorted((ROOT/folder).rglob('*')):
+            if path.is_symlink():
+                raise ValueError('Source alias refused: '+str(path))
+            if path.is_file() and '__pycache__' not in path.parts and path.suffix != '.pyc':
+                if path.is_relative_to(ROOT/'loader/runtime/bepinex'):
+                    continue
+                files[path.relative_to(ROOT).as_posix()] = path.read_bytes()
+    for name in ('README.md', 'CONTRIBUTING.md', '.gitignore', 'run.sh', 'Start-Mod-Loader.cmd'):
+        files[name] = (ROOT/name).read_bytes()
+    return files
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--output', type=Path, default=ROOT/'artifacts')
     parser.add_argument('--with-bepinex', type=Path, metavar='ATTACHMENT',
                         help='Explicit checked runtime attachment containing receipt.json and files/; private mode only')
     args = parser.parse_args(argv)
+    from check_native_sdk import check as check_native_sdk
+    check_native_sdk()
+    from check_managed_sources import check as check_managed_sources
+    check_managed_sources()
+    sources = source_payload()
     managed_payload = {}
     if args.with_bepinex:
         from moonloader.managed import artifact_files
@@ -43,7 +64,9 @@ def main(argv=None):
         managed_payload = {'loader/runtime/bepinex/files/' + name: data for name, data in host_files.items()}
         managed_payload['loader/runtime/bepinex/receipt.json'] = (json.dumps(public_receipt, indent=2) + '\n').encode()
     tools = find_tools()
-    out = ROOT / "artifacts"
+    out = args.output.resolve()
+    if not out.is_relative_to(ROOT/'artifacts'):
+        raise ValueError('Build outputs belong under this project artifacts/')
     work = out / "build"
     work.mkdir(parents=True, exist_ok=True)
     runtime = ROOT / "runtime/loader"
@@ -71,16 +94,10 @@ def main(argv=None):
                "late_update_abi": 1, "shared_update_abi": 1, "vehicle_dispatch_abi": 1,
                "managed_profile_guard_abi": 1,
                "max_native_mods": 64, "public_bootstrap_abi": 1, "runtime_replay": "Installed-game replay not yet qualified"}
-    files = {}
-    for folder in ("loader", "vendored"):
-        for path in sorted((ROOT / folder).rglob("*")):
-            if path.is_file() and "__pycache__" not in path.parts and path.suffix != ".pyc":
-                if path.is_relative_to(ROOT / 'loader/runtime/bepinex'):
-                    continue
-                files[path.relative_to(ROOT).as_posix()] = path.read_bytes()
+    if sources != source_payload():
+        raise ValueError('Loader source changed during compilation; candidate not sealed')
+    files = dict(sources)
     files.update(managed_payload)
-    for name in ("README.md", "run.sh", "Start-Mod-Loader.cmd"):
-        files[name] = (ROOT / name).read_bytes()
     files["loader/runtime/windows-x64/version.dll"] = (work / "version.dll").read_bytes()
     files["loader/runtime/windows-x64/MoonLab.LoaderCheck.exe"] = (work / "MoonLab.LoaderCheck.exe").read_bytes()
     files["loader/runtime/receipt.json"] = (json.dumps(receipt, indent=2) + "\n").encode()
@@ -95,6 +112,7 @@ def main(argv=None):
     checksums = 'SHA256SUMS-managed-private' if managed_payload else 'SHA256SUMS'
     (out / checksums).write_text(hashlib.sha256(archive.read_bytes()).hexdigest() + "  " + archive.name + "\n")
     (out / ("build" + suffix + "-receipt.json")).write_text(json.dumps({"version": VERSION, "runtime": receipt, "pe_exports_valid": True,
+        "source_files": {name: hashlib.sha256(data).hexdigest() for name, data in sources.items()},
         "managed_attachment": bool(managed_payload),
         "archive": archive.name, "sha256": hashlib.sha256(archive.read_bytes()).hexdigest(),
         "limits": ["Host Python/PySide6 required", "No mod binaries bundled", "No game, Wine or native Windows execution"]}, indent=2) + "\n")

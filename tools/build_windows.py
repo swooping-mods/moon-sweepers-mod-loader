@@ -23,14 +23,17 @@ def put(root, name, data):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--inputs', type=Path, required=True, help='Reviewed inert download directory; no downloads occur')
+    parser.add_argument('--output', type=Path, default=ROOT/'artifacts')
     args = parser.parse_args()
     lock = json.loads((ROOT / 'vendored/windows-runtime.lock.json').read_text())
     for item in lock['files']:
         path = args.inputs / item['name']
         if hashlib.sha256(path.read_bytes()).hexdigest() != item['sha256']:
             raise ValueError('Input hash mismatch: ' + item['name'])
-    build.main([])
-    out = ROOT / 'artifacts'
+    out = args.output.resolve()
+    if not out.is_relative_to(ROOT/'artifacts'):
+        raise ValueError('Build outputs belong under this project artifacts/')
+    build.main(['--output', str(out)])
     work = out / 'build'
     tools = build.find_tools()
     cc, link, dlltool = (tools[name] for name in ('clang', 'lld-link', 'llvm-dlltool'))

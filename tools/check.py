@@ -25,6 +25,10 @@ def main():
     if (ROOT / "tools/check_snapshot.py").exists():
         from check_snapshot import check
         check()
+    from check_native_sdk import check as check_native_sdk
+    check_native_sdk()
+    from check_managed_sources import check as check_managed_sources
+    check_managed_sources()
     suite = unittest.defaultTestLoader.discover(str(ROOT / "tests"))
     excluded = []
     included = []

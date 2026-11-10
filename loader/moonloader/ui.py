@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QFrame, QLabe
     QLineEdit, QComboBox, QHBoxLayout, QVBoxLayout, QListWidget, QListWidgetItem, QAbstractItemView,
     QStyledItemDelegate, QStyle, QStyleOptionButton, QScrollArea, QFileDialog, QMessageBox, QDialog, QPlainTextEdit)
 from . import discovery, launch, packages
+from .catalog import CATEGORIES, description as catalog_description, matches
 from .theme import STYLE, COLORS
 
 
@@ -157,8 +158,11 @@ class Window(QMainWindow):
         self.proton_hint = label('Steam launch options: WINEDLLOVERRIDES="version=n,b" %command%\nMerge the version override with your existing options; keep other wrappers and arguments.', 'muted')
         self.proton_hint.setWordWrap(True); self.proton_hint.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse); setup_layout.addWidget(self.proton_hint)
         toolbar, bar = frame('toolbar', True, (16, 8, 16, 8))
-        self.search = QLineEdit(); self.search.setPlaceholderText('Search mods'); self.search.setAccessibleName('Search installed mods'); self.search.setClearButtonEnabled(True); self.search.textChanged.connect(self.render); bar.addWidget(self.search, 1)
-        self.filter = QComboBox(); self.filter.addItems(['All mods', 'Enabled']); self.filter.currentIndexChanged.connect(self.render); bar.addWidget(self.filter)
+        self.search = QLineEdit(); self.search.setPlaceholderText('Search mods, categories or tags'); self.search.setAccessibleName('Search installed mods, categories or tags'); self.search.setClearButtonEnabled(True); self.search.textChanged.connect(self.render); bar.addWidget(self.search, 1)
+        self.search.setToolTip('Search names, descriptions, categories and tags. Combine words, for example: vehicles automation.')
+        self.filter = QComboBox(); self.filter.addItem('All mods', 'all'); self.filter.addItem('Enabled', 'enabled')
+        for value, name in CATEGORIES.items(): self.filter.addItem(name, value)
+        self.filter.setAccessibleName('Filter mods by status or category'); self.filter.currentIndexChanged.connect(self.render); bar.addWidget(self.filter)
         self.select_all_button = QPushButton('Select all'); self.select_all_button.setToolTip('Select every game mod in the library, including hidden search results.'); self.select_all_button.clicked.connect(lambda: self.set_all_checked(True)); bar.addWidget(self.select_all_button)
         self.deselect_all_button = QPushButton('Deselect all'); self.deselect_all_button.setToolTip('Clear all game mod checkmarks, including hidden search results.'); self.deselect_all_button.clicked.connect(lambda: self.set_all_checked(False)); bar.addWidget(self.deselect_all_button)
         self.views = {}
@@ -177,6 +181,7 @@ class Window(QMainWindow):
         self.detail_icon = QLabel(); self.detail_icon.setFixedSize(64,64); details.addWidget(self.detail_icon)
         self.detail_name = label('Select a mod', 'section'); self.detail_name.setWordWrap(True); details.addWidget(self.detail_name)
         self.detail_meta = label('', 'muted'); self.detail_meta.setWordWrap(True); details.addWidget(self.detail_meta)
+        self.detail_catalog = label('', 'muted'); self.detail_catalog.setTextFormat(Qt.TextFormat.PlainText); self.detail_catalog.setWordWrap(True); details.addWidget(self.detail_catalog)
         self.detail_text = label('Check a mod to include it in the next launch.'); self.detail_text.setWordWrap(True); details.addWidget(self.detail_text)
         self.detail_verification = label('', 'muted'); self.detail_verification.setWordWrap(True); details.addWidget(self.detail_verification)
         details.addStretch(); self.open_tool_button = QPushButton('Open tool folder'); self.open_tool_button.clicked.connect(self.open_tool_folder); self.open_tool_button.hide(); details.addWidget(self.open_tool_button)
@@ -280,12 +285,12 @@ class Window(QMainWindow):
         query = self.search.text().casefold(); self.list.blockSignals(True); self.list.clear()
         for name,(mod, folder) in sorted(self.mods.items(), key=lambda item:item[1][0]['name'].casefold()):
             enabled = name in self.service.state['selected']
-            if query not in (mod['name']+' '+mod['summary']+' '+name).casefold() or self.filter.currentIndex() == 1 and not enabled: continue
+            if not matches(mod, query, self.filter.currentData(), enabled): continue
             item = QListWidgetItem(QIcon(str(folder / mod['icon'])), mod['name']); item.setData(Qt.ItemDataRole.UserRole, mod)
             if packages.game_mod(mod):
                 item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable); item.setCheckState(Qt.CheckState.Checked if enabled else Qt.CheckState.Unchecked)
             else: item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsUserCheckable)
-            item.setToolTip(mod['name'] + '\n' + mod['summary'] + ('\nSpace toggles this mod.' if packages.game_mod(mod) else '\nCompanion tool. Open its folder from package details.') + ' Double-click for details.')
+            item.setToolTip(mod['name'] + '\n' + mod['summary'] + ('\n' + catalog_description(mod) if catalog_description(mod) else '') + ('\nSpace toggles this mod.' if packages.game_mod(mod) else '\nCompanion tool. Open its folder from package details.') + ' Double-click for details.')
             self.list.addItem(item)
             if mod['id'] == old_id: self.list.setCurrentItem(item)
         if not self.list.currentItem() and self.list.count(): self.list.setCurrentRow(0)
@@ -329,15 +334,16 @@ class Window(QMainWindow):
         self.more.setEnabled(bool(mod)); self.remove_button.setEnabled(bool(mod))
         self.open_tool_button.setVisible(bool(mod and mod['kind'] == 'companion'))
         if not mod:
-            self.detail_name.setText('Select a mod'); self.detail_meta.clear(); self.detail_text.setText('Check a mod to include it in the next launch.'); self.detail_verification.clear(); self.detail_icon.clear(); return
+            self.detail_name.setText('Select a mod'); self.detail_meta.clear(); self.detail_catalog.clear(); self.detail_catalog.hide(); self.detail_text.setText('Check a mod to include it in the next launch.'); self.detail_verification.clear(); self.detail_icon.clear(); return
         folder = self.mods[mod['id']][1]; self.detail_icon.setPixmap(QIcon(str(folder / mod['icon'])).pixmap(64,64))
         self.detail_name.setText(mod['name']); self.detail_meta.setText('v'+mod['version']+' · '+mod['author']+(' · Companion tool' if mod['kind']=='companion' else ''))
+        self.detail_catalog.setText(catalog_description(mod)); self.detail_catalog.setVisible(bool(catalog_description(mod)))
         self.detail_text.setText(mod['summary']+'\n\n'+ ('Runs separately with Python. Open its folder for the application and README.' if mod['kind']=='companion' else 'Game: '+mod['game'].get('version','Pinned build')))
         self.detail_verification.setText('Compatibility\n'+'\n'.join(key.replace('_',' ').title()+': '+str(value) for key,value in mod.get('verification',{}).items()))
 
     def details_dialog(self, mod):
         if not mod: return
-        self.text_dialog(mod['name'], mod['description'] + '\n\nPackage manifest\n' + json.dumps(mod, indent=2), mod['id'] if mod['kind']=='companion' else None)
+        self.text_dialog(mod['name'], mod['description'] + ('\n\n' + catalog_description(mod) if catalog_description(mod) else '') + '\n\nPackage manifest\n' + json.dumps(mod, indent=2), mod['id'] if mod['kind']=='companion' else None)
 
     def text_dialog(self, title, text, tool_id=None):
         dialog = QDialog(self); dialog.setWindowTitle(title); dialog.resize(720,520); layout = QVBoxLayout(dialog)

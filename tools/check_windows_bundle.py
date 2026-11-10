@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Inspect the produced Windows bundle without executing foreign binaries."""
 import hashlib
+import argparse
 import json
 from pathlib import Path
 import subprocess
@@ -12,9 +13,15 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def main():
-    folder = ROOT / 'artifacts/moon-sweepers-mod-loader-windows-x64'
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--output', type=Path, default=ROOT/'artifacts')
+    args = parser.parse_args()
+    out = args.output.resolve()
+    if not out.is_relative_to(ROOT/'artifacts'):
+        raise ValueError('Bundle outputs must belong to this project artifacts/')
+    folder = out / 'moon-sweepers-mod-loader-windows-x64'
     lock = json.loads((ROOT / 'vendored/windows-runtime.lock.json').read_text())
-    archive = ROOT / f'artifacts/moon-sweepers-mod-loader-{VERSION}-windows-x64.zip'
+    archive = out / f'moon-sweepers-mod-loader-{VERSION}-windows-x64.zip'
     required = ['Mod Loader.exe', 'python/pythonw.exe', 'python/python.exe',
                 'loader/main.py', 'loader/runtime/windows-x64/version.dll',
                 'loader/runtime/windows-x64/MoonLab.LoaderCheck.exe',
@@ -53,7 +60,7 @@ def main():
                'library_source_hashes_verified': True, 'runtime_import_closure': 'Windows system libraries plus bundled DLLs',
                'sha256': hashlib.sha256(archive.read_bytes()).hexdigest(),
                'limits': ['Static package verification; Windows GUI and launcher execution not tested']}
-    (ROOT / 'artifacts/windows-checks.json').write_text(json.dumps(receipt, indent=2) + '\n')
+    (out / 'windows-checks.json').write_text(json.dumps(receipt, indent=2) + '\n')
     print(json.dumps(receipt, indent=2))
 
 

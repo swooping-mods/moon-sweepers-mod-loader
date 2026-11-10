@@ -2,6 +2,7 @@
 
 | Spec | Owning source | Read when |
 |---|---|---|
+| [Native author adapter](native-adapter.md) | `sdk/native/`, `tools/check_native_sdk.py` | Building mods independently of the workshop or changing shared game bindings |
 | [Optional managed runtime](managed-runtime.md) | `loader/moonloader/managed.py`, private service/launch selection, `tools/build.py` | Changing explicit BepInEx attachment, managed private deployment, config/allowlist or backend availability |
 | [Native runtime services](runtime-services.md) | `runtime/loader/{services,service_plan,dispatch,input,camera,interaction}.h`, native startup, `service.py`, pinned SDK | Changing v6/v7 publication, dependency startup, typed frames, input/camera adapters or runtime-plan deployment |
 | [Installed-game deployment](public-deployment.md) | `loader/moonloader/public.py`, mode-aware service/launch/UI, `runtime/loader/public.h` | Changing additive public installation, recovery, enable/disable, uninstall or normal-save policy |

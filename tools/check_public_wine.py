@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Run the built DLL on a synthetic EXE in a new private Wine prefix, offline."""
 import argparse
+from audio_policy import audio_environment
 import hashlib
 import json
 import os
@@ -21,10 +22,13 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--wine',type=Path,required=True,help='Previously installed/reviewed Wine executable')
     parser.add_argument('--portable',type=Path,help='Also smoke-check this built portable folder and actual launcher')
+    parser.add_argument('--build-dir',type=Path,default=ROOT/'artifacts/build')
     args = parser.parse_args()
     if not os.environ.get('GAMESCOPE_WAYLAND_DISPLAY'):
         raise ValueError('Use private headless Gamescope for Wine initialization')
-    tools = build.find_tools(); native = ROOT/'artifacts/build'
+    tools = build.find_tools(); native = args.build_dir.resolve()
+    if not native.is_relative_to(ROOT/'artifacts'):
+        raise ValueError('Native diagnostic inputs must belong to this project artifacts/')
     if not (native/'version.dll').is_file(): raise ValueError('Run tools/build.py first')
     root = ROOT/'artifacts'/('public-wine-'+str(time.time_ns())); root.mkdir()
     subprocess.run([tools['clang'],'--target=x86_64-pc-windows-msvc','-O2','-Wall','-Wextra','-Werror',
@@ -35,6 +39,7 @@ def main():
     env = {k:v for k,v in os.environ.items() if not k.startswith('MOONLAB_')}
     env.update(WINEPREFIX=str(root/'pfx'),WINEDLLOVERRIDES='version=n,b;mscoree,mshtml=',WINEDEBUG='+debugstr',
                WINEFSYNC='0',WINENTSYNC='0',MOONLAB_PROFILE_ROOT='C:\\must-not-be-used')
+    env = audio_environment(env)
     cases = {}
     for name in ('missing','disabled','malformed','unknown-build'):
         folder = root/name; folder.mkdir(); (folder/'MoonLab').mkdir()
@@ -62,7 +67,14 @@ def main():
             success = result.returncode == 0
             if name == 'portable-runtime': success = success and b'no game started' in log.read_bytes()
             cases[name] = {'success':success,'exit':result.returncode}
+    server = args.wine.with_name('wineserver')
+    cleanup = False
+    if server.is_file():
+        stop = subprocess.run([str(server), '-k'], env=env, timeout=10)
+        wait = subprocess.run([str(server), '-w'], env=env, timeout=10)
+        cleanup = stop.returncode == 0 and wait.returncode == 0
     record={'success':all(row['success'] for row in cases.values()),'cases':cases,'game_started':False,
+            'owned_prefix_cleanup':cleanup,
             'runtime_sha256':hashlib.sha256((native/'version.dll').read_bytes()).hexdigest(),
             'runtime':'Existing Wine; fresh private prefix; actual built Windows DLL and BCrypt',
             'limits':['Synthetic EXE only; no supported-game successful mod startup','No native Windows, Steam, Cloud or co-op qualification']}
