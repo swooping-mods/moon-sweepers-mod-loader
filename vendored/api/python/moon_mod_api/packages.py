@@ -9,6 +9,7 @@ import struct
 import tempfile
 import zipfile
 from .storage import contained, key, relative, sha, load, write
+from .build_items import validate_manifest as validate_build_items, validate_selection as validate_build_selection
 
 SCHEMA = 'moon-mod-package/v1'
 MAX_FILES = 128
@@ -69,6 +70,7 @@ def validate(manifest):
     if game.get('id') != 'moon-sweepers' or game.get('appid') != '5335510' or not game.get('hashes'): raise ValueError('Missing game compatibility pins')
     for name, digest in game['hashes'].items():
         if name not in ('GameAssembly.dll', 'MoonSweepers.exe', 'UnityPlayer.dll') or not re.fullmatch('[a-f0-9]{64}', digest): raise ValueError('Invalid game pin')
+    validate_build_items(manifest)
     return manifest
 
 
@@ -145,6 +147,7 @@ def resolve(manifests, selected, game_hashes):
     chosen = set(selected); ordered = []; visiting = set(); done = set(); claims = {}; shared_claims = {}; vehicle_roles = {}; late_override = []
     if not chosen: raise ValueError('Select at least one mod')
     if len(chosen) > MAX_NATIVE_MODS: raise ValueError('At most ' + str(MAX_NATIVE_MODS) + ' native mods can be loaded')
+    validate_build_selection(manifests, chosen)
     def visit(name):
         if name in visiting: raise ValueError('Circular mod dependency: ' + name)
         if name in done: return

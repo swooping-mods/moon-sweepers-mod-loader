@@ -12,4 +12,12 @@ The archive and unpacked payload are limited to 64 MiB, 128 payload files and a 
 
 `resolve` requires explicit dependency selection and yields deterministic dependency-first order. It rejects missing dependencies, cycles, declared conflicts, exclusive hook overlap, duplicate input/physics owners and multiple camera overrides. The capacity is 64 selected native mods; capacity does not imply combined gameplay qualification.
 
-The extraction retains the existing package schema and `MoonLab_*` exported symbols. API package version 0.1.0, C hook ABI 1, native package ABI v5 and the mod's own version are separate version domains.
+The extraction retains the existing package schema and `MoonLab_*` exported symbols. API package version 0.2.0, C hook ABI 1, native package ABI v5 and the mod's own version are separate version domains.
+
+Optional `build_items` entries declare each saved building `kind` and stable
+namespaced `key`. They require the native `build-menu-framework` dependency.
+Only that framework may declare `build_menu_max_kind`; current release 0.2.0
+declares 384. Historical framework manifests without this capability default
+to 224. The resolver rejects overlapping declared building kinds and providers
+that exceed the selected framework's capability before launch. Legacy providers
+without declarations still need runtime conflict checks. See [building API](building-api.md).

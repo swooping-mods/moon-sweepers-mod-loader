@@ -1,0 +1,14 @@
+{
+  "schema": "moon-build-registry/v1",
+  "native_last_kind": 192,
+  "first_kind": 193,
+  "last_kind": 384,
+  "entries": [
+    {
+      "mod": "manual-power-poles",
+      "kind": 193,
+      "key": "manual-power-poles.power-pole",
+      "status": "active"
+    }
+  ]
+}
