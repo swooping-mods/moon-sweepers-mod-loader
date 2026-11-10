@@ -60,8 +60,11 @@ once, retry subscription on that component thread, publish synchronously with
 the callback's borrowed walker, and unsubscribe before disposing callback state.
 Active subscriptions explicitly root their managed delegate and closure until
 successful unsubscribe; a refusal must retain those roots. Host reverse-call,
-GC, exception and allocation checks pass. The candidate's loaded-world legend
-proof remains separate; existing Hints consumers require only the original API.
+GC, exception and allocation checks pass. Its original managed consumer also
+passes a rendered Steam world proof: native legend show/disable/re-enable,
+unsubscribe restoration, forced GC and native-menu normal exit. This qualifies
+that exact provider/consumer/runtime closure, not arbitrary plugins or other
+frameworks. Existing Hints consumers require only the original API.
 
 Native table/code storage lasts until process exit. Do not unload a native
 module, retain borrowed Unity pointers, assume a table is thread-safe, pass
