@@ -3,7 +3,8 @@
 `.github/workflows/check.yml` runs on main pushes, pull requests, manual dispatch
 and reusable workflow calls. Checkout/upload actions retain their reviewed
 immutable pins; checkout does not persist credentials. Build/test jobs have
-read-only permissions. Same-ref Checks runs cancel older unfinished runs.
+read-only permissions. Same-ref runs within each caller workflow cancel older
+unfinished runs; ordinary checks, candidates and releases do not cancel one another.
 
 The Ubuntu 24.04 job uses installed Python/LLVM, runs focused host checks, stages
 exact hash-locked publisher inputs, and calls the offline Windows builder and
