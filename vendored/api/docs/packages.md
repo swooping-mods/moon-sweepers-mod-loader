@@ -4,7 +4,7 @@
 
 A `.msmod` is a ZIP containing `manifest.json` and exactly the payload files named in its SHA-256 table. Required manifest fields are `schema`, `id`, `version`, `name`, `summary`, `description`, `author`, `kind`, `abi`, `entry`, `icon`, `requires`, `conflicts`, `claims`, `game` and `files`.
 
-IDs are lowercase hyphenated names, at most 64 characters. Versions use `major.minor.patch` with an optional lowercase prerelease suffix. Icons contain PNG data with dimensions at most 1024 by 1024. Native entries use `MoonLab_ModStart/v1` through `/v6` and a DLL. Managed entries use `bepinex-il2cpp` with `BepInEx.IL2CPP/6-be791` and a root DLL. Companion tools use `PythonZipApp/v1`, a `.pyz`, and no game dependencies/conflicts/claims. The hook guide explains the required roles and marker for v5.
+IDs are lowercase hyphenated names, at most 64 characters. Versions use `major.minor.patch` with an optional lowercase prerelease suffix. Icons contain PNG data with dimensions at most 1024 by 1024. Native entries use `MoonLab_ModStart/v1` through `/v7` and a DLL. Managed entries use `bepinex-il2cpp` with `BepInEx.IL2CPP/6-be791` and a root DLL. Companion tools use `PythonZipApp/v1`, a `.pyz`, and no game dependencies/conflicts/claims. The hook guide explains the required roles and marker for v5.
 
 The archive and unpacked payload are limited to 64 MiB, 128 payload files and a 32 KiB manifest. Paths must have one portable spelling; absolute/traversal paths, Windows devices/streams, case collisions, symlinks, encryption and unlisted members fail. Integrity hashes do not authenticate an author or sandbox a native DLL.
 
@@ -12,7 +12,7 @@ The archive and unpacked payload are limited to 64 MiB, 128 payload files and a 
 
 `resolve` requires explicit dependency selection and yields deterministic dependency-first order across native/managed game mods. It rejects missing dependencies, cycles, declared conflicts, exclusive hook overlap, duplicate input/physics owners and multiple camera overrides. The capacity is 64 selected game mods; capacity does not imply combined gameplay qualification.
 
-The extraction retains the existing package schema and `MoonLab_*` exported symbols. API package version 0.5.0, C hook ABI 1, native package ABI v6 and the mod's own version are separate version domains.
+The extraction retains the existing package schema and `MoonLab_*` exported symbols. API package version 0.6.0, C hook ABI 1, native package ABIs v6/v7 and the mod's own version are separate version domains.
 
 Optional `build_items` entries declare each saved building `kind` and stable
 namespaced `key`. They require the native `build-menu-framework` dependency.
@@ -46,3 +46,20 @@ Managed packages opting into native `requires_apis` also declare
 `runtime_api_abi: 1`. Their target must advertise `runtime_readiness_abi: 1`.
 This consumer-only bridge preserves native provider ownership; managed packages
 cannot declare native `provides`. See [managed services](managed-services.md).
+
+Native v7 adds mandatory host-adapter admission without changing the C startup
+function or runtime table. It requires `runtime_api_abi: 1` and a nonempty
+`requires_host` map, for example `{"interaction": 1}`. Keys match
+`[a-z][a-z0-9_]{0,63}`; at most 32 exact positive uint32 ABI requirements are
+allowed. This metadata is unavailable to earlier native/managed/companion
+packages; older loaders reject the new package ABI instead of ignoring a
+mandatory requirement. Native v7 retains v6 publication and shared-hook rules.
+
+Target loaders pass their runtime receipt's `host_capabilities` map to `resolve`
+and `require_available`, both during selection and again before preparation.
+Missing or null receipt maps must become `{}`: an explicit empty target refuses
+any required adapter. The SDK's default `host_capabilities=None` permits offline
+inspection only. Extra available capabilities are harmless; missing, malformed
+or different ABI values reject. Capability names describe loader adapters;
+ordinary framework APIs still use owner-qualified `requires_apis` and package
+dependencies. No framework owner identity is registered in this host map.

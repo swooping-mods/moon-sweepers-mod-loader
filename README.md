@@ -94,11 +94,13 @@ the Linux host checks do not establish it.
 
 `vendored/api/` is the pinned first-party SDK from `moon-sweepers-api`, with a file-hash lock. The loader owns the desktop application, native bootstrap, supported game pins and profile/deployment behavior. Gameplay mod implementations and assets are not bundled. Existing `MoonLab_*` native symbols remain unchanged.
 
-The SDK pin is 0.5.0 and understands managed packages and independently owned
-framework interfaces. Native v6 packages use the implemented runtime registry,
+The SDK pin is 0.6.0 and understands managed packages and independently owned
+framework interfaces. Native v6/v7 packages use the implemented runtime registry,
 typed frames, input and camera services. Default builds host native mods;
 importing a managed package does not install its required host. Unsupported
 backends and unavailable runtime capabilities reject before game preparation.
+Native v7 declares exact adapter ABIs in `requires_host`; the loader checks its
+runtime receipt's `host_capabilities` at selection and preparation.
 
 ## Downloads and contributions
 

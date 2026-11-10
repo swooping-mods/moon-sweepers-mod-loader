@@ -127,7 +127,7 @@ static inline int msp_init(const void *data,unsigned int bytes){
         for(unsigned int j=0;j<n;j++)mod->id[j]=(char)id[j];
         mod->id[n]=0;
         mod->package_abi=msp_number(&r,4);mod->provides_count=msp_number(&r,4);mod->provides=r.p;
-        if(!r.ok||!mod->package_abi||mod->package_abi>6||mod->provides_count>64
+        if(!r.ok||!mod->package_abi||mod->package_abi>7||mod->provides_count>64
            ||total+mod->provides_count>256||(mod->package_abi<6&&mod->provides_count))return 0;
         total+=mod->provides_count;
         const unsigned char *names[64];unsigned int lengths[64];
@@ -165,7 +165,7 @@ static int msp_publication(const char *provider,const MoonServicePublicationV1 *
     if(!service_plan.active)return 1;
     char name[161];int n=msp_full_name(provider,spec->service_id,name);MspContract expected;unsigned int index;
     if(!n||!msp_find((const unsigned char *)name,(unsigned int)n,&expected,&index)
-       ||service_plan.mods[index].package_abi!=6||expected.abi!=spec->abi||expected.size!=spec->api_size)return 0;
+       ||service_plan.mods[index].package_abi<6||expected.abi!=spec->abi||expected.size!=spec->api_size)return 0;
     unsigned int count=0;const MoonServiceLimitV1 *limits=0;
     if(spec->size==sizeof(MoonServicePublicationLimitsV1)){
         const MoonServicePublicationLimitsV1 *extended=(const MoonServicePublicationLimitsV1 *)spec;

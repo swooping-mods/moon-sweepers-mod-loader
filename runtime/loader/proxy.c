@@ -171,7 +171,7 @@ static DWORD __stdcall worker(PTR unused){
         PTR mod=LoadLibraryW(path);int (*start)(PTR,PTR)=mod?(int(*)(PTR,PTR))GetProcAddress(mod,"MoonLab_ModStart"):0;
         if(!mod)fail("mod-library-load-failed");
         if(!start)fail("mod-entry-missing");
-        if(service_plan.mods[loaded-1].package_abi==6){
+        if(service_plan.mods[loaded-1].package_abi>=6){
             int (*abi)(void)=(int(*)(void))GetProcAddress(mod,"MoonLab_RuntimeServicesAbi");
             if(!abi||abi()!=1)fail("runtime-api-marker");
         }

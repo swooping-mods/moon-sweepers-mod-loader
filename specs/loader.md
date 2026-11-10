@@ -12,19 +12,24 @@ The repository owns the Python/PySide6 desktop app, its native Windows AMD64 boo
 
 `vendored/api/` is the content-pinned first-party SDK. `moonloader.packages` reexports its validator/resolver, and `moonloader.storage` reexports its portable storage functions while retaining loader locks/process identity locally. `moonloader.__init__` resolves the snapshot relative to the repository, never to a sibling development checkout. `tools/check_snapshot.py` verifies every pinned payload file and rejects extra/changed files and symlinks.
 
-The SDK pin is 0.5.0. It validates native v1–v6, ordinary/external managed mods,
+The SDK pin is 0.6.0. It validates native v1–v7, ordinary/external managed mods,
 and companions; the UI treats managed packages as selectable game mods. This
 default distribution hosts native mods. An explicitly attached checked managed
 runtime enables [private managed deployment](managed-runtime.md).
 `available_runtimes(installation)` accounts for the selected deployment mode in
 both UI readiness and service selection, and preparation repeats the runtime
 check before creating a game copy. A managed package can be stored without
-being routed to native ModStart. Native v6 interface packages require
+being routed to native ModStart. Native v6/v7 interface packages require
 `runtime_api_abi: 1`; the native receipt advertises the implemented registry,
 typed frame, input and camera tables. The deployment includes a bounded startup
 plan and validates actual publications before committing provider startup; see
 [runtime services](runtime-services.md). Installed-game managed hosting and
-native/managed service bridging remain separate qualification work.
+broader native/managed framework presentation remain separate qualification work.
+Native v7 additionally requires a nonempty `requires_host` map. Selection and
+preparation compare exact adapter ABI values against `host_capabilities` in the
+runtime receipt, treating absent/null maps as empty targets. A cached selection
+cannot bypass replacement of that receipt before preparation. Older package
+ABIs retain their existing admission rules.
 
 `runtime/loader/` implements the hook registry, startup sealing, shared Update, camera override/observers and vehicle input/physics ownership. It uses the pinned public SDK. `runtime/native/` retains the private exception bridge, original instruction emulator and version exports. Existing MoonLab symbols and package ABIs retain compatibility. Game pins require separate gameplay qualification.
 

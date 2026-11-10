@@ -1,7 +1,7 @@
 {
   "schema": "moon-api-snapshot/v1",
   "repository": "moon-sweepers-api",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "files": {
     "include/moon_sweepers/build_menu/bootstrap.h": "9b132b47e65ca9ef89a9ef51c88e89c6baf4d61bba4f23ba38c3b701515c80bd",
     "include/moon_sweepers/build_menu/build_menu.h": "77da2f004cc2480f6debb3aa30ddde401fb0c373e7f20ee34d64e558b0693683",
@@ -18,14 +18,14 @@
     "include/moon_sweepers/services.h": "72de584c98cf0ca6367f5decd4416c78fa4eeea44b4b48401d0737a44b2c7a2b",
     "include/moon_sweepers/services_client.h": "17f670371f5798457301b14c046daa99632c9685cc2c5f78921c3fe53d095479",
     "include/moon_sweepers/vehicle_input.h": "6af332b456ff9fb74e96a6e963a8cf9627bd51a8edca55f07b6e5a829b9da790",
-    "python/moon_mod_api/__init__.py": "7425c336dfc713cb12e682ea64befbb1b1324e2197e188b9d21546951606ac6e",
+    "python/moon_mod_api/__init__.py": "aa1750d83da7ee5df989f671f5ba86bea983f73530049918630a9c03f4770641",
     "python/moon_mod_api/__main__.py": "4ffd4c62bdbbd2f5aa7c33c55d0dfa01e25846cb7ebcdead17f114bdd95e9eb1",
     "python/moon_mod_api/build_items.py": "9df0615d48678cd3a8c169e1a5302a7a98b1ea4afdcd29ecb49ec5fbb871bf04",
-    "python/moon_mod_api/interfaces.py": "6120fc776f0a21c2fffd953a899a7dd3dcff7ec95c7ecff07ee153dc9a73bb39",
+    "python/moon_mod_api/interfaces.py": "16cdf0b046807d5425febd138557e0144676dd9f5dd180f5e22cec3afbded0f7",
     "python/moon_mod_api/pack.py": "672e621ba6b1298eb49047705c5bea9b716dcb65c491608eb00dabf5418d207d",
-    "python/moon_mod_api/packages.py": "d36abcc9085ef401cae1dbf406c6a3e8777c834038741aa10af1df848d1db64f",
+    "python/moon_mod_api/packages.py": "ed04be82da6c3bbd9fc3d71aa511d94671a490a615454e133097dfd58ba1bbfb",
     "python/moon_mod_api/runtime_plan.py": "552e3c49a1e0b757baa0f4d2a9194347b925482914c87d07d578a3a9249bdc2c",
-    "python/moon_mod_api/runtimes.py": "51da8752b831c831d788d43b7941b85d8a1a08ba27aa40f2fecc858eeb6c24bb",
+    "python/moon_mod_api/runtimes.py": "ab4dd55e1520eeac847bf062976b05914858c1dc4607800db8ceee8e85567f73",
     "python/moon_mod_api/storage.py": "473599f465241e1087a49d420fd59be8c3a810d9ae3dc0c2b57be47e48cb2c89",
     "managed/MoonSweepers.Api/RuntimeClient.cs": "0337f2ba019acf5887b4eeae5b172b822595c241572630f3bb18ddf3d26f9415",
     "docs/building-api.md": "b677b998266099009966dc33c4820bcb72cb6fd8c92714ecaefa76b9a211a1d9",
@@ -34,7 +34,7 @@
     "docs/interfaces.md": "d9969d1efd74e009342dc3bc9831f3add0a7c276c503f080de842f2c18912cb5",
     "docs/managed-services.md": "c785a8a130a4a1d6b15e305863710074ba3134cd673942d60e04f6c60424d036",
     "docs/mod-ci.md": "a07d961d5628fb773ea61d3278b300d4aab357578c677a7cf2e3c16c03c0af4a",
-    "docs/packages.md": "9b8132cf21314bdf9abfb80962ddd73a1071cfc6b58c3ba8ecce7d4862253885",
+    "docs/packages.md": "7fdffc7e235cc0106891ada68e5723f024c4fe3c23b6339e801bf236c32baec9",
     "docs/registries/buildings.json": "e1c796453e075bb8651dd545bcf391ac27fecd9b9499df47c314462c7d86cf71",
     "docs/runtime-services.md": "12bf9606c6ae8a1b7a11b41c1aeaa198f1b36f476e71d54b21a7842171b3d9a3"
   }

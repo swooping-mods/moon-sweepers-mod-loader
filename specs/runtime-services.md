@@ -84,3 +84,17 @@ framework presentation remains separate. The
 workshop pins/synchronizes the reviewed core separately; its framework migration
 has independent qualification. These host checks do not establish game startup,
 loaded-world/save/co-op behavior, native Windows gameplay or measured speedup.
+
+
+Native v7 host capability admission retains the v6 C startup marker and table
+layouts. The plan parser accepts package numbers 1–7, and both v6/v7 packages
+use the runtime-services marker and publication checks. Required host adapters
+are checked before deployment through SDK `requires_host`/`host_capabilities`;
+they do not add special framework IDs or alter owner-scoped service discovery.
+
+The capability change passes the complete 101-test loader gate with no skips or
+exclusions. New checks cover actual v7 archive intake, missing/null/malformed or
+incompatible runtime capabilities before game copying, a cached selection after
+runtime replacement, and production v7 native provider/consumer calls under
+Clang/GCC ASan/UBSan. The new adapter's engine behavior remains separately owned
+and must qualify its final runtime bytes.

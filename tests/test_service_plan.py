@@ -58,6 +58,12 @@ class ServicePlanChecks(unittest.TestCase):
         values = fixtures()
         self.run_core(encode(values, list(values)), "valid")
 
+    def test_v7_retains_v6_publication_and_consumer_registration(self):
+        values = fixtures()
+        for value in values.values():
+            value.update(abi="MoonLab_ModStart/v7", requires_host={"interaction": 1})
+        self.run_core(encode(values, list(values)), "valid")
+
     def test_missing_publications_and_failed_startup_rollback_apis_and_frames(self):
         values = fixtures()
         for mode in ("missing", "rollback"):

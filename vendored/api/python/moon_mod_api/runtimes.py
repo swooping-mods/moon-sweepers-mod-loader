@@ -3,7 +3,7 @@ import re
 from urllib.parse import urlsplit
 from .storage import relative
 
-NATIVE_ABIS = tuple("MoonLab_ModStart/v" + str(version) for version in range(1, 7))
+NATIVE_ABIS = tuple("MoonLab_ModStart/v" + str(version) for version in range(1, 8))
 MANAGED_KIND = "bepinex-il2cpp"
 MANAGED_ABI = "BepInEx.IL2CPP/6-be791"
 RUNTIMES = frozenset([*(('native', abi) for abi in NATIVE_ABIS),
@@ -14,10 +14,30 @@ def game_mod(manifest):
     return manifest.get("kind") in ("native", MANAGED_KIND)
 
 
+def _capabilities(value):
+    if (not isinstance(value, dict) or len(value) > 32
+            or any(not isinstance(name, str) or not re.fullmatch(r"[a-z][a-z0-9_]{0,63}", name)
+                   or type(abi) is not int or not 0 < abi <= 0xffffffff
+                   for name, abi in value.items())):
+        raise ValueError("Host capabilities require bounded named positive ABI integers")
+
+
+def host_requirements(manifest):
+    """A new package ABI prevents older loaders ignoring mandatory adapter gates."""
+    required = manifest.get("requires_host", {})
+    v7 = manifest.get("kind") == "native" and manifest.get("abi") == NATIVE_ABIS[6]
+    if "requires_host" in manifest or v7:
+        if not v7 or not required:
+            raise ValueError("Host requirements require native v7 and a nonempty capability map")
+        _capabilities(required)
+    return required
+
+
 def validate(manifest):
     runtime = (manifest.get("kind"), manifest.get("abi"))
     if not all(isinstance(value, str) for value in runtime) or runtime not in RUNTIMES:
         raise ValueError("Unsupported mod runtime")
+    host_requirements(manifest)
     if "mode" in manifest or "external" in manifest:
         external = manifest.get("external")
         if manifest.get("mode") != "external" or manifest["kind"] != MANAGED_KIND:
@@ -73,7 +93,8 @@ def selection(manifests, chosen):
             owners[value] = name
 
 
-def require_available(manifest, available, runtime_api_abi=None, runtime_readiness_abi=None):
+def require_available(manifest, available, runtime_api_abi=None, runtime_readiness_abi=None,
+                      host_capabilities=None):
     """An SDK can inspect a backend without promising that a target hosts it."""
     if available is not None and (manifest.get("kind"), manifest.get("abi")) not in available:
         raise ValueError("Runtime is unavailable for " + manifest["id"] + ": " +
@@ -85,3 +106,10 @@ def require_available(manifest, available, runtime_api_abi=None, runtime_readine
             and runtime_readiness_abi is not None
             and (type(runtime_readiness_abi) is not int or runtime_readiness_abi != 1)):
         raise ValueError("Native runtime readiness ABI is unavailable for " + manifest["id"])
+    required = host_requirements(manifest)
+    if required and host_capabilities is not None:
+        _capabilities(host_capabilities)
+        for name, abi in required.items():
+            if host_capabilities.get(name) != abi:
+                raise ValueError("Host capability " + name + " ABI " + str(abi)
+                                 + " is unavailable for " + manifest["id"])

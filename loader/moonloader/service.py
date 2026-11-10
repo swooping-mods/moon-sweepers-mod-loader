@@ -120,7 +120,8 @@ class Service:
         if not self.state['selected'] and self.mode(installation) == 'installed': return [], library
         order = packages.resolve({name: pair[0] for name, pair in library.items()}, self.state['selected'], result['hashes'],
                                  available_runtimes=self.available_runtimes(installation), runtime_api_abi=self.runtime_api_abi(),
-                                 runtime_readiness_abi=load(self.bundle / 'runtime/receipt.json', {}).get('runtime_readiness_abi', 0))
+                                 runtime_readiness_abi=load(self.bundle / 'runtime/receipt.json', {}).get('runtime_readiness_abi', 0),
+                                 host_capabilities=load(self.bundle / 'runtime/receipt.json', {}).get('host_capabilities') or {})
         return order, library
 
     def install_root(self, installation):
@@ -218,7 +219,8 @@ class Service:
                 raise ValueError('Loader runtime is missing or changed; rebuild the distribution')
             for name in order:
                 packages.require_available(library[name][0], self.available_runtimes(installation),
-                                           runtime_receipt.get('runtime_api_abi', 0), runtime_receipt.get('runtime_readiness_abi', 0))
+                                           runtime_receipt.get('runtime_api_abi', 0), runtime_receipt.get('runtime_readiness_abi', 0),
+                                           runtime_receipt.get('host_capabilities') or {})
             if any(library[name][0].get('shared_claims') for name in order) and runtime_receipt.get('shared_update_abi') != 1:
                 raise ValueError('Selected mods require the shared Update runtime; rebuild the distribution')
             if any(library[name][0].get('vehicle_hook') for name in order) and runtime_receipt.get('vehicle_dispatch_abi') != 1:
