@@ -51,7 +51,9 @@ must satisfy the requirement and it starts before the consumer. An incompatible
 selected provider is an error. Required/optional API dependency cycles reject.
 No automatic replacement provider or network acquisition occurs.
 
-IDs use lowercase owner-qualified names, at most 160 characters. A package may
+IDs use lowercase owner-qualified names, at most 160 characters. The owner is
+the ordinary package ID, including valid digit-leading IDs such as `3d-tools`;
+service-name segments begin with a letter. A package may
 publish 64 APIs and require 64; a selected set may publish 256. ABI values are
 positive uint32; table sizes are 1–65536 bytes. Each limit dictionary has at most
 32 lowercase identifiers and nonnegative uint32 capacities. Booleans are not

@@ -6,15 +6,15 @@ static int (*before_hook)(int,Context *);
  * The handler emulates precisely that original instruction and resumes in the
  * original function/unwind region. There is no relocated trampoline. */
 static int instruction_length(const unsigned char *p){
-    /* MoonDepotBuilder.MachineBuilt saves RSI at RSP+0x10 in the pinned
-     * build; the existing five-byte emulator already handles this slot. */
-    if(p[0]==0x48 && p[1]==0x89 && (p[2]==0x4c||p[2]==0x5c||p[2]==0x6c||p[2]==0x74||p[2]==0x7c) && p[3]==0x24 && (p[4]==0x08||p[4]==0x10||p[4]==0x18||p[4]==0x20))return 5;
+    /* MoonDepotBuilder.MachineBuilt saves RSI and MoonMapScreen.Steer saves
+     * RDX in pinned stack home slots. Emulate only these exact store forms. */
+    if(p[0]==0x48 && p[1]==0x89 && (p[2]==0x4c||p[2]==0x54||p[2]==0x5c||p[2]==0x6c||p[2]==0x74||p[2]==0x7c) && p[3]==0x24 && (p[4]==0x08||p[4]==0x10||p[4]==0x18||p[4]==0x20))return 5;
     if(p[0]==0x40 && p[1]>=0x53 && p[1]<=0x57 && p[1]!=0x54)return 2;
     if(p[0]==0x48 && p[1]==0x8b && p[2]==0xc4)return 3;
     return 0;
 }
 static U64 saved_register(Context *c,int reg){
-    switch(reg){case 1:return c->rcx;case 3:return c->rbx;case 5:return c->rbp;case 6:return c->rsi;default:return c->rdi;}
+    switch(reg){case 1:return c->rcx;case 2:return c->rdx;case 3:return c->rbx;case 5:return c->rbp;case 6:return c->rsi;default:return c->rdi;}
 }
 static int exception_handler(ExceptionPointers *e){
     if(e->record->code!=0x80000003)return 0;

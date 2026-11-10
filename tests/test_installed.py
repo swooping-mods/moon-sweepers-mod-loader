@@ -28,7 +28,7 @@ class InstalledChecks(unittest.TestCase):
         service, installation = test_loader.LoaderChecks.prepared_fixture(self)
         service.set_mode(installation, 'installed')
         receipt = service.bundle / 'runtime/receipt.json'
-        write(receipt, {**load(receipt), 'public_bootstrap_abi': 1})
+        write(receipt, {**load(receipt), 'public_bootstrap_abi': 1, 'runtime_api_abi': 1})
         service.accept_normal_saves(installation, 'fresh')
         return service, installation
 
@@ -109,6 +109,41 @@ class InstalledChecks(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'coexistence'): service.prepare(installation)
         self.assertEqual((game/'winhttp.dll').read_bytes(), b'other bootstrap')
         self.assertFalse((game/'MoonLab').exists())
+
+    def test_enable_refuses_new_competing_loader_but_disable_and_uninstall_work(self):
+        service, installation = self.fixture(); service.prepare(installation); game = Path(installation.path)
+        (game/'winhttp.dll').write_bytes(b'new competing loader')
+        service.set_enabled(installation, False)
+        disabled = (game/public.CONFIG).read_bytes()
+        with self.assertRaisesRegex(ValueError, 'coexistence'): service.set_enabled(installation, True)
+        self.assertEqual((game/public.CONFIG).read_bytes(), disabled)
+        service.uninstall(installation)
+        self.assertEqual((game/'winhttp.dll').read_bytes(), b'new competing loader')
+
+    def test_case_alias_of_control_directory_is_rejected_before_ownership(self):
+        service, installation = self.fixture(); game = Path(installation.path)
+        alias = game/'moonlab'; alias.mkdir(); (alias/'user.txt').write_bytes(b'preserve')
+        with self.assertRaisesRegex(ValueError, 'Case alias'): service.prepare(installation)
+        self.assertEqual((alias/'user.txt').read_bytes(), b'preserve')
+        self.assertFalse((alias/'owner.json').exists())
+        self.assertFalse((game/'version.dll').exists())
+
+    def test_package_destination_aliases_reject_before_transaction(self):
+        service, installation = self.fixture(); game = Path(installation.path)
+        for extra in ({'MOD.dll':b'alias'}, {'Assets/a':b'a', 'assets/b':b'b'}):
+            with self.subTest(extra=list(extra)):
+                manifest = test_loader.descriptor('alias-mod'); manifest['entry'] = 'entry.dll'
+                manifest['game']['hashes'] = discovery.PIN
+                files = {'entry.dll':b'inert DLL', 'icon.png':test_loader.PNG, **extra}
+                manifest['files'] = {n:public.digest(data) for n,data in files.items()}
+                package = self.root/'alias.msmod'
+                with zipfile.ZipFile(package,'w') as archive:
+                    archive.writestr('manifest.json',json.dumps(manifest))
+                    for name,data in files.items(): archive.writestr(name,data)
+                service.import_package(package, select=True); service.accept_normal_saves(installation, 'fresh')
+                with self.assertRaisesRegex(ValueError, 'alias|collision'): service.prepare(installation)
+                self.assertFalse((game/'version.dll').exists())
+                self.assertFalse((service.install_root(installation)/'pending-installed.json').exists())
 
     def test_installed_api1_plan_is_hashed_and_unknown_edit_preserved(self):
         from moon_mod_api.runtime_plan import encode, PATH
@@ -220,6 +255,41 @@ class InstalledChecks(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Unknown edit'): service.uninstall(installation)
         self.assertEqual((game/'version.dll').read_bytes(), b'unrecognized edit')
 
+    def test_game_start_during_apply_defers_rollback_until_closed(self):
+        service, installation = self.fixture(); root = service.prepare(installation); game = Path(installation.path)
+        before = load(root/'deployment.json'); replace_file = os.replace; running = False
+        def stopped():
+            if running: raise ValueError('Game is still running')
+        def start_after_write(source, destination):
+            nonlocal running
+            result = replace_file(source, destination)
+            if '/new/' in str(source): running = True
+            elif running: self.fail('Rollback mutated files while the game was running')
+            return result
+        with patch('moonloader.public.assert_stopped', side_effect=stopped), patch('moonloader.public.os.replace', side_effect=start_after_write):
+            with self.assertRaisesRegex(ValueError, 'still running'): service.prepare(installation)
+            self.assertTrue((root/'pending-installed.json').exists())
+            with self.assertRaisesRegex(ValueError, 'still running'): public.recover(root, installation)
+        with public.operation(root, game): public.recover(root, installation)
+        self.assertEqual(load(root/'deployment.json'), before)
+        self.assertTrue(all(public.current_hash(game, n) == h for n,h in before['files'].items()))
+
+    def test_edit_after_recovery_preflight_is_preserved(self):
+        service, installation = self.fixture(); root = service.prepare(installation); game = Path(installation.path)
+        old = load(root/'deployment.json'); stage = game/('.moonlab-stage-' + 'a'*32); stage.mkdir()
+        for name in old['files']:
+            path = stage/'old'/name; path.parent.mkdir(parents=True,exist_ok=True); path.write_bytes((game/name).read_bytes())
+        write(root/'pending-installed.json', {'before':old,'after':old,'stage':stage.name})
+        write_bytes = public.file_bytes
+        def external_edit(path, data):
+            write_bytes(path, data)
+            if str(path).endswith('/restore/version.dll'): (game/'version.dll').write_bytes(b'edit during recovery')
+        with patch('moonloader.public.file_bytes', side_effect=external_edit):
+            with public.operation(root, game):
+                with self.assertRaisesRegex(ValueError, 'Unknown edit'): public.recover(root, installation)
+        self.assertEqual((game/'version.dll').read_bytes(), b'edit during recovery')
+        self.assertTrue((root/'pending-installed.json').exists())
+
     def test_first_install_crash_can_recover_without_a_committed_receipt(self):
         service, installation = self.fixture(); game = Path(installation.path); root = service.install_root(installation)
         replace_file = os.replace
@@ -232,6 +302,20 @@ class InstalledChecks(unittest.TestCase):
         self.assertTrue((root/'pending-installed.json').exists()); self.assertFalse((root/'deployment.json').exists())
         service.prepare(installation)
         self.assertFalse((root/'pending-installed.json').exists()); self.assertTrue((game/public.CONFIG).exists())
+
+    def test_first_install_failure_before_payload_writes_cleans_journal(self):
+        service, installation = self.fixture(); root = service.install_root(installation)
+        validate = public.validate_game; calls = 0
+        def fail_after_staging(item):
+            nonlocal calls
+            calls += 1
+            if calls == 2: raise ValueError('Game changed after staging')
+            return validate(item)
+        with patch('moonloader.public.validate_game', side_effect=fail_after_staging):
+            with self.assertRaisesRegex(ValueError, 'after staging'): service.prepare(installation)
+        self.assertFalse((root/'pending-installed.json').exists())
+        self.assertFalse((Path(installation.path)/'version.dll').exists())
+        service.prepare(installation)
 
     def test_disable_before_prepare_has_no_installed_side_effects(self):
         service, installation = self.fixture()
@@ -305,6 +389,7 @@ class InstalledChecks(unittest.TestCase):
     def test_native_public_config_and_build_guard_ordering(self):
         binary = self.root/'public-check'
         subprocess.run(['clang','-std=c11','-fshort-wchar','-Wall','-Wextra','-Werror',
+                        '-O1','-fsanitize=address,undefined','-fno-sanitize-recover=all',
                         str(test_loader.ROOT/'tests/native_public_checks.c'),'-o',str(binary)],check=True)
         result = subprocess.run([str(binary)],check=True,capture_output=True,text=True)
         self.assertIn('guard ordering passed', result.stdout)

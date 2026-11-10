@@ -14,15 +14,17 @@ The repository owns the Python/PySide6 desktop app, its native Windows AMD64 boo
 
 The SDK pin is 0.4.0. It validates native v1–v6, ordinary/external managed mods,
 and companions; the UI treats managed packages as selectable game mods. This
-standalone distribution currently hosts native mods only. `available_runtimes`
-is passed to both UI readiness and service selection, and preparation repeats
-the runtime check before creating a game copy. A managed package can be stored
-without being routed to native ModStart. Native v6 interface packages require
+default distribution hosts native mods. An explicitly attached checked managed
+runtime enables [private managed deployment](managed-runtime.md).
+`available_runtimes(installation)` accounts for the selected deployment mode in
+both UI readiness and service selection, and preparation repeats the runtime
+check before creating a game copy. A managed package can be stored without
+being routed to native ModStart. Native v6 interface packages require
 `runtime_api_abi: 1`; the native receipt advertises the implemented registry,
 typed frame, input and camera tables. The deployment includes a bounded startup
 plan and validates actual publications before committing provider startup; see
-[runtime services](runtime-services.md). The development managed host remains a separate
-integration rather than an implied capability of this distribution.
+[runtime services](runtime-services.md). Installed-game managed hosting and
+native/managed service bridging remain separate qualification work.
 
 `runtime/loader/` implements the hook registry, startup sealing, shared Update, camera override/observers and vehicle input/physics ownership. It uses the pinned public SDK. `runtime/native/` retains the private exception bridge, original instruction emulator and version exports. Existing MoonLab symbols and package ABIs retain compatibility. Game pins require separate gameplay qualification.
 

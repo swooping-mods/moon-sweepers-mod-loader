@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 import uuid
+from . import packages
 from .discovery import APP_ID, library_roots
 from .storage import contained, load, write, sha, locked, assert_inactive, process_birth
 from .settings import environment as settings_environment
@@ -56,6 +57,10 @@ def plan(service, installation, platform=None, check_client=True):
     """Deterministic preflight with no runtime initialization or directory writes."""
     platform = platform or sys.platform
     order, library = service.selected(installation)
+    native_order = [name for name in order if library[name][0]['kind'] == 'native']
+    managed_selected = any(library[name][0]['kind'] == packages.MANAGED_KIND for name in order)
+    external_mods = {name: library[name][0]['external']['adapter'] for name in order
+                     if library[name][0].get('mode') == 'external'}
     root = service.install_root(installation)
     if service.mode(installation) == 'installed':
         from .public import preview
@@ -86,13 +91,14 @@ def plan(service, installation, platform=None, check_client=True):
     if not str(root).isascii() or len(str(root)) > 170:
         raise ValueError('This v1 mod needs a short ASCII data folder. Start the loader with --data PATH.')
     if platform == 'win32':
-        environment = {'MOONLAB_MODS': ';'.join(order), 'MOONLAB_EVIDENCE': str(run),
+        environment = {'MOONLAB_MODS': ';'.join(native_order), 'MOONLAB_EVIDENCE': str(run),
                        'MOONLAB_RUN_ID': run.name, 'MOONLAB_PROFILE_ROOT': str(profile)}
+        if managed_selected: environment.update(MOONLAB_BEPINEX='1', MOONLAB_BEPINEX_EVIDENCE=str(run))
         environment.update(settings_environment(root, order, platform))
         if installation.store == 'steam': environment.update(SteamAppId=APP_ID, SteamGameId=APP_ID)
         command = [str(game / 'MoonSweepers.exe'), '-logFile', str(run / 'Player.log')]
         return {'platform': platform, 'command': command, 'env': environment, 'cwd': str(game), 'run': str(run),
-                'store': installation.store, 'profile': str(profile), 'order': order, 'runtime': 'Windows native',
+                'store': installation.store, 'profile': str(profile), 'order': order, 'external_mods': external_mods, 'runtime': 'Windows native',
                 'limits': ['Native Windows game replay pending', 'Process-local known-folder isolation requires rendered qualification']}
     if platform != 'linux': raise ValueError('Supported hosts are Linux and Windows')
     if installation.store != 'steam' or not installation.steam_root:
@@ -105,10 +111,11 @@ def plan(service, installation, platform=None, check_client=True):
     windows = lambda p: 'Z:' + str(p).replace('/', '\\')
     environment = {'STEAM_COMPAT_CLIENT_INSTALL_PATH': str(steam), 'STEAM_COMPAT_DATA_PATH': str(prefix.parent),
                    'WINEPREFIX': str(prefix), 'SteamAppId': APP_ID, 'SteamGameId': APP_ID,
-                   'WINEDLLOVERRIDES': 'version=n,b', 'WINEDEBUG': '-all', 'PROTON_NO_NTSYNC': '1',
-                   'WINEFSYNC': '0', 'WINENTSYNC': '0', 'MOONLAB_MODS': ';'.join(order),
+                   'WINEDLLOVERRIDES': 'version=n,b;winhttp=n,b' if managed_selected else 'version=n,b', 'WINEDEBUG': '-all', 'PROTON_NO_NTSYNC': '1',
+                   'WINEFSYNC': '0', 'WINENTSYNC': '0', 'MOONLAB_MODS': ';'.join(native_order),
                    'MOONLAB_EVIDENCE': windows(run), 'MOONLAB_RUN_ID': run.name,
                    'MOONLAB_PROFILE_ROOT': 'M:\\profile'}
+    if managed_selected: environment.update(MOONLAB_BEPINEX='1', MOONLAB_BEPINEX_EVIDENCE=windows(run))
     environment.update(settings_environment(root, order, platform))
     flatpak = str(steam).startswith(str(Path.home() / '.var/app/com.valvesoftware.Steam/'))
     if flatpak:
@@ -123,7 +130,7 @@ def plan(service, installation, platform=None, check_client=True):
         command = [sys.executable, str(proton / 'proton'), 'run']
     command += [str(game / 'MoonSweepers.exe'), '-logFile', windows(run / 'Player.log')]
     return {'platform': platform, 'command': command, 'env': environment, 'cwd': str(game), 'run': str(run),
-            'store': installation.store, 'profile': str(profile), 'order': order, 'runtime': 'Steam / Proton Experimental',
+            'store': installation.store, 'profile': str(profile), 'order': order, 'external_mods': external_mods, 'runtime': 'Steam / Proton Experimental',
             'installed_proton': str(installed), 'private_proton': str(proton),
             'limits': ['Packaged loader replay pending', 'Native Steam host adapter is unqualified; existing evidence uses Flatpak Steam']}
 

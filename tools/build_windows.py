@@ -29,7 +29,7 @@ def main():
         path = args.inputs / item['name']
         if hashlib.sha256(path.read_bytes()).hexdigest() != item['sha256']:
             raise ValueError('Input hash mismatch: ' + item['name'])
-    build.main()
+    build.main([])
     out = ROOT / 'artifacts'
     work = out / 'build'
     tools = build.find_tools()

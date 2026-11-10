@@ -216,7 +216,7 @@ class LoaderChecks(unittest.TestCase):
     def test_plan_windows_is_explicit_no_spawn(self):
         service=Service(self.root/'data',self.root/'bundle');installation=discovery.Installation(str(self.root/'source'),'steam','C:/Steam')
         service.set_mode(installation, 'private')
-        with patch.object(service,'selected',return_value=(['test-mod'],{})),patch('subprocess.Popen') as spawn:
+        with patch.object(service,'selected',return_value=(['test-mod'],{'test-mod':(descriptor(),self.root/'fixture')})),patch('subprocess.Popen') as spawn:
             record=launch.plan(service,installation,platform='win32')
         spawn.assert_not_called();self.assertEqual(record['env']['SteamAppId'],'5335510')
         self.assertIn('profile',record['env']['MOONLAB_PROFILE_ROOT']);self.assertNotIn('MOONLAB_TEST_TOOLS',record['env'])
@@ -225,7 +225,7 @@ class LoaderChecks(unittest.TestCase):
     def test_nonsteam_linux_requires_separate_adapter(self):
         service=Service(self.root/'data',self.root/'bundle')
         service.state['default_mode'] = 'private'
-        with patch.object(service,'selected',return_value=(['test-mod'],{})):
+        with patch.object(service,'selected',return_value=(['test-mod'],{'test-mod':(descriptor(),self.root/'fixture')})):
             with self.assertRaisesRegex(ValueError,'another storefront'):launch.plan(service,discovery.Installation(str(self.root/'source'),'epic'))
 
     def test_host_native_save_mapping_and_iat_guard(self):

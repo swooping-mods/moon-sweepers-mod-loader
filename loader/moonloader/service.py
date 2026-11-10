@@ -100,10 +100,13 @@ class Service:
         self.save()
         return installation
 
-    def available_runtimes(self):
-        # The SDK can validate managed packages even when this distribution has
-        # no managed host. Never route an imported managed DLL to ModStart.
-        return {('native', abi) for abi in packages.NATIVE_ABIS}
+    def available_runtimes(self, installation=None):
+        result = {('native', abi) for abi in packages.NATIVE_ABIS}
+        if installation is not None and self.mode(installation) == 'private':
+            from . import managed
+            if managed.available(self.bundle, load(self.bundle / 'runtime/receipt.json', {})):
+                result.add((packages.MANAGED_KIND, packages.MANAGED_ABI))
+        return result
 
     def runtime_api_abi(self):
         return load(self.bundle / 'runtime/receipt.json', {}).get('runtime_api_abi', 0)
@@ -116,7 +119,7 @@ class Service:
             if name in errors: raise ValueError(errors[name])
         if not self.state['selected'] and self.mode(installation) == 'installed': return [], library
         order = packages.resolve({name: pair[0] for name, pair in library.items()}, self.state['selected'], result['hashes'],
-                                 available_runtimes=self.available_runtimes(), runtime_api_abi=self.runtime_api_abi())
+                                 available_runtimes=self.available_runtimes(installation), runtime_api_abi=self.runtime_api_abi())
         return order, library
 
     def install_root(self, installation):
@@ -213,7 +216,7 @@ class Service:
             if not runtime.is_file() or sha(runtime) != runtime_receipt.get('sha256'):
                 raise ValueError('Loader runtime is missing or changed; rebuild the distribution')
             for name in order:
-                packages.require_available(library[name][0], self.available_runtimes(),
+                packages.require_available(library[name][0], self.available_runtimes(installation),
                                            runtime_receipt.get('runtime_api_abi', 0))
             if any(library[name][0].get('shared_claims') for name in order) and runtime_receipt.get('shared_update_abi') != 1:
                 raise ValueError('Selected mods require the shared Update runtime; rebuild the distribution')
@@ -224,18 +227,24 @@ class Service:
             if any(library[name][0].get('hook_framework_abi') for name in order) and runtime_receipt.get('hook_framework_abi') != 1:
                 raise ValueError('Selected mods require hook framework ABI 1; rebuild the distribution')
             capacity = runtime_receipt.get('max_native_mods', 32)
-            if not isinstance(capacity, int) or len(order) > capacity:
+            if not isinstance(capacity, int) or sum(library[name][0]['kind'] == 'native' for name in order) > capacity:
                 raise ValueError('Selected mods exceed this loader runtime capacity; rebuild the distribution')
             if self.mode(installation) == 'installed':
                 if runtime_receipt.get('public_bootstrap_abi') != 1:
                     raise ValueError('Runtime does not support installed-game startup; rebuild the distribution')
                 from . import public
                 return public.prepare(self, installation, order, library, runtime)
+            managed_selected = any(library[name][0]['kind'] == packages.MANAGED_KIND for name in order)
+            managed_files = {}
+            if managed_selected:
+                from . import managed
+                managed.validate_runtime_receipt(runtime_receipt)
+                managed_files = managed.runtime_files(self.bundle)
             root.mkdir(parents=True, exist_ok=True)
             game = contained(root, 'game'); baseline_file = root / 'baseline.json'
             if not baseline_file.exists():
                 if game.exists(): raise ValueError('Unowned private game folder; move it aside before preparing')
-                if (source / 'version.dll').exists() or (source / 'MoonLab').exists():
+                if any((source / name).exists() for name in ('version.dll', 'MoonLab', 'winhttp.dll', 'BepInEx', 'doorstop_config.ini')):
                     raise ValueError('Source already has a loader; choose a clean game installation')
                 before = tree(source)
                 stage = contained(root, 'copy-' + uuid.uuid4().hex)
@@ -268,13 +277,26 @@ class Service:
                     files['steam_appid.txt'] = (discovery.APP_ID + '\n').encode('ascii')
                 elif (game / 'steam_appid.txt').read_text().strip() != discovery.APP_ID:
                     raise ValueError('Source Steam application ID differs')
+            files.update(managed_files)
             for name in order:
                 manifest, folder = library[name]
+                if manifest['kind'] == packages.MANAGED_KIND:
+                    payload = managed.plugin_files(manifest, folder)
+                    if set(payload) & files.keys(): raise ValueError('Managed package destination collision')
+                    files.update(payload)
+                    continue
                 for member in manifest['files']:
                     target = 'MoonLab/mods/' + name + '/' + ('mod.dll' if member == manifest['entry'] else member)
                     if target in files: raise ValueError('Package entry alias collision')
                     files[target] = contained(folder, member).read_bytes()
+            if managed_selected:
+                managed.preflight(game, files)
+                # Keep the executable-input allowlist inside the same deployment
+                # transaction as the bytes it authorizes.
+                files['BepInEx/MoonLab/allowed-inputs.json'] = managed.allowlist(files)
             self.deploy(root, files, order)
+            if managed_selected:
+                managed.prepare_cache(game, self.bundle)
             from .settings import seed
             seed(root, order, library)
             profile = contained(root, 'profile')

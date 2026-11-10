@@ -60,6 +60,18 @@ static int public_hex(const char *s,DWORD length){
     for(DWORD i=0;i<length;i++)if(!((s[i]>='0'&&s[i]<='9')||(s[i]>='a'&&s[i]<='f')))return 0;
     return 1;
 }
+/* Match SDK storage.key for package IDs, including a leading digit. Qualified
+ * API names retain their separate letter-leading namespace contract. */
+static int valid_id(const WCHAR *s){
+    unsigned int n=0;int segment=0;
+    for(;*s;s++){
+        if(++n>64)return 0;
+        if(*s=='-'){if(!segment)return 0;segment=0;}
+        else if((*s>='a'&&*s<='z')||(*s>='0'&&*s<='9'))segment=1;
+        else return 0;
+    }
+    return segment;
+}
 static char *public_field(char **cursor,const char *prefix){
     char *start=*cursor;
     while(*prefix)if(*start++!=*prefix++)return 0;
@@ -140,13 +152,14 @@ static int public_payload(void){
     char inventory[100];append(append(inventory,prefix),"files.txt");DWORD size;
     if(!public_read(inventory,public_inventory,sizeof(public_inventory),&size)||!size)return 0;
     for(DWORD i=0;i<size;i++)if(!public_inventory[i])return 0;
-    char *line=public_inventory;unsigned int entries=0;
+    char *line=public_inventory;unsigned int entries=0,plans=0;
     while(*line){
         char *end=line;while(*end&&*end!='\n')end++;
         if(*end!='\n'||end-line<67)return 0;
         *end=0;if(line[64]!=' '||!public_hex(line,64))return 0;
         char *name=line+65,*p=name;const char *q="MoonLab/mods/";
-        if(!equal(name,"MoonLab/runtime-plan.bin"))while(*q)if(*p++!=*q++)return 0;
+        if(equal(name,"MoonLab/runtime-plan.bin"))plans++;
+        else while(*q)if(*p++!=*q++)return 0;
         if(!public_relative(name)||!public_hash(name,line,0))return 0;
         entries++;line=end+1;
     }
@@ -162,7 +175,9 @@ static int public_payload(void){
         if(!found)return 0;
         if(!*id)break;id++;
     }
-    return entries>0;
+    /* The worker consumes this plan even for legacy native packages. An
+     * omitted inventory row must not authorize unchecked startup contracts. */
+    return entries>0&&plans==1;
 }
 static int public_startup(void){
     DWORD n=GetModuleFileNameW(self_module,public_base,950);

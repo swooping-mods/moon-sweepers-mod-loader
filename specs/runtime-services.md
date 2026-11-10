@@ -1,5 +1,7 @@
 # Native runtime services
 
+Native startup accepts package IDs using the SDK's lowercase alphanumeric groups separated by single hyphens, including numeric prefixes. API owner prefixes use the same package grammar; service names keep their separate letter-leading grammar.
+
 The pinned SDK 0.4 owns public C tables, interface/package validation and
 `runtime_plan.encode`. This loader owns the executable implementation. Domain
 framework APIs remain ordinary independent mod packages with opaque tables.

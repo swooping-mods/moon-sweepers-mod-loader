@@ -15,7 +15,6 @@ typedef __WCHAR_TYPE__ WCHAR;
 static PTR self_module;
 static char *append(char *out,const char *s){while(*s)*out++=*s++;*out=0;return out;}
 static int equal(const char *a,const char *b){return strcmp(a,b)==0;}
-static int valid_id(const WCHAR *s){int n=0;while(*s){if(!((*s>='a'&&*s<='z')||(*s>='0'&&*s<='9')||*s=='-')||++n>64)return 0;s++;}return n>0;}
 DWORD GetModuleFileNameW(PTR,WCHAR *,DWORD);
 PTR CreateFileW(const WCHAR *,DWORD,DWORD,PTR,DWORD,DWORD,PTR);
 BOOL CloseHandle(PTR);
@@ -33,7 +32,7 @@ static int wrong_hash;
 static const char *generation="0123456789abcdef0123456789abcdef";
 static void reset(const char *enabled,const char *mods){
     snprintf(configuration,sizeof(configuration),"MOONLAB-PUBLIC-1\ninstallation=0123456789abcdef\ngeneration=%s\nenabled=%s\nmods=%s\n",generation,enabled,mods);
-    snprintf(inventory,sizeof(inventory),"%s MoonLab/mods/test-mod/mod.dll\n",mod_hash);
+    snprintf(inventory,sizeof(inventory),"%s MoonLab/mods/test-mod/mod.dll\n%s MoonLab/runtime-plan.bin\n",mod_hash,mod_hash);
     hashes=environments=0;wrong_hash=0;public_mode=1;
 }
 DWORD GetModuleFileNameW(PTR module,WCHAR *out,DWORD capacity){
@@ -47,9 +46,9 @@ PTR CreateFileW(const WCHAR *path,DWORD access,DWORD share,PTR security,DWORD mo
     if(strstr(name,"active.txt"))file_data=configuration;
     else if(strstr(name,"files.txt"))file_data=inventory;
     else {
-        const char *names[]={"GameAssembly.dll","MoonSweepers.exe","UnityPlayer.dll","mod.dll"};
-        hashing_file=4;for(unsigned int j=0;j<4;j++)if(strstr(name,names[j]))hashing_file=j;
-        if(hashing_file==4)return (PTR)(U64)-1;
+        const char *names[]={"GameAssembly.dll","MoonSweepers.exe","UnityPlayer.dll","mod.dll","runtime-plan.bin"};
+        hashing_file=5;for(unsigned int j=0;j<5;j++)if(strstr(name,names[j]))hashing_file=j;
+        if(hashing_file==5)return (PTR)(U64)-1;
         file_data="synthetic file";
     }
     return (PTR)(uintptr_t)(hashing_file+1);
@@ -78,10 +77,28 @@ int BCryptDestroyHash(PTR hash){(void)hash;return 0;}
 int BCryptCloseAlgorithmProvider(PTR alg,DWORD flags){(void)alg;(void)flags;return 0;}
 
 int main(void){
+    assert(valid_id(L"3d-tools"));assert(valid_id(L"test-3d"));assert(valid_id(L"123"));
+    assert(!valid_id(L"-test"));assert(!valid_id(L"test-"));assert(!valid_id(L"test--mod"));
     assert(public_same_path(L"C:\\Game\\MoonSweepers.exe",L"c:/game/moonsweepers.exe"));
     assert(!public_same_path(L"C:\\Game\\MoonSweepers.exe",L"C:\\Elsewhere\\MoonSweepers.exe"));
     self_module=(PTR)1;assert(public_installed_marker());assert(!public_game_module((PTR)1));
-    reset("1","test-mod");assert(public_startup());assert(hashes==4);assert(environments>2);public_release_inputs();
+    reset("1","test-mod");assert(public_startup());assert(hashes==5);assert(environments>2);public_release_inputs();
+    reset("1","3d-tools");snprintf(inventory,sizeof(inventory),"%s MoonLab/mods/3d-tools/mod.dll\n%s MoonLab/runtime-plan.bin\n",mod_hash,mod_hash);
+    assert(public_startup());assert(hashes==5);public_release_inputs();
+    reset("1","test-mod");strchr(inventory,'\n')[1]=0;
+    assert(!public_startup());assert(environments==0);public_release_inputs();
+    reset("1","test-mod");size_t used=strlen(inventory);
+    snprintf(inventory+used,sizeof(inventory)-used,"%s MoonLab/runtime-plan.bin\n",mod_hash);
+    assert(!public_startup());assert(environments==0);public_release_inputs();
+    reset("1","test-mod");size_t config_length=strlen(configuration), inventory_length=strlen(inventory);
+    for(size_t length=0;length<config_length;length++){
+        reset("1","test-mod");configuration[length]=0;
+        assert(!public_startup());assert(hashes==0);assert(environments==0);public_release_inputs();
+    }
+    for(size_t length=0;length<inventory_length;length++){
+        reset("1","test-mod");inventory[length]=0;
+        assert(!public_startup());assert(environments==0);public_release_inputs();
+    }
     reset("0","test-mod");assert(!public_startup());assert(hashes==0);assert(environments==0);
     reset("1","");assert(!public_startup());assert(hashes==0);
     reset("1","../escape");assert(!public_startup());assert(hashes==0);

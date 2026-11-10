@@ -1,5 +1,6 @@
 """Owner-qualified public interfaces, independent of particular framework IDs."""
 import re
+from .storage import key
 
 MAX_APIS = 256
 MAX_MOD_APIS = 64
@@ -7,10 +8,16 @@ MAX_API_SIZE = 65536
 
 
 def owner(api):
-    if (not isinstance(api, str) or len(api) > 160 or
-            not re.fullmatch(r"[a-z][a-z0-9-]{0,63}\.[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*", api)):
+    if not isinstance(api, str) or len(api) > 160 or '.' not in api:
         raise ValueError("API identity must be owner-qualified")
-    return api.split(".", 1)[0]
+    provider, suffix = api.split('.', 1)
+    try:
+        key(provider)
+    except ValueError:
+        raise ValueError("API identity must be owner-qualified") from None
+    if not re.fullmatch(r"[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*", suffix):
+        raise ValueError("API identity must be owner-qualified")
+    return provider
 
 
 def positive(value, maximum=0xffffffff):

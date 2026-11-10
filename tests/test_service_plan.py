@@ -69,6 +69,25 @@ class ServicePlanChecks(unittest.TestCase):
         self.run_core(data + b"unexpected", "reject")
         self.run_core(MAGIC + struct.pack("<I", 65), "reject")
 
+    def test_package_ids_match_sdk_key_including_numeric_prefixes(self):
+        from moon_mod_api.storage import key
+        for name in ('3d-tools', '123', 'test-3d', 'a-1-b'):
+            with self.subTest(name=name):
+                key(name)
+                values = {name: {'id':name, 'kind':'native', 'abi':'MoonLab_ModStart/v1', 'requires':[]}}
+                self.run_core(encode(values, [name]), 'parse')
+
+    def test_numeric_provider_and_consumer_api_owners_match_sdk(self):
+        for provider in ('3d-tools', 'test-3d', '7'):
+            consumer = '1-feature'; api = provider + '.building.api'
+            values = {
+                provider: {'id':provider, 'kind':'native', 'abi':'MoonLab_ModStart/v6',
+                           'runtime_api_abi':1, 'requires':[], 'provides':{api:{'abi':1,'size':16}}},
+                consumer: {'id':consumer, 'kind':'native', 'abi':'MoonLab_ModStart/v6',
+                           'runtime_api_abi':1, 'requires':[provider],
+                           'requires_apis':[{'api':api,'abi':1,'min_size':8}]}}
+            with self.subTest(provider=provider): self.run_core(encode(values, list(values)), 'parse')
+
     def test_capacity_and_api_limits_match_package_and_c_parser(self):
         values = {}
         for i in range(4):
@@ -92,3 +111,13 @@ class ServicePlanChecks(unittest.TestCase):
                                 str(ROOT / "tests/native_camera_service_checks.c"), "-o", str(binary)], check=True)
                 result = subprocess.run([str(binary)], check=True, capture_output=True, text=True)
                 self.assertIn("restoration passed", result.stdout)
+
+    def test_shared_native_prologues_preserve_register_stack_flags_and_continuation(self):
+        for compiler in ("clang", "gcc"):
+            with self.subTest(compiler=compiler):
+                binary = self.directory / (compiler + "-prologues")
+                subprocess.run([compiler, "-std=c11", "-Wall", "-Wextra", "-Werror", "-O1",
+                                "-fsanitize=address,undefined", "-fno-sanitize-recover=all",
+                                str(ROOT / "tests/native_vessel_hook_checks.c"), "-o", str(binary)], check=True)
+                result = subprocess.run([str(binary)], check=True, capture_output=True, text=True)
+                self.assertIn("exact stack offsets, flags and continuation", result.stdout)

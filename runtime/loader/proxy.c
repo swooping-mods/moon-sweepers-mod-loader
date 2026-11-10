@@ -48,11 +48,6 @@ static void event(const char *name,int success){
     FlushFileBuffers(log_file);
 }
 static void fail(const char *name){event(name,0);ExitProcess(111);}
-static int valid_id(const WCHAR *s){
-    if(*s<'a'||*s>'z')return 0;int n=0;
-    while(*s){if(!((*s>='a'&&*s<='z')||(*s>='0'&&*s<='9')||*s=='-')||++n>64)return 0;s++;}
-    return 1;
-}
 static void read_service_plan(void){
     static WCHAR path[1200];DWORD n=GetModuleFileNameW(self_module,path,950);
     if(!n||n>=950)fail("runtime-plan-path");
@@ -150,7 +145,14 @@ static DWORD __stdcall worker(PTR unused){
     /* Include every maximum-length ID plus separators and termination. */
     static WCHAR ids[MOONLAB_MAX_NATIVE_MODS*65+1];
     n=GetEnvironmentVariableW(L"MOONLAB_MODS",ids,MOONLAB_MAX_NATIVE_MODS*65+1);
-    if(!n||n>=MOONLAB_MAX_NATIVE_MODS*65+1)fail("missing-mod-list");
+    if(!n){
+        WCHAR managed[4];
+        if(public_mode||GetEnvironmentVariableW(L"MOONLAB_BEPINEX",managed,4)!=1||managed[0]!='1')fail("missing-mod-list");
+        if(service_plan.count)fail("runtime-plan-mod-list");
+        if(!seal_updates())fail("shared-update-install-failed");
+        event("managed-host-only",1);detach(thread);event("load-complete",1);CloseHandle(log_file);return 0;
+    }
+    if(n>=MOONLAB_MAX_NATIVE_MODS*65+1)fail("missing-mod-list");
     static WCHAR base[1000];DWORD count=GetModuleFileNameW(self_module,base,950);
     if(!count||count>=950)fail("loader-path");
     while(count&&base[count-1]!='\\'&&base[count-1]!='/')count--;

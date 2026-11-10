@@ -7,7 +7,7 @@ from pathlib import Path
 import re
 import uuid
 from . import discovery
-from .storage import contained, is_alias, load, locked, sha, write
+from .storage import contained, is_alias, load, locked, relative, sha, write
 
 CONFIG = 'MoonLab/active.txt'
 SCHEMA = 'moon-loader-installed/v1'
@@ -91,6 +91,8 @@ def assert_stopped():
 def validate_game(installation):
     if installation.store != 'steam': raise ValueError('Installed-game mode requires a Steam installation')
     game = Path(installation.path)
+    competitors = competing_loaders(game)
+    if competitors: raise ValueError('Unqualified loader coexistence: ' + ', '.join(competitors))
     if not str(game).isascii() or len(str(game)) > 170:
         raise ValueError('This native mod ABI requires a short ASCII game installation path')
     for name, expected in discovery.PIN.items():
@@ -113,12 +115,14 @@ def competing_loaders(game):
 def operation(root, game):
     """One on-target lock serializes managers even with different data folders."""
     game = Path(game)
+    owner_path = target(game, 'MoonLab/owner.json')
+    target(game, 'MoonLab/operation.lock')
     # Do not create game-root lock files that another data directory cannot own.
     root.mkdir(parents=True, exist_ok=True)
     with locked(root):
         assert_stopped()
         if (game / 'MoonLab').exists():
-            owner = load(contained(game, 'MoonLab/owner.json'), {})
+            owner = load(owner_path, {})
             if owner != {'schema': SCHEMA, 'data': str(root)}:
                 raise ValueError('Unowned MoonLab folder or another loader data directory owns this installation')
             with locked(game / 'MoonLab', 'operation.lock'): yield
@@ -127,7 +131,7 @@ def operation(root, game):
             if is_alias(game / 'MoonLab'): raise ValueError('Symlink in installed path')
             (game / 'MoonLab').mkdir()
             try:
-                file_bytes(game / 'MoonLab/owner.json',
+                file_bytes(owner_path,
                            (json.dumps({'schema': SCHEMA, 'data': str(root)}) + '\n').encode())
                 with locked(game / 'MoonLab', 'operation.lock'): yield
             except BaseException:
@@ -177,27 +181,41 @@ def recover(root, installation):
     stage_name = journal['stage']
     if not re.fullmatch(r'\.moonlab-stage-[a-f0-9]{32}', stage_name): raise ValueError('Invalid transaction stage')
     stage = contained(game, stage_name)
-    for name in set(before['files']) | set(after['files']):
+    def check_destination(name):
         actual = current_hash(game, name)
         if actual is not None and actual not in (before['files'].get(name), after['files'].get(name)):
             raise ValueError('Unknown edit blocks installed recovery: ' + name)
+        # Recovery is also a deployment: Steam may start the game after the
+        # operation's first process scan or during a long backup verification.
+        assert_stopped()
+    for name in set(before['files']) | set(after['files']): check_destination(name)
     for name, expected in before['files'].items():
         if sha(contained(stage, 'old/' + name)) != expected: raise ValueError('Changed recovery backup')
+    def restore(name, temporary):
+        data = contained(stage, 'old/' + name).read_bytes()
+        if digest(data) != before['files'][name]: raise ValueError('Changed recovery backup')
+        if temporary.exists():
+            if sha(temporary) != before['files'][name]: raise ValueError('Unknown recovery temporary: ' + name)
+            temporary.unlink()
+        file_bytes(temporary, data)
+        check_destination(name)
+        destination = target(game, name)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        os.replace(temporary, destination); sync_directory(destination.parent)
     # Remove the selection before restoring a partially updated payload.
-    target(game, CONFIG).unlink(missing_ok=True)
+    check_destination(CONFIG)
+    target(game, CONFIG).unlink(missing_ok=True); sync_directory(game / 'MoonLab')
     for name, expected in before['files'].items():
         if name == CONFIG: continue
-        destination = target(game, name); destination.parent.mkdir(parents=True, exist_ok=True)
         temporary = contained(stage, 'restore/' + name)
-        temporary.parent.mkdir(parents=True, exist_ok=True)
-        if temporary.exists(): temporary.unlink()
-        file_bytes(temporary, contained(stage, 'old/' + name).read_bytes())
-        os.replace(temporary, destination); sync_directory(destination.parent)
-    for name in set(after['files']) - set(before['files']): target(game, name).unlink(missing_ok=True)
+        restore(name, temporary)
+    for name in set(after['files']) - set(before['files']):
+        check_destination(name)
+        path = target(game, name)
+        if path.exists():
+            path.unlink(); sync_directory(path.parent)
     if CONFIG in before['files']:
-        contained(stage, 'restore-active').unlink(missing_ok=True)
-        file_bytes(contained(stage, 'restore-active'), contained(stage, 'old/' + CONFIG).read_bytes())
-        os.replace(contained(stage, 'restore-active'), target(game, CONFIG)); sync_directory(game / 'MoonLab')
+        restore(CONFIG, contained(stage, 'restore-active'))
     if any(current_hash(game, n) != h for n, h in before['files'].items()): raise ValueError('Recovery read-back failed')
     write(root / 'deployment.json', before); sync_directory(root)
     journal_path.unlink(); sync_directory(root)
@@ -220,6 +238,15 @@ def cleanup_stage(stage):
 
 def transact(root, installation, files, order, generation, enabled):
     """Recheck external writes at each mutation, then publish selection last."""
+    # Renaming a package entry to mod.dll can introduce aliases absent from the
+    # package itself. Check directory spellings too, before staging any payload.
+    spellings = {}; leaves = {name.casefold() for name in files}
+    for name in files:
+        parts = relative(name).split('/')
+        for length in range(1, len(parts) + 1):
+            prefix = '/'.join(parts[:length]); folded = prefix.casefold()
+            if spellings.setdefault(folded, prefix) != prefix or (length < len(parts) and folded in leaves):
+                raise ValueError('Deployment path alias collision: ' + prefix)
     game = Path(installation.path); before = receipt(root, installation)
     after = {**empty(installation), 'files': {n: digest(b) for n, b in files.items()},
              'order': order, 'generation': generation, 'enabled': enabled}
@@ -254,6 +281,7 @@ def transact(root, installation, files, order, generation, enabled):
         # Existing package ABIs resolve dependencies/assets under MoonLab/mods.
         # Disconnect selection while replacing that stable path surface.
         if current_hash(game, CONFIG) != before['files'].get(CONFIG): raise ValueError('Configuration changed')
+        assert_stopped()
         target(game, CONFIG).unlink(missing_ok=True); sync_directory(game / 'MoonLab')
         for name in sorted(names & set(files)):
             assert_stopped()
@@ -261,16 +289,19 @@ def transact(root, installation, files, order, generation, enabled):
             if current_hash(game, name) != before['files'].get(name): raise ValueError('File changed during deployment: ' + name)
             path = target(game, name)
             path.parent.mkdir(parents=True, exist_ok=True)
+            assert_stopped()
             os.replace(contained(stage, 'new/' + name), path)
             sync_directory(path.parent)
         if CONFIG in files:
             assert_stopped()
             if enabled: validate_game(installation)
             if current_hash(game, CONFIG) is not None: raise ValueError('Configuration changed')
+            assert_stopped()
             os.replace(contained(stage, 'new/' + CONFIG), target(game, CONFIG)); sync_directory(game / 'MoonLab')
         for name in sorted(names - set(files)):
             assert_stopped()
             if current_hash(game, name) != before['files'].get(name): raise ValueError('File changed during removal: ' + name)
+            assert_stopped()
             path = target(game, name); path.unlink(missing_ok=True); sync_directory(path.parent)
         if any(current_hash(game, n) != h for n, h in after['files'].items()): raise ValueError('Installed read-back failed')
         write(root / 'deployment.json', after); sync_directory(root)

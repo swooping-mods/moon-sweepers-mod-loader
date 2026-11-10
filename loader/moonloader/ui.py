@@ -368,7 +368,7 @@ class Window(QMainWindow):
             try:
                 from .packages import resolve
                 resolve({name:pair[0] for name,pair in self.mods.items()}, selected, self.inspection['hashes'],
-                        available_runtimes=self.service.available_runtimes(), runtime_api_abi=self.service.runtime_api_abi())
+                        available_runtimes=self.service.available_runtimes(installation), runtime_api_abi=self.service.runtime_api_abi())
             except ValueError as error: ready=False; reason=str(error)
         active = self._busy or self.process is not None
         native = {name for name,(mod,_) in self.mods.items() if packages.game_mod(mod)}

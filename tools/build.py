@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Build the native loader and a mod-free portable source bundle, entirely offline."""
+import argparse
 import hashlib
 import json
 from pathlib import Path
@@ -26,7 +27,21 @@ def find_tools():
     return tools
 
 
-def main():
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--with-bepinex', type=Path, metavar='ATTACHMENT',
+                        help='Explicit checked runtime attachment containing receipt.json and files/; private mode only')
+    args = parser.parse_args(argv)
+    managed_payload = {}
+    if args.with_bepinex:
+        from moonloader.managed import artifact_files
+        host_receipt, host_files = artifact_files(args.with_bepinex)
+        # Keep portable provenance and original notices/source archives without
+        # disclosing the author's intake or build directories in a distribution.
+        public_receipt = {key: value for key, value in host_receipt.items() if key in
+                          ('schema', 'version', 'files', 'inputs', 'adapter_sha256', 'builder_sha256', 'limits')}
+        managed_payload = {'loader/runtime/bepinex/files/' + name: data for name, data in host_files.items()}
+        managed_payload['loader/runtime/bepinex/receipt.json'] = (json.dumps(public_receipt, indent=2) + '\n').encode()
     tools = find_tools()
     out = ROOT / "artifacts"
     work = out / "build"
@@ -53,18 +68,23 @@ def main():
                "runtime_api_abi": 1, "input_api_abi": 1, "camera_api_abi": 1,
                "runtime_plan_schema": "moon-runtime-plan/v1",
                "late_update_abi": 1, "shared_update_abi": 1, "vehicle_dispatch_abi": 1,
+               "managed_profile_guard_abi": 1,
                "max_native_mods": 64, "public_bootstrap_abi": 1, "runtime_replay": "Installed-game replay not yet qualified"}
     files = {}
     for folder in ("loader", "vendored"):
         for path in sorted((ROOT / folder).rglob("*")):
             if path.is_file() and "__pycache__" not in path.parts and path.suffix != ".pyc":
+                if path.is_relative_to(ROOT / 'loader/runtime/bepinex'):
+                    continue
                 files[path.relative_to(ROOT).as_posix()] = path.read_bytes()
+    files.update(managed_payload)
     for name in ("README.md", "run.sh", "Start-Mod-Loader.cmd"):
         files[name] = (ROOT / name).read_bytes()
     files["loader/runtime/windows-x64/version.dll"] = (work / "version.dll").read_bytes()
     files["loader/runtime/windows-x64/MoonLab.LoaderCheck.exe"] = (work / "MoonLab.LoaderCheck.exe").read_bytes()
     files["loader/runtime/receipt.json"] = (json.dumps(receipt, indent=2) + "\n").encode()
-    archive = out / f"moon-sweepers-mod-loader-{VERSION}-source.zip"
+    suffix = '-managed-private' if managed_payload else ''
+    archive = out / f"moon-sweepers-mod-loader-{VERSION}{suffix}-source.zip"
     with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as target:
         for name, data in sorted(files.items()):
             info = zipfile.ZipInfo(name, (2026, 11, 10, 0, 0, 0))
@@ -72,7 +92,8 @@ def main():
             info.external_attr = (0o100755 if name.endswith(".sh") else 0o100644) << 16
             target.writestr(info, data)
     (out / "SHA256SUMS").write_text(hashlib.sha256(archive.read_bytes()).hexdigest() + "  " + archive.name + "\n")
-    (out / "build-receipt.json").write_text(json.dumps({"version": VERSION, "runtime": receipt, "pe_exports_valid": True,
+    (out / ("build" + suffix + "-receipt.json")).write_text(json.dumps({"version": VERSION, "runtime": receipt, "pe_exports_valid": True,
+        "managed_attachment": bool(managed_payload),
         "archive": archive.name, "sha256": hashlib.sha256(archive.read_bytes()).hexdigest(),
         "limits": ["Host Python/PySide6 required", "No mod binaries bundled", "No game, Wine or native Windows execution"]}, indent=2) + "\n")
     print(archive)

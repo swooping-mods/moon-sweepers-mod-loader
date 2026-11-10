@@ -39,16 +39,32 @@ static int msp_bytes(const unsigned char *a,unsigned int n,const unsigned char *
 }
 /* kind: mod ID, qualified API, or integer-limit key. */
 static int msp_name(const unsigned char *p,unsigned int n,unsigned int kind){
-    if(!p||!n||p[0]<'a'||p[0]>'z')return 0;
-    unsigned int segment=0,dots=0;
+    if(!p||!n)return 0;
+    if(kind==0){
+        unsigned int segment=0;
+        for(unsigned int i=0;i<n;i++){
+            unsigned char c=p[i];
+            if(c=='-'){if(!segment)return 0;segment=0;}
+            else if((c>='a'&&c<='z')||(c>='0'&&c<='9'))segment++;
+            else return 0;
+        }
+        return segment!=0;
+    }
+    if(kind==1){
+        unsigned int owner=0;while(owner<n&&p[owner]!='.')owner++;
+        if(owner>64||owner==n||!msp_name(p,owner,0))return 0;
+        p+=owner+1;n-=owner+1;
+    }
+    if(!n||p[0]<'a'||p[0]>'z')return 0;
+    unsigned int segment=0;
     for(unsigned int i=0;i<n;i++){
         unsigned char c=p[i];
-        if(c=='.'&&kind==1){if(!segment||(!dots&&segment>64))return 0;dots++;segment=0;continue;}
+        if(c=='.'&&kind==1){if(!segment)return 0;segment=0;continue;}
         if(!segment&&(c<'a'||c>'z'))return 0;
         if(!((c>='a'&&c<='z')||(c>='0'&&c<='9')||(kind==2?c=='_':c=='-')))return 0;
         segment++;
     }
-    return segment&&(kind!=1||dots);
+    return segment!=0;
 }
 static unsigned int msp_owner_length(const unsigned char *name,unsigned int n){
     unsigned int i=0;while(i<n&&name[i]!='.')i++;return i;
