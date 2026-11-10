@@ -100,7 +100,9 @@ typed frames, input and camera services. Default builds host native mods;
 importing a managed package does not install its required host. Unsupported
 backends and unavailable runtime capabilities reject before game preparation.
 Native v7 declares exact adapter ABIs in `requires_host`; the loader checks its
-runtime receipt's `host_capabilities` at selection and preparation.
+runtime receipt's `host_capabilities` at selection and preparation. The separate
+interaction adapter supplies exclusive actions while retaining InputApiV1 and
+the existing generic Update delivery contract.
 
 ## Downloads and contributions
 

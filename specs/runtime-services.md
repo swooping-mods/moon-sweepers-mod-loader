@@ -2,13 +2,13 @@
 
 Native startup accepts package IDs using the SDK's lowercase alphanumeric groups separated by single hyphens, including numeric prefixes. API owner prefixes use the same package grammar; service names keep their separate letter-leading grammar.
 
-The pinned SDK 0.5 owns public C tables, interface/package validation and
+The pinned SDK 0.6 owns public C tables, interface/package validation and
 `runtime_plan.encode`. This loader owns the executable implementation. Domain
 framework APIs remain ordinary independent mod packages with opaque tables.
 
 `services.h` extends the existing owner/thread-scoped hook registry rather than
 creating another callback scheduler. `MoonLab_GetRuntimeApi_v1` exposes publish,
-find, typed Update subscribe and unsubscribe. V6 DLLs export
+find, typed Update subscribe and unsubscribe. V6/v7 DLLs export
 `MoonLab_RuntimeServicesAbi` returning 1. Legacy v1–v5 exports share the same
 hook registry and retain their existing layouts and startup order.
 
@@ -99,3 +99,27 @@ or deployment, a cached selection after
 runtime replacement, and production v7 native provider/consumer calls under
 Clang/GCC ASan/UBSan. The new adapter's engine behavior remains separately owned
 and must qualify its final runtime bytes.
+
+
+The separate `interaction.h` adapter and portable SDK interaction core implement
+host capability `interaction: 1`. The runtime exports a 32-byte ABI 1 table with
+ModStart registration, cached sample and actor-specific take. Coherent held and
+pressed input snapshots use render-frame plus InputSystem update-step epochs.
+Native interception matches actual keyboard/mouse controls, retaining unrelated
+keys and controller input. InputApiV1 remains ABI 1, 64 bytes.
+
+Generic typed frame subscriptions retain each observed walker. Input preflight
+runs before Update callbacks, and take validates the local actor; interaction
+registration does not filter unrelated frame observers. Unit/Sound frame-latch
+admission belongs to their domain implementations. The production regression
+executes two distinct walker callbacks with an input adapter active under both
+sanitized compilers.
+
+The mirrored SDK contains 37 pinned files; the workshop source pin covers 16
+headers with explicit include adaptations. The complete API gate passes 44 tests;
+the complete loader gate passes 102, with no skips/exclusions. The new standalone
+runtime passes strict freestanding AMD64 compile/link/export checks. Its build
+receipt is `artifacts/build-receipt.json`; it is not the older game-qualified
+b36 runtime. Its interaction engine/world, native Windows and co-op behavior
+require their own exact candidate receipts. Default workshop runtime 51549 is
+preserved; no library or seed promotion accompanies this source integration.

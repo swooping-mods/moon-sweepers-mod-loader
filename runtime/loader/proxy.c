@@ -28,8 +28,9 @@ static char *append(char *out,const char *s){while(*s)*out++=*s++;*out=0;return 
 static int equal(const char *a,const char *b){while(*a&&*a==*b){a++;b++;}return *a==*b;}
 #include "forward.h"
 #include "profile.h"
-#include "dispatch.h"
 #include "input.h"
+#include "dispatch.h"
+#include "interaction.h"
 int _fltused=0;
 __declspec(dllexport) DWORD MoonLab_LoaderAbi(void){return 1;}
 __declspec(dllexport) const MoonInputApiV1 *MoonLab_GetInputApi_v1(void){return moon_input_api_v1();}
@@ -142,6 +143,7 @@ static DWORD __stdcall worker(PTR unused){
         if(vehicle_address!=(char *)game+0x4d0c80)fail("dispatch-vehicle-address");
     }
     if((U64)update_address<(U64)game+0x1000||(U64)update_address>=(U64)game+31917844)fail("dispatch-update-address");
+    if(!moon_interaction_bind(domain,game))fail("interaction-bind-failed");
     read_service_plan();
     /* Include every maximum-length ID plus separators and termination. */
     static WCHAR ids[MOONLAB_MAX_NATIVE_MODS*65+1];

@@ -1,7 +1,8 @@
 #ifndef MOONLAB_INPUT_V1_H
 #define MOONLAB_INPUT_V1_H
 /* Local input only: each consumer supplies its own world, focus, typing,
- * menu and authority gate. No action suppresses vanilla or another action. */
+ * menu and authority gate. This API does not consume keys; a separate host
+ * interaction adapter may mask delivery of a captured physical key. */
 #define MOON_INPUT_ABI 1u
 #define MOON_INPUT_NAME_CAPACITY 96u
 #define MOON_INPUT_LABEL_CAPACITY 64u

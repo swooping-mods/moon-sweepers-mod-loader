@@ -59,8 +59,9 @@ state instead of unloading callback code.
 Shared local input uses `input.h` and `MoonLab_GetInputApi_v1`. Call it on the
 game thread, register stable namespaced actions once, then sample with a gate
 covering world, focus, text input, menus and authority. It does not consume game
-input. The portable registry/host headers let another adapter supply key
-polling without a Windows dependency.
+input itself. The separate [interaction adapter](interaction.md) can mask keys
+that an exclusive action captures. The portable registry/host headers let another
+adapter supply key polling without a Windows dependency.
 
 Shared camera ownership uses `camera.h` and
 `MoonLab_GetCameraApi_v1(MOON_CAMERA_ABI, sizeof(MoonCameraApiV1))`. Claims start

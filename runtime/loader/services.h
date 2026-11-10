@@ -100,6 +100,7 @@ static inline int finish_runtime_registration(int success){
         for(unsigned int j=i+1;j<runtime_service_count;j++)registry_copy(&runtime_services[j-1],&runtime_services[j],sizeof(runtime_services[j]));
         runtime_service_count--;
     }
+    MOON_LOADER_INTERACTION_FINISH(success);
     if(success&&service_plan.active)service_plan.next_owner++;
     runtime_registration_id[0]=0;finish_hook_registration(success);return success;
 }

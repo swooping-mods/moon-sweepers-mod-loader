@@ -3,7 +3,7 @@
 | Spec | Owning source | Read when |
 |---|---|---|
 | [Optional managed runtime](managed-runtime.md) | `loader/moonloader/managed.py`, private service/launch selection, `tools/build.py` | Changing explicit BepInEx attachment, managed private deployment, config/allowlist or backend availability |
-| [Native runtime services](runtime-services.md) | `runtime/loader/{services,service_plan,dispatch,input,camera}.h`, native startup, `service.py`, pinned SDK | Changing v6 publication, dependency startup, typed frames, input/camera adapters or runtime-plan deployment |
+| [Native runtime services](runtime-services.md) | `runtime/loader/{services,service_plan,dispatch,input,camera,interaction}.h`, native startup, `service.py`, pinned SDK | Changing v6/v7 publication, dependency startup, typed frames, input/camera adapters or runtime-plan deployment |
 | [Installed-game deployment](public-deployment.md) | `loader/moonloader/public.py`, mode-aware service/launch/UI, `runtime/loader/public.h` | Changing additive public installation, recovery, enable/disable, uninstall or normal-save policy |
 | [GitHub CI](ci.md) | `.github/workflows/`, `tools/fetch_windows_inputs.py` | Changing CI triggers, runtime input staging, artifacts or Windows smoke checks |
 | [Windows portable packaging](windows-packaging.md) | `tools/build_windows.py`, `runtime/loader/desktop.c`, `vendored/windows-runtime.lock.json` | Changing bundled dependencies, launcher, licenses or package checks |

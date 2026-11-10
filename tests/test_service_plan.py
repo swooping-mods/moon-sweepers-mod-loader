@@ -64,6 +64,10 @@ class ServicePlanChecks(unittest.TestCase):
             value.update(abi="MoonLab_ModStart/v7", requires_host={"interaction": 1})
         self.run_core(encode(values, list(values)), "valid")
 
+    def test_input_adapter_preserves_each_observed_walker_for_unrelated_frames(self):
+        values = fixtures()
+        self.run_core(encode(values, list(values)), "actor-delivery")
+
     def test_missing_publications_and_failed_startup_rollback_apis_and_frames(self):
         values = fixtures()
         for mode in ("missing", "rollback"):

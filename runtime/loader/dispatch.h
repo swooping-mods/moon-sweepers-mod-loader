@@ -9,6 +9,12 @@ __declspec(dllimport) PTR __stdcall AddVectoredExceptionHandler(DWORD,int (*)(Ex
 __declspec(dllimport) DWORD __stdcall RemoveVectoredExceptionHandler(PTR);
 #include "../native/hook_engine.h"
 #include "camera.h"
+#ifndef MOON_LOADER_INPUT_PREFLIGHT
+#define MOON_LOADER_INPUT_PREFLIGHT(walker) ((void)0)
+#define MOON_LOADER_INTERACTION_SEAL() 1
+#define MOON_LOADER_INTERACTION_FINISH(success) ((void)0)
+#define MOON_LOADER_INTERACTION_COUNT 0
+#endif
 #define MOONLAB_MAX_NATIVE_MODS 64
 #define MOONLAB_MAX_SUBSCRIPTIONS (2*MOONLAB_MAX_NATIVE_MODS+3)
 typedef struct {
@@ -99,7 +105,11 @@ static void copy_context(Context *out,const Context *in){
     for(U64 i=0;i<sizeof(*out);i++)((unsigned char *)out)[i]=((const unsigned char *)in)[i];
 }
 static int dispatch_update(int id,Context *context){
+#ifdef MOON_LOADER_INPUT_HOOK
+    if(id>=100&&id<=102)return MOON_LOADER_INPUT_HOOK(id,context);
+#endif
     moon_camera_observe_thread();
+    if(id==MOON_HOOK_UPDATE)MOON_LOADER_INPUT_PREFLIGHT((PTR)context->rcx);
     unsigned int hook=(unsigned int)id;int skip=0;
     MoonVehicleInput input={0};
     /* The role boundary is invariant even if registration order is reversed. */
@@ -164,7 +174,7 @@ static int seal_updates(void){
         registry_copy(&subscriptions[j],&value,sizeof(value));
     }
     for(unsigned int kind=MOON_HOOK_UPDATE;kind<=MOON_HOOK_VEHICLE_FIXED;kind++){
-        int used=0;
+        int used=kind==MOON_HOOK_UPDATE&&MOON_LOADER_INTERACTION_COUNT;
         for(unsigned int i=0;i<subscription_count;i++)if(subscriptions[i].spec.hook==kind){used=1;break;}
         if(!used)continue;
         unsigned char *address=hook_address(kind);int length=instruction_length(address);
@@ -173,6 +183,7 @@ static int seal_updates(void){
         Hook *hook=&hooks[hook_count++];hook->address=address;hook->length=length;hook->id=(int)kind;
         for(int i=0;i<5;i++)hook->original[i]=address[i];
     }
+    if(!MOON_LOADER_INTERACTION_SEAL())return 0;
     before_hook=dispatch_update;
     return !hook_count||install_local_hooks();
 }

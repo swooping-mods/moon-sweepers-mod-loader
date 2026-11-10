@@ -9,3 +9,4 @@ int independent_publish(const MoonRuntimeApiV1 *,unsigned int variant);
 int independent_consume(const MoonRuntimeApiV1 *);
 unsigned int independent_frame(const MoonRuntimeApiV1 *);
 int independent_frame_count(void);
+unsigned independent_frame_actors(void);

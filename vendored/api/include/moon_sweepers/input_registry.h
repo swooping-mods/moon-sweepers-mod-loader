@@ -16,6 +16,9 @@ typedef struct {
     MoonInputAction actions[MOON_INPUT_ACTION_CAPACITY];unsigned count;
     MoonInputClaim claims[MOON_INPUT_CLAIM_CAPACITY];
     int (*key)(unsigned);MoonInputResolve resolve;
+    /* Optional adapter-owned coherent frame. This implementation structure is
+     * private to each host; it does not change the public InputApiV1 table. */
+    const unsigned char *snapshot;
 } MoonInputRegistry;
 static inline int mi_equal(const char *a,const char *b){while(*a&&*a==*b){a++;b++;}return *a==*b;}
 static inline int mi_copy(char *out,unsigned cap,const char *in){unsigned n=0;if(!in||!cap)return 0;while(in[n]){if(n+1>=cap)return 0;out[n]=in[n];n++;}out[n]=0;return 1;}
@@ -48,7 +51,7 @@ static inline int mi_parse(const char *text,MoonInputChord *out){
         chord.key=mi_key(name);if(chord.required&chord.forbidden)return 0;*out=chord;return 1;
     }return 0;
 }
-static inline int mi_down(MoonInputRegistry *r,unsigned key){return key&&key<256&&r->key&&r->key(key);}
+static inline int mi_down(MoonInputRegistry *r,unsigned key){return key&&key<256&&(r->snapshot?r->snapshot[key]!=0:r->key&&r->key(key));}
 static inline int mi_chord_base(MoonInputRegistry *r,const MoonInputChord *c,unsigned modifiers){return mi_down(r,c->key)&&(modifiers&c->required)==c->required;}
 static inline unsigned mi_modifiers(MoonInputRegistry *r){return (mi_down(r,17)?1u:0)|(mi_down(r,16)?2u:0)|(mi_down(r,18)?4u:0);}
 static inline int mi_rebind(MoonInputRegistry *r,unsigned handle,const char *text){

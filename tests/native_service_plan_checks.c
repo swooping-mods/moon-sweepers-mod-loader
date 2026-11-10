@@ -10,6 +10,15 @@ PTR GetCurrentProcess(void){return (PTR)1;}
 static DWORD fake_thread=1;
 DWORD GetCurrentThreadId(void){return fake_thread;}
 BOOL FlushInstructionCache(PTR p,const void *a,U64 n){(void)p;(void)a;(void)n;return 1;}
+/* An active input adapter must not narrow the generic frame stream. The old
+ * implicit admission hook deliberately rejects the other actor here. */
+static int input_adapter_active,preflights;
+static void input_preflight(PTR actor){(void)actor;preflights++;}
+#define MOON_LOADER_INPUT_PREFLIGHT(actor) input_preflight(actor)
+#define MOON_LOADER_INTERACTION_COUNT input_adapter_active
+#define MOON_LOADER_INTERACTION_SEAL() 1
+#define MOON_LOADER_INTERACTION_FINISH(success) ((void)0)
+#define MOON_LOADER_FRAME_ADMIT(actor) ((actor)==(PTR)17)
 #include "../runtime/loader/dispatch.h"
 PTR AddVectoredExceptionHandler(DWORD first,int (*handler)(ExceptionPointers *)){(void)first;(void)handler;return (PTR)1;}
 DWORD RemoveVectoredExceptionHandler(PTR p){(void)p;return 1;}
@@ -66,6 +75,7 @@ int main(int argc,char **argv){
     CHECK(!api->find("other-authors-library","building",7,0));
     fake_thread=2;CHECK(!api->find("other-authors-library","building",7,16));fake_thread=1;
     CHECK(begin_runtime_registration(2,"independent-feature"));CHECK(independent_consume(api));CHECK(finish_runtime_registration(1));
+    input_adapter_active=!strcmp(argv[2],"actor-delivery");
     CHECK(service_plan.next_owner==2);CHECK(seal_updates());
     CHECK(MoonLab_RuntimeState_v1()==MOON_RUNTIME_PENDING);
     if(!strcmp(argv[2],"hooks-failed")){
@@ -77,6 +87,10 @@ int main(int argc,char **argv){
     CHECK(math&&math->add(20,22)==42);CHECK(!independent_publish(api,0));CHECK(!independent_frame(api));
     Context context={0};context.rcx=17;CHECK(!dispatch_update(MOON_HOOK_UPDATE,&context));
     CHECK(independent_frame_count()==1);
+    if(input_adapter_active){
+        context.rcx=18;CHECK(!dispatch_update(MOON_HOOK_UPDATE,&context));
+        CHECK(independent_frame_count()==2&&independent_frame_actors()==3&&preflights==2);
+    }
     runtime_startup_failed();CHECK(MoonLab_RuntimeState_v1()==MOON_RUNTIME_FAILED);
     CHECK(!runtime_finish_startup(1));CHECK(MoonLab_RuntimeState_v1()==MOON_RUNTIME_FAILED);
     free(data);puts("production registry + independent provider/consumer passed");return 0;
