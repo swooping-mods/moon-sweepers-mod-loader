@@ -1,0 +1,18 @@
+{
+  "schema": "moon-api-snapshot/v1",
+  "repository": "moon-sweepers-api",
+  "version": "0.1.0",
+  "files": {
+    "include/moon_sweepers/context.h": "6c84145cc761550c4943aa10c52242a538e92243f79a1b20c65b6a4ef9e82605",
+    "include/moon_sweepers/hooks.h": "7c006f1254dd6a130f56dac499ba8196fb84ee4883443ee4f12d601534df56ec",
+    "include/moon_sweepers/vehicle_input.h": "6af332b456ff9fb74e96a6e963a8cf9627bd51a8edca55f07b6e5a829b9da790",
+    "python/moon_mod_api/__init__.py": "f71d4db99c11838054be4d7d6027e03c4b6a7263585f8f98f319b7bc7199b814",
+    "python/moon_mod_api/__main__.py": "4ffd4c62bdbbd2f5aa7c33c55d0dfa01e25846cb7ebcdead17f114bdd95e9eb1",
+    "python/moon_mod_api/pack.py": "672e621ba6b1298eb49047705c5bea9b716dcb65c491608eb00dabf5418d207d",
+    "python/moon_mod_api/packages.py": "dbab475f96d82fdda36451655573b93cbfeaef00657ff11d1ba4c8c139e1fded",
+    "python/moon_mod_api/storage.py": "473599f465241e1087a49d420fd59be8c3a810d9ae3dc0c2b57be47e48cb2c89",
+    "docs/hooks.md": "6b590506c918ae3b043b46b32646231f78e6ac88352d0d93172a0753feee687b",
+    "docs/mod-ci.md": "a07d961d5628fb773ea61d3278b300d4aab357578c677a7cf2e3c16c03c0af4a",
+    "docs/packages.md": "7d2f00814d761b3c42f6cbc290a26e07775e79f1b6fe696530cf51aaa67ffd4e"
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "schema": "moon-source-extraction/v1",
+  "source_repository": "moon-sweepers-modding",
+  "source_head": "7f6bbc3807b1fbb59ce9bf96d427f8a3366753e4",
+  "basis": "Selected working-tree bytes; this preparation does not carry source history or local artifacts",
+  "source_files": {
+    "loader/moonloader/__init__.py": "92b16151d5f53daec072be81e40d1f630040cad66077c08c832cb8812be21688",
+    "loader/moonloader/discovery.py": "d45ffc4d77aaed488431bd7217d0719386f793c80a6b2b30b6093044a539d137",
+    "loader/moonloader/launch.py": "4cf37c0543ebbbc702aa2cf8604dc3e8de09e2fad7c1ef4b228cd34fb5ead242",
+    "loader/moonloader/packages.py": "dbab475f96d82fdda36451655573b93cbfeaef00657ff11d1ba4c8c139e1fded",
+    "loader/moonloader/service.py": "426ad69749b88fa56241c96f1620862f1e38176eab2745d655df52b0bfbca629",
+    "loader/moonloader/settings.py": "0cb05ebfb9c5c622a904f7b32279c29bef87aed3ecdb8a7290b970430db0d127",
+    "loader/moonloader/storage.py": "9fd449a4b142015a1479768c2e57890b5ee385cad7f950edb046ed8bb2a35bc6",
+    "loader/moonloader/theme.py": "3a4913503942f056bf832013f932edd7e12383a097a1e37ece07f26a47876cb2",
+    "loader/moonloader/ui.py": "78c13e10f681483c5181a4e3b05d8d033a5c741e72b9fdbb131500b898524459",
+    "runtime/loader/check.c": "760e683e2c1e4d06e61d85e26da9e17e2b352e5bab7d968bea409958d3e8440e",
+    "runtime/loader/dispatch.h": "a2c865b43e172bca1efb0be9e30888fc598b58954b4071a9b848a6fca0cceb65",
+    "runtime/loader/forward.h": "f11285bc7ee01917f321eafe613b3a54b15d7bfb0caf3033ad488225c7be82cb",
+    "runtime/loader/kernel32.def": "c3eeafff4d963113a0e560006b31cfec12e6b85b5c082e35b7e283da34519fe1",
+    "runtime/loader/ole32.def": "e0e4e731d1bba36153b5795ba8efec488eb74233b83ecc6800a175b32bb101f7",
+    "runtime/loader/profile.h": "3e8d483b834136f0a7ebebacc0dc23aaba7058b372bff28a83ccedca407c5943",
+    "runtime/loader/proxy.c": "467f0db703da05d873e958842a69586cabef367ed331614dc5bc592790b983ae",
+    "runtime/loader/shell32.def": "2dc78a2b92264bd8f886c5f687d16d3bda7484a641b54bf730533324e8e4927b",
+    "runtime/native/hook_context.h": "28f6c6502f3b4d6e8ae02c06e60b6d3b7f1b8674d0a5f20ac42664ea3133d016",
+    "runtime/native/hook_engine.h": "d37ba6b80ad47d0de431cf0fbc7b80e8e658c3425c89daa858a09ee26896d049",
+    "runtime/native/version.def": "2acf24fc2f88aacea6d4cdffce5e09d8a8c784e131fe320467acdc5efa62af86",
+    "tests/native_dispatch_checks.c": "3f300648cc889167122310d895d08d68efa73f3dd7f83a13f01a6c407328e6ca",
+    "tests/native_hook_framework_checks.c": "a1115ddff74be43c220e63c4a33cb140ca04cfe4401801457bd9f0d0de865338",
+    "tests/native_loader_checks.c": "8a999648de963db7f692d648638dd9fcc399b98691d09b0eab2b95ac7cc78cf0",
+    "tests/test_loader.py": "bc36b78f31bb5b3be287d11328aa413d0f0ef2f3b9809f8009550667da090d09",
+    "tools/pe.py": "d1b40598073a7ccf082d95bda9790e01fd77eaf8fc43ac3405fb242670c8fda8"
+  }
+}
