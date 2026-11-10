@@ -91,7 +91,8 @@ def main(argv=None):
             info.compress_type = zipfile.ZIP_DEFLATED
             info.external_attr = (0o100755 if name.endswith(".sh") else 0o100644) << 16
             target.writestr(info, data)
-    (out / "SHA256SUMS").write_text(hashlib.sha256(archive.read_bytes()).hexdigest() + "  " + archive.name + "\n")
+    checksums = 'SHA256SUMS-managed-private' if managed_payload else 'SHA256SUMS'
+    (out / checksums).write_text(hashlib.sha256(archive.read_bytes()).hexdigest() + "  " + archive.name + "\n")
     (out / ("build" + suffix + "-receipt.json")).write_text(json.dumps({"version": VERSION, "runtime": receipt, "pe_exports_valid": True,
         "managed_attachment": bool(managed_payload),
         "archive": archive.name, "sha256": hashlib.sha256(archive.read_bytes()).hexdigest(),

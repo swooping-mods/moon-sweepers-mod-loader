@@ -23,7 +23,8 @@ shown in the UI before that full integrity check; preparation repeats it.
 `tools/build.py --with-bepinex ATTACHMENT` explicitly packages the attachment
 in a separate `*-managed-private-source.zip`. It never executes or downloads
 the input. Default builds exclude an attached managed folder unless the flag
-is supplied. Portable receipts retain file/source hashes and bounded limits,
+is supplied. Its separate `SHA256SUMS-managed-private` preserves the default
+source/Windows checksum manifest. Portable receipts retain file/source hashes and bounded limits,
 omitting local intake/build directories. The normal Windows portable build
 remains native-only unless a separate managed packaging path is requested.
 
