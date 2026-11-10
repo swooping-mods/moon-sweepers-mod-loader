@@ -63,6 +63,11 @@ class ServicePlanChecks(unittest.TestCase):
         for mode in ("missing", "rollback"):
             self.run_core(encode(values, list(values)), mode)
 
+    def test_readiness_rejects_incomplete_owners_and_failed_hook_installation(self):
+        values = fixtures()
+        for mode in ("incomplete-startup", "hooks-failed"):
+            self.run_core(encode(values, list(values)), mode)
+
     def test_every_truncated_prefix_and_trailing_bytes_reject(self):
         data = encode(fixtures(), list(fixtures()))
         self.run_core(data, "truncations")

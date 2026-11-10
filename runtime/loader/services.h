@@ -8,6 +8,21 @@ typedef struct {
 } RuntimeService;
 static RuntimeService runtime_services[MOONLAB_MAX_SERVICES];
 static unsigned int runtime_service_count;
+static unsigned int runtime_startup_state;
+__declspec(dllexport) unsigned int MoonLab_RuntimeState_v1(void){
+    return __atomic_load_n(&runtime_startup_state,__ATOMIC_ACQUIRE);
+}
+static inline void runtime_startup_failed(void){
+    __atomic_store_n(&runtime_startup_state,MOON_RUNTIME_FAILED,__ATOMIC_RELEASE);
+}
+static inline int runtime_finish_startup(int hooks_installed){
+    if(MoonLab_RuntimeState_v1()!=MOON_RUNTIME_PENDING)return 0;
+    if(!hooks_installed||!update_sealed||registration_owner
+       ||(service_plan.active&&service_plan.next_owner!=service_plan.count)){
+        runtime_startup_failed();return 0;
+    }
+    __atomic_store_n(&runtime_startup_state,MOON_RUNTIME_READY,__ATOMIC_RELEASE);return 1;
+}
 static char runtime_registration_id[65];
 static int runtime_id_valid(const char *id,unsigned int maximum){
     if(!id||!*id)return 0;

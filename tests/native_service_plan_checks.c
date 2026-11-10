@@ -17,6 +17,7 @@ DWORD RemoveVectoredExceptionHandler(PTR p){(void)p;return 1;}
 static unsigned char code[3][5]={{0x48,0x8b,0xc4,0,0},{0x48,0x8b,0xc4,0,0},{0x48,0x8b,0xc4,0,0}};
 int main(int argc,char **argv){
     CHECK(argc==3);
+    CHECK(MoonLab_RuntimeState_v1()==MOON_RUNTIME_PENDING);
     FILE *file=fopen(argv[1],"rb");CHECK(file);CHECK(!fseek(file,0,SEEK_END));long size=ftell(file);CHECK(size>=0);
     CHECK(!fseek(file,0,SEEK_SET));unsigned char *data=malloc((size_t)size+1);CHECK(data);
     CHECK(fread(data,1,(size_t)size,file)==(size_t)size);CHECK(!fclose(file));
@@ -29,6 +30,10 @@ int main(int argc,char **argv){
     }
     CHECK(msp_init(data,(unsigned int)size));
     if(!strcmp(argv[2],"parse")){printf("parsed %u mods\n",service_plan.count);free(data);return 0;}
+    if(!strcmp(argv[2],"incomplete-startup")){
+        CHECK(!runtime_finish_startup(1));CHECK(MoonLab_RuntimeState_v1()==MOON_RUNTIME_FAILED);
+        CHECK(!runtime_finish_startup(1));free(data);return 0;
+    }
     update_address=code[0];late_update_address=code[1];vehicle_address=code[2];
     const MoonRuntimeApiV1 *api=MoonLab_GetRuntimeApi_v1();CHECK(moon_runtime_api_valid(api));
     CHECK(!api->find("other-authors-library","building",7,16));
@@ -55,8 +60,17 @@ int main(int argc,char **argv){
     fake_thread=2;CHECK(!api->find("other-authors-library","building",7,16));fake_thread=1;
     CHECK(begin_runtime_registration(2,"independent-feature"));CHECK(independent_consume(api));CHECK(finish_runtime_registration(1));
     CHECK(service_plan.next_owner==2);CHECK(seal_updates());
+    CHECK(MoonLab_RuntimeState_v1()==MOON_RUNTIME_PENDING);
+    if(!strcmp(argv[2],"hooks-failed")){
+        CHECK(!runtime_finish_startup(0));CHECK(MoonLab_RuntimeState_v1()==MOON_RUNTIME_FAILED);
+        CHECK(!runtime_finish_startup(1));free(data);return 0;
+    }
+    CHECK(runtime_finish_startup(1));CHECK(MoonLab_RuntimeState_v1()==MOON_RUNTIME_READY);
     fake_thread=2;const IndependentMath *math=api->find("other-authors-library","building",7,16);
     CHECK(math&&math->add(20,22)==42);CHECK(!independent_publish(api,0));CHECK(!independent_frame(api));
     Context context={0};context.rcx=17;CHECK(!dispatch_update(MOON_HOOK_UPDATE,&context));
-    CHECK(independent_frame_count()==1);free(data);puts("production registry + independent provider/consumer passed");return 0;
+    CHECK(independent_frame_count()==1);
+    runtime_startup_failed();CHECK(MoonLab_RuntimeState_v1()==MOON_RUNTIME_FAILED);
+    CHECK(!runtime_finish_startup(1));CHECK(MoonLab_RuntimeState_v1()==MOON_RUNTIME_FAILED);
+    free(data);puts("production registry + independent provider/consumer passed");return 0;
 }

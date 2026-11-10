@@ -12,7 +12,7 @@ The archive and unpacked payload are limited to 64 MiB, 128 payload files and a 
 
 `resolve` requires explicit dependency selection and yields deterministic dependency-first order across native/managed game mods. It rejects missing dependencies, cycles, declared conflicts, exclusive hook overlap, duplicate input/physics owners and multiple camera overrides. The capacity is 64 selected game mods; capacity does not imply combined gameplay qualification.
 
-The extraction retains the existing package schema and `MoonLab_*` exported symbols. API package version 0.3.0, C hook ABI 1, native package ABI v6 and the mod's own version are separate version domains.
+The extraction retains the existing package schema and `MoonLab_*` exported symbols. API package version 0.5.0, C hook ABI 1, native package ABI v6 and the mod's own version are separate version domains.
 
 Optional `build_items` entries declare each saved building `kind` and stable
 namespaced `key`. They require the native `build-menu-framework` dependency.
@@ -41,3 +41,8 @@ Native v6 requires `runtime_api_abi: 1`. Shared hook roles in v6 still require
 hook framework ABI 1; a registry-only v6 package need not claim a shared hook.
 Target loaders pass their actual `runtime_api_abi` (zero when absent) as well as
 backend availability. Metadata validation alone never grants runtime support.
+
+Managed packages opting into native `requires_apis` also declare
+`runtime_api_abi: 1`. Their target must advertise `runtime_readiness_abi: 1`.
+This consumer-only bridge preserves native provider ownership; managed packages
+cannot declare native `provides`. See [managed services](managed-services.md).

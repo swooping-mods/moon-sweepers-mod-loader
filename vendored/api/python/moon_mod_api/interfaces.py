@@ -1,6 +1,7 @@
 """Owner-qualified public interfaces, independent of particular framework IDs."""
 import re
 from .storage import key
+from .runtimes import MANAGED_KIND, MANAGED_ABI
 
 MAX_APIS = 256
 MAX_MOD_APIS = 64
@@ -35,9 +36,13 @@ def validate_manifest(manifest):
     fields = {"provides", "requires_apis", "runtime_api_abi"}
     if not fields.intersection(manifest) and manifest.get("abi") != "MoonLab_ModStart/v6":
         return
-    if (manifest.get("kind") != "native" or manifest.get("abi") != "MoonLab_ModStart/v6" or
-            type(manifest.get("runtime_api_abi")) is not int or manifest["runtime_api_abi"] != 1):
-        raise ValueError("Public interfaces require native package v6 and runtime API ABI 1")
+    native = manifest.get("kind") == "native" and manifest.get("abi") == "MoonLab_ModStart/v6"
+    managed = manifest.get("kind") == MANAGED_KIND and manifest.get("abi") == MANAGED_ABI
+    if (not (native or managed) or type(manifest.get("runtime_api_abi")) is not int
+            or manifest["runtime_api_abi"] != 1):
+        raise ValueError("Public interfaces require native v6 or a managed consumer and runtime API ABI 1")
+    if managed and manifest.get("provides"):
+        raise ValueError("Managed consumers cannot publish native API tables")
     provides = manifest.get("provides", {})
     if not isinstance(provides, dict) or len(provides) > MAX_MOD_APIS:
         raise ValueError("Invalid provided API table")

@@ -73,7 +73,7 @@ def selection(manifests, chosen):
             owners[value] = name
 
 
-def require_available(manifest, available, runtime_api_abi=None):
+def require_available(manifest, available, runtime_api_abi=None, runtime_readiness_abi=None):
     """An SDK can inspect a backend without promising that a target hosts it."""
     if available is not None and (manifest.get("kind"), manifest.get("abi")) not in available:
         raise ValueError("Runtime is unavailable for " + manifest["id"] + ": " +
@@ -81,3 +81,7 @@ def require_available(manifest, available, runtime_api_abi=None):
     if (manifest.get("runtime_api_abi") is not None and runtime_api_abi is not None
             and (type(runtime_api_abi) is not int or runtime_api_abi != manifest["runtime_api_abi"])):
         raise ValueError("Public runtime API ABI is unavailable for " + manifest["id"])
+    if (manifest.get("kind") == MANAGED_KIND and manifest.get("runtime_api_abi") is not None
+            and runtime_readiness_abi is not None
+            and (type(runtime_readiness_abi) is not int or runtime_readiness_abi != 1)):
+        raise ValueError("Native runtime readiness ABI is unavailable for " + manifest["id"])

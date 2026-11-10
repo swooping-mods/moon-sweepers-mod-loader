@@ -147,7 +147,7 @@ def installed(folder):
     return manifest
 
 
-def resolve(manifests, selected, game_hashes, *, available_runtimes=None, runtime_api_abi=None):
+def resolve(manifests, selected, game_hashes, *, available_runtimes=None, runtime_api_abi=None, runtime_readiness_abi=None):
     """Order selected game mods and reject conflicting runtime/API contracts."""
     chosen = set(selected); ordered = []; visiting = set(); done = set(); claims = {}; shared_claims = {}; vehicle_roles = {}; late_override = []
     if not chosen: raise ValueError('Select at least one mod')
@@ -161,7 +161,7 @@ def resolve(manifests, selected, game_hashes, *, available_runtimes=None, runtim
         if name not in manifests: raise ValueError('Missing installed mod: ' + name)
         mod = manifests[name]
         if not game_mod(mod): raise ValueError(mod['name'] + ' is a companion tool; open its folder instead of selecting it for a game launch')
-        require_available(mod, available_runtimes, runtime_api_abi)
+        require_available(mod, available_runtimes, runtime_api_abi, runtime_readiness_abi)
         for file, digest in mod['game']['hashes'].items():
             if game_hashes.get(file) != digest: raise ValueError(mod['name'] + ' does not support this game build')
         for other in mod['conflicts']:

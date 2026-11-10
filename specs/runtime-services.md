@@ -2,7 +2,7 @@
 
 Native startup accepts package IDs using the SDK's lowercase alphanumeric groups separated by single hyphens, including numeric prefixes. API owner prefixes use the same package grammar; service names keep their separate letter-leading grammar.
 
-The pinned SDK 0.4 owns public C tables, interface/package validation and
+The pinned SDK 0.5 owns public C tables, interface/package validation and
 `runtime_plan.encode`. This loader owns the executable implementation. Domain
 framework APIs remain ordinary independent mod packages with opaque tables.
 
@@ -48,8 +48,17 @@ ABI/table size. Providers root targets, capture snapshots, restore while held
 and release only after successful restoration. Scene changes do not silently
 expire a live claim. Game-specific camera capture remains provider-owned.
 
-`tools/build.py` verifies the three new exports and records runtime/input/camera
-ABI 1 and native v6 capability in the hashed runtime receipt. Preparation
+`MoonLab_RuntimeState_v1` is a separate atomic query: Pending (0), Ready (1),
+Failed (2). Ready is released only after every selected native owner commits and
+`seal_updates` successfully installs the shared hooks. Missing providers,
+failed hooks or disabled/invalid installed startup cannot report Ready. The
+40-byte runtime function table is unchanged. The source-only SDK C# connector
+checks this query before managed consumer lookup; it does not publish native
+tables or register callbacks from BepInEx Load. Frameworks own typed wrappers
+and stricter game-thread/object admission.
+
+`tools/build.py` verifies the runtime/state/input/camera exports and records
+runtime/input/camera/readiness ABI 1 and native v6 capability in the hashed runtime receipt. Preparation
 refuses a distribution without the required capability before deployment.
 
 Verification: `tests/test_service_plan.py` builds the production C registry and
@@ -61,7 +70,14 @@ prefix and trailing bytes. `tests/test_runtime_contracts.py` exercises actual
 v6 archives, deterministic plan deployment and preservation of unknown edits.
 The full check gate and AMD64 cross-build remain required.
 
-Limits: no managed host or native/managed service bridge is implied. The
+The optional managed host is described in [its spec](managed-runtime.md).
+Managed API consumers require runtime API/readiness ABI 1 before copying a game;
+preparation repeats this gate if selection was cached. Ordinary managed plugins
+retain their existing requirements.
+
+Limits: compiled C#/C and native registry checks qualify host interop and startup
+admission. The new readiness runtime has not yet repeated the retained managed
+game/world/save qualification; actual framework presentation remains separate. The
 workshop pins/synchronizes the reviewed core separately; its framework migration
 has independent qualification. These host checks do not establish game startup,
 loaded-world/save/co-op behavior, native Windows gameplay or measured speedup.

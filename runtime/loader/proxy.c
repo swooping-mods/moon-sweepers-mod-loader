@@ -47,7 +47,7 @@ static void event(const char *name,int success){
     if(!WriteFile(log_file,text,(DWORD)n,&written,0)||written!=n)ExitProcess(112);
     FlushFileBuffers(log_file);
 }
-static void fail(const char *name){event(name,0);ExitProcess(111);}
+static void fail(const char *name){runtime_startup_failed();event(name,0);ExitProcess(111);}
 static void read_service_plan(void){
     static WCHAR path[1200];DWORD n=GetModuleFileNameW(self_module,path,950);
     if(!n||n>=950)fail("runtime-plan-path");
@@ -69,14 +69,15 @@ static void read_service_plan(void){
 static DWORD __stdcall worker(PTR unused){
     (void)unused;
     if(public_mode&&!public_startup()){
+        runtime_startup_failed();
         OutputDebugStringA("MoonLab: mods disabled (configuration, build or payload validation failed).\n");
         public_release_inputs();return 0;
     }
     static WCHAR evidence[1200];DWORD n=GetEnvironmentVariableW(L"MOONLAB_EVIDENCE",evidence,1000);
-    if(!n||n>=1000){if(public_mode)return 0;ExitProcess(110);}
+    if(!n||n>=1000){runtime_startup_failed();if(public_mode)return 0;ExitProcess(110);}
     const WCHAR *tail=L"\\loader.jsonl";while(*tail)evidence[n++]=*tail++;evidence[n]=0;
     log_file=CreateFileW(evidence,0x40000000,1,0,1,0x80,0);
-    if(log_file==(PTR)(U64)-1){if(public_mode)return 0;ExitProcess(110);}
+    if(log_file==(PTR)(U64)-1){runtime_startup_failed();if(public_mode)return 0;ExitProcess(110);}
     event("loader-ready",1);event(public_mode?"installed-game":"private-profile",1);
     if(public_mode){
         char text[200],*out=append(text,"{\"case\":\"deployment\",\"installation\":\"");
@@ -88,7 +89,7 @@ static DWORD __stdcall worker(PTR unused){
     }
     PTR game=0;for(int i=0;i<1200&&!game;i++){game=GetModuleHandleW(L"GameAssembly.dll");if(!game)Sleep(25);}
     if(!game)fail("gameassembly-timeout");
-    if(public_mode&&!public_game_module(game)){event("gameassembly-path-mismatch",0);CloseHandle(log_file);public_release_inputs();return 0;}
+    if(public_mode&&!public_game_module(game)){runtime_startup_failed();event("gameassembly-path-mismatch",0);CloseHandle(log_file);public_release_inputs();return 0;}
     if(!public_mode&&!protect_profile(game,0))fail("gameassembly-profile-guard");
     PTR domain=0;
     for(int i=0;i<1200;i++){
@@ -149,7 +150,7 @@ static DWORD __stdcall worker(PTR unused){
         WCHAR managed[4];
         if(public_mode||GetEnvironmentVariableW(L"MOONLAB_BEPINEX",managed,4)!=1||managed[0]!='1')fail("missing-mod-list");
         if(service_plan.count)fail("runtime-plan-mod-list");
-        if(!seal_updates())fail("shared-update-install-failed");
+        if(!runtime_finish_startup(seal_updates()))fail("shared-update-install-failed");
         event("managed-host-only",1);detach(thread);event("load-complete",1);CloseHandle(log_file);return 0;
     }
     if(n>=MOONLAB_MAX_NATIVE_MODS*65+1)fail("missing-mod-list");
@@ -183,7 +184,7 @@ static DWORD __stdcall worker(PTR unused){
     }
     active_mod[0]=0;
     if(service_plan.next_owner!=service_plan.count)fail("runtime-plan-mod-list");
-    if(!seal_updates())fail("shared-update-install-failed");
+    if(!runtime_finish_startup(seal_updates()))fail("shared-update-install-failed");
     event("shared-update-ready",1);
     event("hook-framework-ready",1);
     event("runtime-services-ready",1);
@@ -198,7 +199,7 @@ BOOL __stdcall DllMain(PTR module,DWORD reason,PTR reserved){
     n=public_installed_marker()?0:GetEnvironmentVariableW(L"MOONLAB_PROFILE_ROOT",profile_root,800);
     if(!n){
         public_mode=1;PTR thread=CreateThread(0,0,worker,0,0,0);
-        if(thread)CloseHandle(thread);return 1;
+        if(thread)CloseHandle(thread);else runtime_startup_failed();return 1;
     }
     if(n>=800)return 0;
     /* Synchronous: never let Unity compute its personal persistentDataPath

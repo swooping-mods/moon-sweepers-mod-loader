@@ -15,11 +15,12 @@ from moonloader.storage import load, write
 from moon_mod_api.runtime_plan import encode, PATH
 
 
-def managed_package(path, pins):
+def managed_package(path, pins, extra=None):
     value = test_loader.descriptor("independent-managed")
     value.update(kind=packages.MANAGED_KIND, abi=packages.MANAGED_ABI,
                  bepinex={"guid": "another.author.plugin", "data_root": "AnotherAuthor"})
     value["game"]["hashes"] = pins
+    value.update(extra or {})
     files = {"mod.dll": b"Never executed managed fixture", "icon.png": test_loader.PNG}
     value["files"] = {name: hashlib.sha256(data).hexdigest() for name, data in files.items()}
     with zipfile.ZipFile(path, "w") as archive:
@@ -57,6 +58,42 @@ class RuntimeContractChecks(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "runtime API ABI"):
                 service.prepare(installation)
         self.assertFalse(service.install_root(installation).exists())
+
+    def test_managed_api_consumer_requires_readiness_before_game_copy(self):
+        service, installation = self.prepared_fixture()
+        receipt_path = service.bundle / "runtime/receipt.json"
+        receipt = load(receipt_path)
+        receipt["runtime_api_abi"] = 1
+        write(receipt_path, receipt)
+        pins = service.library()[0]["test-mod"][0]["game"]["hashes"]
+        source = self.root / "managed-api.msmod"
+        plugin = managed_package(source, pins, {"runtime_api_abi": 1,
+            "requires_apis": [{"api": "optional-author.table", "abi": 7,
+                                "min_size": 16, "optional": True}]})
+        service.import_package(source, select=True)
+        available = {("native", abi) for abi in packages.NATIVE_ABIS}
+        available.add((packages.MANAGED_KIND, packages.MANAGED_ABI))
+        with patch.object(service, "available_runtimes", return_value=available), patch("subprocess.Popen") as spawn:
+            for capability in (None, 0, 2, True):
+                if capability is None: receipt.pop("runtime_readiness_abi", None)
+                else: receipt["runtime_readiness_abi"] = capability
+                write(receipt_path, receipt)
+                with self.subTest(capability=capability), self.assertRaisesRegex(ValueError, "readiness ABI"):
+                    service.prepare(installation)
+                self.assertFalse(service.install_root(installation).exists())
+            receipt["runtime_readiness_abi"] = 1
+            write(receipt_path, receipt)
+            order, _ = service.selected(installation)
+            self.assertIn(plugin["id"], order)
+            # The preparation gate rechecks capability even if a caller cached a
+            # selection before replacing its runtime distribution.
+            library = service.library()[0]
+            receipt.pop("runtime_readiness_abi")
+            write(receipt_path, receipt)
+            with patch.object(service, "selected", return_value=(order, library)):
+                with self.assertRaisesRegex(ValueError, "readiness ABI"):
+                    service.prepare(installation)
+            spawn.assert_not_called()
 
     def test_pinned_resolver_handles_an_independent_managed_dependency(self):
         native = test_loader.descriptor("another-library")

@@ -57,7 +57,7 @@ def main(argv=None):
     expected = set((ROOT / "runtime/native/version.def").read_text().splitlines()[2:]) | {
         "MoonLab_LoaderAbi", "MoonLab_RegisterUpdate_v1", "MoonLab_RegisterVehicle_v1",
         "MoonLab_RegisterLateUpdate_v1", "MoonLab_CameraOverrideActive_v1", "MoonLab_GetHookApi_v1",
-        "MoonLab_GetRuntimeApi_v1", "MoonLab_GetInputApi_v1", "MoonLab_GetCameraApi_v1"}
+        "MoonLab_GetRuntimeApi_v1", "MoonLab_RuntimeState_v1", "MoonLab_GetInputApi_v1", "MoonLab_GetCameraApi_v1"}
     if image.machine != 0x8664 or not expected.issubset({e["name"] for e in image.exports()}):
         raise ValueError("Loader PE/export surface is incomplete")
     diagnostic = PE(work / "MoonLab.LoaderCheck.exe")
@@ -66,6 +66,7 @@ def main(argv=None):
     receipt = {"schema": "moon-loader-runtime/v1", "sha256": hashlib.sha256((work / "version.dll").read_bytes()).hexdigest(),
                "game_pins": PIN, "abi": "MoonLab_ModStart/v6", "hook_framework_abi": 1,
                "runtime_api_abi": 1, "input_api_abi": 1, "camera_api_abi": 1,
+               "runtime_readiness_abi": 1,
                "runtime_plan_schema": "moon-runtime-plan/v1",
                "late_update_abi": 1, "shared_update_abi": 1, "vehicle_dispatch_abi": 1,
                "managed_profile_guard_abi": 1,

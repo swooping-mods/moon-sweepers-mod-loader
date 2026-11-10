@@ -5,6 +5,13 @@
  * package contract; API tables and callback code remain resident. */
 #include "hooks.h"
 #define MOON_RUNTIME_SERVICES_ABI 1u
+/* Separate from the frozen API table. READY is published only after all native
+ * owners commit and hook installation succeeds; it does not admit domain calls
+ * on another thread or make a borrowed game object valid. */
+#define MOON_RUNTIME_PENDING 0u
+#define MOON_RUNTIME_READY 1u
+#define MOON_RUNTIME_FAILED 2u
+typedef unsigned int (*MoonRuntimeStateV1)(void);
 typedef struct {
     const char *name;
     unsigned int value;

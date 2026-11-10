@@ -12,7 +12,7 @@ The repository owns the Python/PySide6 desktop app, its native Windows AMD64 boo
 
 `vendored/api/` is the content-pinned first-party SDK. `moonloader.packages` reexports its validator/resolver, and `moonloader.storage` reexports its portable storage functions while retaining loader locks/process identity locally. `moonloader.__init__` resolves the snapshot relative to the repository, never to a sibling development checkout. `tools/check_snapshot.py` verifies every pinned payload file and rejects extra/changed files and symlinks.
 
-The SDK pin is 0.4.0. It validates native v1–v6, ordinary/external managed mods,
+The SDK pin is 0.5.0. It validates native v1–v6, ordinary/external managed mods,
 and companions; the UI treats managed packages as selectable game mods. This
 default distribution hosts native mods. An explicitly attached checked managed
 runtime enables [private managed deployment](managed-runtime.md).

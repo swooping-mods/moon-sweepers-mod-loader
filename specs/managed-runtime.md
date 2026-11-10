@@ -47,8 +47,15 @@ IL2CPP 108. Its upstream .NET 6.0.7 closure is development-only; attaching it
 does not qualify a public runtime release or arbitrary game/Unity profiles.
 Managed plugin lifecycle follows BepInEx metadata. Mixed package dependency
 ordering establishes package closure, not a native/managed startup rendezvous.
-Native service bridging and cross-backend startup dependencies need their own
-readiness/lifetime contract and qualification.
+SDK 0.5 managed consumers may declare native `requires_apis` with
+`runtime_api_abi: 1`. Both selection and preparation require readiness ABI 1 in
+the native receipt before copying game data. The source C# connector queries the
+resident loader's Pending/Ready/Failed export before binding a committed native
+table; it never loads or privately starts a provider. This consumer-only bridge
+does not sequence arbitrary BepInEx Load methods or admit managed native-table
+publication. Each domain owns its typed wrapper and game-thread/object rules.
+The new readiness runtime still needs its own loaded-game requalification;
+retained tests below describe their exact previous runtime candidate.
 
 Verification: `tests/test_managed_runtime.py` imports unrelated original inert
 packages, exercises managed-only and mixed deployment/launch plans, separate

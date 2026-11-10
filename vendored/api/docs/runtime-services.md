@@ -70,7 +70,9 @@ resources. `moon_camera_finish` restores while ownership is exclusive, then
 releases. If restoration fails, retain the rooted targets/session and retry.
 Never discard a live claim merely because a scene changed.
 
-The runtime retains modules and API tables until exit. Managed bridging, hot
-unload and automatic save/network conversion are not part of this ABI. See the
+The runtime retains modules and API tables until exit. The optional [C# consumer client](managed-services.md) binds these tables after
+native readiness; each framework owns its domain wrapper and call admission.
+Managed publication, hot unload and automatic save/network conversion are not
+part of this ABI. See the
 [runtime spec](https://github.com/swooping-mods/moon-sweepers-api/blob/main/specs/runtime-services.md) for startup-plan and verification
 boundaries.

@@ -59,9 +59,10 @@ positive uint32; table sizes are 1–65536 bytes. Each limit dictionary has at m
 32 lowercase identifiers and nonnegative uint32 capacities. Booleans are not
 integers for this contract. Duplicate requirements and foreign API namespaces
 reject. Interface-aware native packages require native ABI v6 so older loaders
-reject them rather than ignoring new metadata. Companion tools and the current
-managed backend cannot declare these interfaces; a managed bridge needs its
-own versioned host contract.
+reject them rather than ignoring new metadata. Companion tools cannot declare these interfaces. SDK 0.5 permits managed
+consumers to declare native API requirements with `runtime_api_abi: 1`; they
+cannot publish native tables. Such consumers require readiness ABI 1 on the
+target runtime. See the [managed client guide](managed-services.md).
 
 New building providers choose `build_api` naming their required interface and
 retain ordinary `build_items`. The selected provider must advertise the
@@ -71,9 +72,9 @@ not make duplicate saved kinds compatible. Existing packages without
 `build_api` retain the Build Menu Framework dependency and 224 historical
 capacity fallback. No saved identity is reallocated.
 
-SDK 0.4 adds the [native runtime protocol](runtime-services.md). A matching
+SDK 0.5 supplies the [native runtime protocol](runtime-services.md). A matching
 runtime receipt is required before deployment. Actual tables must match these
 declarations during dependency-ordered startup; a successful provider becomes
 visible before its consumer starts. Domain headers and implementations remain
-with their owning frameworks. Managed wrappers and loaded-world qualification
-remain separate work.
+with their owning frameworks. Each framework owns its typed managed wrapper; loaded-world qualification
+remains separate from these package and runtime checks.
