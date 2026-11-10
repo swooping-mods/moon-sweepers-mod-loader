@@ -68,6 +68,11 @@ class ServicePlanChecks(unittest.TestCase):
         for mode in ("incomplete-startup", "hooks-failed"):
             self.run_core(encode(values, list(values)), mode)
 
+    def test_managed_only_empty_native_plan_reaches_ready_without_hooks(self):
+        values={'managed-only':{'id':'managed-only','kind':'bepinex-il2cpp',
+                'abi':'BepInEx.IL2CPP/6-be791','requires':[]}}
+        self.run_core(encode(values,list(values)),"empty-startup")
+
     def test_every_truncated_prefix_and_trailing_bytes_reject(self):
         data = encode(fixtures(), list(fixtures()))
         self.run_core(data, "truncations")

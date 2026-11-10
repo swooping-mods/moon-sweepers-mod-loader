@@ -54,8 +54,13 @@ resident loader's Pending/Ready/Failed export before binding a committed native
 table; it never loads or privately starts a provider. This consumer-only bridge
 does not sequence arbitrary BepInEx Load methods or admit managed native-table
 publication. Each domain owns its typed wrapper and game-thread/object rules.
-The new readiness runtime still needs its own loaded-game requalification;
-retained tests below describe their exact previous runtime candidate.
+The separate readiness runtime now passes a headless original managed interop
+and independent native-provider/managed-consumer startup diagnostic. It records
+Ready, typed result 42, forced GC and 10,000 native calls with zero managed bytes
+in that warmed batch. Native startup was already Ready at managed Load; actual
+Pending timing remains host-tested. This is not loaded-world/save or Hints UI
+qualification. Retained world tests below describe their exact previous runtime
+candidate.
 
 Verification: `tests/test_managed_runtime.py` imports unrelated original inert
 packages, exercises managed-only and mixed deployment/launch plans, separate

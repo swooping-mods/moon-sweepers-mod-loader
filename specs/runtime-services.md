@@ -76,8 +76,11 @@ preparation repeats this gate if selection was cached. Ordinary managed plugins
 retain their existing requirements.
 
 Limits: compiled C#/C and native registry checks qualify host interop and startup
-admission. The new readiness runtime has not yet repeated the retained managed
-game/world/save qualification; actual framework presentation remains separate. The
+admission. The separate b36 readiness runtime passes its original managed interop and
+independent typed native-service startup diagnostic under private Steam/Proton.
+Its actual initial state was already Ready; Pending timing remains host-tested.
+It has not repeated the retained managed world/save qualification, and actual
+framework presentation remains separate. The
 workshop pins/synchronizes the reviewed core separately; its framework migration
 has independent qualification. These host checks do not establish game startup,
 loaded-world/save/co-op behavior, native Windows gameplay or measured speedup.

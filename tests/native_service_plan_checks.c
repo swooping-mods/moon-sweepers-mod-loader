@@ -29,6 +29,13 @@ int main(int argc,char **argv){
         memset(&service_plan,0,sizeof(service_plan));CHECK(msp_init(data,(unsigned int)size));free(data);return 0;
     }
     CHECK(msp_init(data,(unsigned int)size));
+    if(!strcmp(argv[2],"empty-startup")){
+        CHECK(!service_plan.count&&!subscription_count);
+        CHECK(runtime_finish_startup(seal_updates()));
+        CHECK(MoonLab_RuntimeState_v1()==MOON_RUNTIME_READY);
+        CHECK(!MoonLab_GetRuntimeApi_v1()->find("absent-provider","arithmetic",1,24));
+        free(data);return 0;
+    }
     if(!strcmp(argv[2],"parse")){printf("parsed %u mods\n",service_plan.count);free(data);return 0;}
     if(!strcmp(argv[2],"incomplete-startup")){
         CHECK(!runtime_finish_startup(1));CHECK(MoonLab_RuntimeState_v1()==MOON_RUNTIME_FAILED);
