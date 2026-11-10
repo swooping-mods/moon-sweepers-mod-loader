@@ -39,8 +39,9 @@ borrowed for that Update invocation, before the original game method.
 `input.h` adapts the SDK's bounded portable action registry to Windows
 GetAsyncKeyState. `MoonLab_GetInputApi_v1` returns ABI 1; callers serialize access
 on the game thread and provide focus/typing/menu/world/authority gates. Input
-does not intercept vanilla keys. `camera.h` adapts the portable 16-claim registry
-to the observed game dispatch thread. `MoonLab_GetCameraApi_v1` requires exact
+does not intercept vanilla keys. `camera.h` forwards to the canonical SDK
+`camera_host.h`, sharing the same 16-claim registry and observed game dispatch
+thread implementation with independent native SDKs. `MoonLab_GetCameraApi_v1` requires exact
 ABI/table size. Providers root targets, capture snapshots, restore while held
 and release only after successful restoration. Scene changes do not silently
 expire a live claim. Game-specific camera capture remains provider-owned.
