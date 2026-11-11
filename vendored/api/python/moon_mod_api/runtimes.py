@@ -3,7 +3,7 @@ import re
 from urllib.parse import urlsplit
 from .storage import relative
 
-NATIVE_ABIS = tuple("MoonLab_ModStart/v" + str(version) for version in range(1, 8))
+NATIVE_ABIS = tuple("MoonLab_ModStart/v" + str(version) for version in range(1, 9))
 MANAGED_KIND = "bepinex-il2cpp"
 MANAGED_ABI = "BepInEx.IL2CPP/6-be791"
 RUNTIMES = frozenset([*(('native', abi) for abi in NATIVE_ABIS),
@@ -26,8 +26,9 @@ def host_requirements(manifest):
     """A new package ABI prevents older loaders ignoring mandatory adapter gates."""
     required = manifest.get("requires_host", {})
     v7 = manifest.get("kind") == "native" and manifest.get("abi") == NATIVE_ABIS[6]
+    v8 = manifest.get("kind") == "native" and manifest.get("abi") == NATIVE_ABIS[7]
     if "requires_host" in manifest or v7:
-        if not v7 or not required:
+        if not (v7 or v8) or v7 and not required:
             raise ValueError("Host requirements require native v7 and a nonempty capability map")
         _capabilities(required)
     return required
@@ -94,11 +95,15 @@ def selection(manifests, chosen):
 
 
 def require_available(manifest, available, runtime_api_abi=None, runtime_readiness_abi=None,
-                      host_capabilities=None):
+                      host_capabilities=None, native_package_abis=None):
     """An SDK can inspect a backend without promising that a target hosts it."""
     if available is not None and (manifest.get("kind"), manifest.get("abi")) not in available:
         raise ValueError("Runtime is unavailable for " + manifest["id"] + ": " +
                          str(manifest.get("kind")) + " / " + str(manifest.get("abi")))
+    if manifest.get("kind") == "native" and manifest.get("abi") == NATIVE_ABIS[7]:
+        if (not isinstance(native_package_abis, (tuple, list, set, frozenset))
+                or NATIVE_ABIS[7] not in native_package_abis):
+            raise ValueError("Native package ABI v8 is unavailable for " + manifest["id"])
     if (manifest.get("runtime_api_abi") is not None and runtime_api_abi is not None
             and (type(runtime_api_abi) is not int or runtime_api_abi != manifest["runtime_api_abi"])):
         raise ValueError("Public runtime API ABI is unavailable for " + manifest["id"])

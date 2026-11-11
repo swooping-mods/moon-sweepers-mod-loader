@@ -36,13 +36,13 @@ def validate_manifest(manifest):
     host_requirements(manifest)
     fields = {"provides", "requires_apis", "runtime_api_abi"}
     native = manifest.get("kind") == "native" and manifest.get("abi") in (
-        "MoonLab_ModStart/v6", "MoonLab_ModStart/v7")
+        "MoonLab_ModStart/v6", "MoonLab_ModStart/v7", "MoonLab_ModStart/v8")
     if not fields.intersection(manifest) and not native:
         return
     managed = manifest.get("kind") == MANAGED_KIND and manifest.get("abi") == MANAGED_ABI
     if (not (native or managed) or type(manifest.get("runtime_api_abi")) is not int
             or manifest["runtime_api_abi"] != 1):
-        raise ValueError("Public interfaces require native v6/v7 or a managed consumer and runtime API ABI 1")
+        raise ValueError("Public interfaces require native v6/v7/v8 or a managed consumer and runtime API ABI 1")
     if managed and manifest.get("provides"):
         raise ValueError("Managed consumers cannot publish native API tables")
     provides = manifest.get("provides", {})

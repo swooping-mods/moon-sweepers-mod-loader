@@ -22,3 +22,11 @@ Changes require review, updating the source lock and rebuilding affected mods.
 Exact prior qualified DLLs remain separately retained; a new compilation never
 inherits their gameplay proof. Host compilation and hash checks do not qualify
 Unity behavior, native Windows gameplay, real co-op or performance.
+
+SDK 0.7 also supplies `runtime/sdk/game_adapter.h`, copied from the public API
+snapshot. This is the broker-only native v8 context and typed game-clock
+contract. New v8 code uses logical game capabilities and framework APIs; it
+does not receive the raw domain/module pointers used by the legacy bindings.
+The remaining game-specific native headers still target the pinned 1.0.5
+layout and do not become forward-compatible through this header addition.
+The snapshot records that distinction and the new header's API provenance.

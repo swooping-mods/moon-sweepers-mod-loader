@@ -11,11 +11,13 @@
     "runtime/native/interaction.h": "df9e74ca26ed8416dc04436844c146dbd5273c1d06c0bc62db5bd8719845b71e",
     "runtime/native/interaction_client.h": "4c37e3e6f691d62cbfe75dcd1a544891377f620b7111e2981c0edf64bbfd1b77",
     "runtime/native/interaction_unity.h": "edc1c5a61d8daf2485b7d8e6eb474e91ad6e6c91e8a88de14bb50bda854b192c",
+    "runtime/native/local_actor.h": "d16cbfeef20df121d4bffb53b6a0f7da91ee664f070c4a2af0e0da70145b40e5",
     "runtime/native/services.h": "1178e09c77f30f53bbccbfbacf8771e5faad1cf79753703d90dfd0a1e0fbadeb",
     "runtime/sdk/camera.h": "2a889ad15396b0aaafae640447f9d173fee7f42b966b9177cbbabc3b742e82b3",
     "runtime/sdk/camera_host.h": "6d4886166c7ea02bc71de69f99a043a8a55b26d88bf06d02b9fcd335d519dda5",
     "runtime/sdk/camera_registry.h": "0428ed4a1bd5029115166c39629a46bbb6fd796244d50a7600c14ec14cce30ce",
     "runtime/sdk/context.h": "6c84145cc761550c4943aa10c52242a538e92243f79a1b20c65b6a4ef9e82605",
+    "runtime/sdk/game_adapter.h": "5285749438101a72af27711c408d4123c04f9c05fa9a691dfa309523e63efc20",
     "runtime/sdk/hooks.h": "7c006f1254dd6a130f56dac499ba8196fb84ee4883443ee4f12d601534df56ec",
     "runtime/sdk/input.h": "33739269793e88776c6f611a05e19ade01bd8326a115d38a0eec71ff64344ac8",
     "runtime/sdk/input_host.h": "8d3f59ed3e21bdb7c7528737dd263b234c65e05b481a142eaf5f33f70604e0cb",
@@ -37,8 +39,7 @@
     "runtime/sdk/storage.h": "c95b63653b564fb67d5385ec76abf80582daee82aa8da03178350c97cfb29a2b",
     "runtime/sdk/update_driver.h": "615ccbd58a34756dd38f4312296badfe7d169392f94f8847bc5fb885bea3efb2",
     "runtime/sdk/vehicle_input.h": "6af332b456ff9fb74e96a6e963a8cf9627bd51a8edca55f07b6e5a829b9da790",
-    "runtime/sdk/wallet.h": "04f19f23ca6f51f015716362103c5936b972d90fbafd6447ff84853836e9cf22",
-    "runtime/native/local_actor.h": "d16cbfeef20df121d4bffb53b6a0f7da91ee664f070c4a2af0e0da70145b40e5"
+    "runtime/sdk/wallet.h": "04f19f23ca6f51f015716362103c5936b972d90fbafd6447ff84853836e9cf22"
   },
   "entrypoints": [
     "runtime/native/camera.h",
@@ -73,9 +74,14 @@
     "runtime/sdk/update_driver.h",
     "runtime/sdk/vehicle_input.h",
     "runtime/sdk/wallet.h",
-    "runtime/native/local_actor.h"
+    "runtime/native/local_actor.h",
+    "runtime/sdk/game_adapter.h"
   ],
   "source_revision": "e7ba34175df7dcc1e7fe5cfe32f3c761e34be096",
   "source_snapshot": "working tree export; exact file hashes are authoritative",
-  "gameplay_qualification": "None inherited for changed builds"
+  "gameplay_qualification": "None inherited for changed builds",
+  "game_adapter_contract": {
+    "source": "moon-sweepers-api/include/moon_sweepers/game_adapter.h",
+    "api_version": "0.7.0"
+  }
 }

@@ -13,6 +13,7 @@ from .build_items import validate_manifest as validate_build_items, validate_sel
 from .runtimes import (MANAGED_KIND, MANAGED_ABI, NATIVE_ABIS, game_mod, validate as validate_runtime,
                        selection as validate_runtime_selection, require_available)
 from .interfaces import validate_manifest as validate_interfaces, selection as interface_selection
+from .compatibility import validate_manifest as validate_game_contract, require_game
 
 SCHEMA = 'moon-mod-package/v1'
 MAX_FILES = 128
@@ -71,9 +72,14 @@ def validate(manifest):
     if 'default_selected' in manifest and type(manifest['default_selected']) is not bool:
         raise ValueError('default_selected must be a boolean')
     game = manifest.get('game', {})
-    if game.get('id') != 'moon-sweepers' or game.get('appid') != '5335510' or not game.get('hashes'): raise ValueError('Missing game compatibility pins')
-    for name, digest in game['hashes'].items():
-        if name not in ('GameAssembly.dll', 'MoonSweepers.exe', 'UnityPlayer.dll') or not re.fullmatch('[a-f0-9]{64}', digest): raise ValueError('Invalid game pin')
+    if (not isinstance(game, dict) or game.get('id') != 'moon-sweepers'
+            or game.get('appid') != '5335510' or native_version != 8 and not game.get('hashes')):
+        raise ValueError('Missing game compatibility pins')
+    hashes = game.get('hashes', {})
+    if not isinstance(hashes, dict): raise ValueError('Invalid game pin table')
+    for name, digest in hashes.items():
+        if name not in ('GameAssembly.dll', 'MoonSweepers.exe', 'UnityPlayer.dll') or not isinstance(digest, str) or not re.fullmatch('[a-f0-9]{64}', digest): raise ValueError('Invalid game pin')
+    validate_game_contract(manifest)
     validate_runtime(manifest)
     validate_interfaces(manifest)
     validate_build_items(manifest)
@@ -149,7 +155,8 @@ def installed(folder):
 
 
 def resolve(manifests, selected, game_hashes, *, available_runtimes=None, runtime_api_abi=None,
-            runtime_readiness_abi=None, host_capabilities=None):
+            runtime_readiness_abi=None, host_capabilities=None, native_package_abis=None,
+            game_profile=None, game_adapter=None, legacy_profile_ids=None):
     """Order selected game mods and reject conflicting runtime/API contracts."""
     chosen = set(selected); ordered = []; visiting = set(); done = set(); claims = {}; shared_claims = {}; vehicle_roles = {}; late_override = []
     if not chosen: raise ValueError('Select at least one mod')
@@ -164,9 +171,8 @@ def resolve(manifests, selected, game_hashes, *, available_runtimes=None, runtim
         mod = manifests[name]
         if not game_mod(mod): raise ValueError(mod['name'] + ' is a companion tool; open its folder instead of selecting it for a game launch')
         require_available(mod, available_runtimes, runtime_api_abi, runtime_readiness_abi,
-                          host_capabilities)
-        for file, digest in mod['game']['hashes'].items():
-            if game_hashes.get(file) != digest: raise ValueError(mod['name'] + ' does not support this game build')
+                          host_capabilities, native_package_abis)
+        require_game(mod, game_hashes, game_profile, game_adapter, legacy_profile_ids)
         for other in mod['conflicts']:
             if other in chosen: raise ValueError(mod['name'] + ' conflicts with ' + other)
         for claim in mod['claims']:

@@ -5,11 +5,12 @@ from .interfaces import selection as interface_selection
 from .runtimes import NATIVE_ABIS
 
 MAGIC = b"MSAPI\x01\0\0"
+MAGIC_V2 = b"MSAPI\x02\0\0"
 MAX_BYTES = 2 * 1024 * 1024
 PATH = "MoonLab/runtime-plan.bin"
 
 
-def encode(manifests, order):
+def encode(manifests, order, *, game_profile=None):
     """Encode an already selected dependency order for the native bootstrap.
 
     Absent optional providers are omitted; present providers become ordinary
@@ -25,7 +26,8 @@ def encode(manifests, order):
             if dependency not in positions or positions[dependency] >= positions[name]:
                 raise ValueError("Runtime plan requires dependency-first order")
     native = [manifests[name] for name in order if manifests[name]["kind"] == "native"]
-    parts = [MAGIC, struct.pack("<I", len(native))]
+    modern = any(mod["abi"] == "MoonLab_ModStart/v8" for mod in native)
+    parts = [MAGIC_V2 if modern else MAGIC]
 
     def number(value):
         parts.append(struct.pack("<I", value))
@@ -33,6 +35,15 @@ def encode(manifests, order):
     def string(value):
         data = value.encode("ascii")
         parts.extend((struct.pack("<H", len(data)), data))
+
+    if modern:
+        from .compatibility import validate_profile
+        if game_profile is None:
+            raise ValueError("Native v8 runtime plan requires the reviewed game profile")
+        validate_profile(game_profile)
+        string(game_profile["id"])
+        string(game_profile["digest"])
+    number(len(native))
 
     def contract(api, spec, size_key):
         string(api)
@@ -45,6 +56,8 @@ def encode(manifests, order):
             number(value)
 
     for mod in native:
+        from .compatibility import validate_manifest
+        validate_manifest(mod)
         abi = mod.get("abi")
         if abi not in NATIVE_ABIS:
             raise ValueError("Invalid native runtime plan ABI")
@@ -59,6 +72,11 @@ def encode(manifests, order):
         number(len(requirements))
         for spec in sorted(requirements, key=lambda value: value["api"]):
             contract(spec["api"], spec, "min_size")
+        if modern:
+            game_requirements = mod.get("requires_game", {})
+            number(len(game_requirements))
+            for name, spec in sorted(game_requirements.items()):
+                contract(name, spec, "min_size")
     data = b"".join(parts)
     if len(data) > MAX_BYTES:
         raise ValueError("Native runtime plan exceeds 2 MiB")
