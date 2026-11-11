@@ -64,6 +64,19 @@ class SteamOptionsChecks(unittest.TestCase):
         self.assertEqual(setup.inspect(self.installation, 'linux')['status'], 'ready')
         self.assertFalse(setup.apply(self.installation, self.root/'data', setup.inspect(self.installation))['changed'])
 
+    def test_sole_account_without_mostrecent_matches_current_steam_shape(self):
+        self.login.write_text('"users" {"76561197960265770" {"AccountName" "synthetic" "PersonaName" "Fixture" "RememberPassword" "1" "WantsOfflineMode" "0" "SkipOfflineModeWarning" "0" "AutoLogin" "1" "timestamp" "123"}}')
+        preview = setup.inspect(self.installation)
+        self.assertEqual(preview['status'], 'required'); self.assertEqual(preview['account'], '42')
+        setup.apply(self.installation, self.root/'data', preview)
+        self.assertEqual(setup.inspect(self.installation)['status'], 'ready')
+
+    def test_multiple_unmarked_or_contradictory_accounts_remain_unsupported(self):
+        for users in ('"76561197960265770" {"AutoLogin" "1"} "76561197960265771" {"AutoLogin" "0"}', '"76561197960265770" {"MostRecent" "0"}', '"76561197960265770" {"MostRecent" "unknown"}', '"76561197960265770" {"MostRecent" "1"} "76561197960265771" {"MostRecent" "1"}'):
+            with self.subTest(users=users):
+                self.login.write_text('"users" {' + users + '}')
+                self.assertEqual(setup.inspect(self.installation)['status'], 'unsupported')
+
     def test_existing_options_replace_only_value_and_preserve_bom_crlf(self):
         self.options('WINEDLLOVERRIDES="version=b;winhttp=n,b" gamemoderun %command% -x')
         self.config.write_bytes(b'\xef\xbb\xbf' + self.config.read_bytes().replace(b' ', b'\r\n', 1))

@@ -162,10 +162,18 @@ def _snapshot(installation):
     login = root / 'config/loginusers.vdf'
     login_data, login_signature = _read(login, root)
     users = _walk(_tree(login_data.decode('utf-8-sig')), 'users')
-    recent = []
+    recent = []; accounts = []; marked = False
     for steam_id, user in users.items():
         if 'children' not in user or not steam_id.isdigit(): continue
-        if user['children'].get('mostrecent', {}).get('value') == '1': recent.append(steam_id)
+        accounts.append(steam_id)
+        marker = user['children'].get('mostrecent')
+        if marker is not None:
+            marked = True
+            if marker.get('value') not in ('0', '1'): raise ValueError('Unsupported Steam account selection marker')
+            if marker['value'] == '1': recent.append(steam_id)
+    # Some current Steam clients omit MostRecent entirely for a sole account.
+    # That shape is unambiguous; never guess among multiple stored accounts.
+    if not marked and len(accounts) == 1: recent = accounts
     if len(recent) != 1: raise ValueError('Cannot identify one recent Steam account; sign in to the intended account and retry')
     account = str(int(recent[0]) & 0xffffffff)
     path = root / 'userdata' / account / 'config/localconfig.vdf'
@@ -179,7 +187,9 @@ def _snapshot(installation):
     current = options['value'] if options else ''
     proposed = merge(current)
     if options: modified = text[:options['start']] + _quoted(proposed) + text[options['end']:]
-    else: modified = text[:node['close']] + '\n\t\t\t\t\t"LaunchOptions"\t\t' + _quoted(proposed) + '\n\t\t\t\t' + text[node['close']:]
+    else:
+        newline = '\r\n' if '\r\n' in text else '\n'
+        modified = text[:node['close']] + newline + '\t\t\t\t\t"LaunchOptions"\t\t' + _quoted(proposed) + newline + '\t\t\t\t' + text[node['close']:]
     if data.startswith(b'\xef\xbb\xbf'): modified = '\ufeff' + modified
     return {'path': str(path), 'account': account, 'current': current, 'proposed': proposed,
             'signature': signature, 'login_signature': login_signature}, data, modified.encode('utf-8')
