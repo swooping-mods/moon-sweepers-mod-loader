@@ -229,6 +229,36 @@ def _preloader_logs(game, baseline):
     return result
 
 
+def _managed_snapshot(game):
+    from .storage import contained
+    path = contained(game, 'BepInEx/LogOutput.log')
+    info = path.stat() if path.is_file() else None
+    if info and info.st_nlink != 1: raise ValueError('Aliased managed log refused')
+    prefix = b''
+    if info:
+        with path.open('rb') as stream: prefix = stream.read(min(info.st_size, TAIL_BYTES))
+    return {'path':str(path), 'before':[info.st_ino, info.st_size, info.st_mtime_ns] if info else None,
+            'prefix_bytes':len(prefix), 'prefix_sha256':hashlib.sha256(prefix).hexdigest(), 'since_ns':time.time_ns()}
+
+
+def _managed_log(game, baseline, since=0):
+    from .storage import contained
+    if not isinstance(baseline, dict): return None
+    path = contained(game, 'BepInEx/LogOutput.log')
+    if baseline.get('path') != str(path) or not path.is_file(): return None
+    info = path.stat(); before = baseline['before']
+    if info.st_nlink != 1 or info.st_mtime_ns < max(since, baseline.get('since_ns', 0)): return None
+    if [info.st_ino, info.st_size, info.st_mtime_ns] == before: return None
+    count = baseline['prefix_bytes']
+    if not isinstance(count, int) or not 0 <= count <= TAIL_BYTES: raise ValueError('Invalid managed log baseline')
+    offset = before[1] if before and info.st_ino == before[0] and info.st_size > before[1] else 0
+    with path.open('rb') as stream:
+        prefix = stream.read(count)
+        if hashlib.sha256(prefix).hexdigest() != baseline['prefix_sha256']: offset = 0
+        stream.seek(max(offset, info.st_size-TAIL_BYTES)); tail = stream.read(TAIL_BYTES).decode('utf-8', errors='replace')
+    return {'bytes':info.st_size-offset, 'tail':tail, 'truncated':info.st_size-offset > TAIL_BYTES}
+
+
 def prepare_run(root, record):
     """Mark the private managed log so an unchanged previous run is not copied."""
     if record.get('mode') == 'installed': return
@@ -237,14 +267,7 @@ def prepare_run(root, record):
         root = Path(root).absolute(); game = Path(record['cwd']).absolute()
         game = contained(root, game.relative_to(root).as_posix())
         record['diagnostic_preloader_logs'] = _preloader_snapshot(game)
-        path = contained(game, 'BepInEx/LogOutput.log')
-        info = path.stat() if path.is_file() else None
-        prefix = b''
-        if info:
-            with path.open('rb') as stream: prefix = stream.read(min(info.st_size, TAIL_BYTES))
-        record['diagnostic_managed_log'] = {'path': str(path),
-            'before': [info.st_ino, info.st_size, info.st_mtime_ns] if info else None,
-            'prefix_bytes': len(prefix), 'prefix_sha256': hashlib.sha256(prefix).hexdigest()}
+        record['diagnostic_managed_log'] = _managed_snapshot(game)
     except Exception:
         # A malformed/synthetic plan cannot expand the collection boundary.
         return
@@ -261,6 +284,8 @@ def prepare_installed(service, installation, record):
                  'installed_log_watch': {'installation': installation.record(),
                      'generation': deployed['generation'], 'data': str(data), 'since_ns': time.time_ns(),
                      'preloader_baseline': _preloader_snapshot(Path(installation.path))}}
+        if deployed.get('managed') is True:
+            watch['installed_log_watch']['managed_log'] = _managed_snapshot(Path(installation.path))
         record['installed_log_watch'] = watch['installed_log_watch']
         write(contained(data, 'diagnostics-watch.json'), watch)
     except Exception as error:
@@ -293,6 +318,10 @@ def collect_installed(root, record):
         since = meta['since_ns']
         if not isinstance(since, int) or since < 1: raise ValueError('Invalid installed diagnostic start time')
         result['preloader_logs'] = _preloader_logs(game, meta.get('preloader_baseline'))
+        result['adapter_logs'] = []
+        if deployed.get('managed') is True:
+            managed_log = _managed_log(game, meta.get('managed_log'), since)
+            if managed_log: result['managed_log'] = managed_log
         folder = contained(game, 'MoonLab/logs')
         if folder.is_dir():
             from itertools import islice
@@ -315,10 +344,22 @@ def collect_installed(root, record):
                 if attributed:
                     result['logs'].append({'run': path.parent.name, 'path': str(path), 'bytes': size,
                                            'tail': tail, 'truncated': size > TAIL_BYTES})
+                    if deployed.get('managed') is not True: continue
+                    for name in ('adapter-ready.json', 'adapter-failed.json', 'adapter-failure.txt'):
+                        try:
+                            sidecar = contained(game, 'MoonLab/logs/'+path.parent.name+'/'+name)
+                            info = sidecar.stat()
+                            if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or info.st_mtime_ns < since or not info.st_size: continue
+                            with sidecar.open('rb') as stream:
+                                stream.seek(max(0, info.st_size-TAIL_BYTES)); tail = stream.read(TAIL_BYTES).decode('utf-8', errors='replace')
+                            result['adapter_logs'].append({'run':path.parent.name, 'name':name, 'path':str(sidecar),
+                                'bytes':info.st_size, 'tail':tail, 'truncated':info.st_size > TAIL_BYTES})
+                        except (OSError, ValueError): continue
+        adapter_failed = any(row['name'] != 'adapter-ready.json' for row in result['adapter_logs'])
         result.update(installation=installation.identity, generation=generation,
-                      status='preloader-failed' if result['preloader_logs'] else 'bootstrap-observed' if result['logs'] else 'no-attributed-bootstrap-log-yet')
+                      status='preloader-failed' if result['preloader_logs'] else 'adapter-failed' if adapter_failed else 'bootstrap-observed' if result['logs'] else 'no-attributed-bootstrap-log-yet')
         write(_log_path(session.root, 'installed-bootstrap.json'), result)
-        session.event('installed-bootstrap-collected', result['status'], 'ERROR' if result['preloader_logs'] else 'INFO', logs=len(result['logs']), preloader_logs=len(result['preloader_logs']))
+        session.event('installed-bootstrap-collected', result['status'], 'ERROR' if result['preloader_logs'] or adapter_failed else 'INFO', logs=len(result['logs']), preloader_logs=len(result['preloader_logs']), adapter_logs=len(result['adapter_logs']))
     except Exception as error:
         result.update(status='collection-unavailable', message=str(error))
         try:
@@ -371,7 +412,7 @@ def finish_run(root, record, code, detail=''):
         if 'runs' not in Path(relative).parts[:-1]: raise ValueError('Not a loader launch run')
         run = contained(session.root, relative)
         if not run.is_dir(): raise ValueError('Current run directory is missing')
-        for name in ('process.log', 'Player.log', 'loader.jsonl', 'bepinex.jsonl'):
+        for name in ('process.log', 'Player.log', 'loader.jsonl', 'bepinex.jsonl', 'adapter-ready.json', 'adapter-failed.json', 'adapter-failure.txt'):
             path = contained(run, name)
             if not path.is_file(): continue
             with path.open('rb') as stream:
@@ -380,26 +421,19 @@ def finish_run(root, record, code, detail=''):
             summary['tails'][name] = {'bytes': size, 'tail': tail, 'truncated': size > TAIL_BYTES}
         managed = record.get('diagnostic_managed_log') if not installed else None
         if managed:
-            path = Path(managed['path']).absolute()
             game = Path(record['cwd']).absolute()
             game = contained(session.root, game.relative_to(session.root).as_posix())
-            if path != contained(game, 'BepInEx/LogOutput.log'): raise ValueError('Unexpected managed log path')
-            if path.is_file():
-                info = path.stat(); before = managed['before']
-                changed = [info.st_ino, info.st_size, info.st_mtime_ns] != before
-                if changed:
-                    offset = before[1] if before and info.st_ino == before[0] and info.st_size > before[1] else 0
-                    with path.open('rb') as stream:
-                        prefix = stream.read(managed['prefix_bytes'])
-                        if hashlib.sha256(prefix).hexdigest() != managed['prefix_sha256']: offset = 0
-                        stream.seek(max(offset, info.st_size-TAIL_BYTES)); tail = stream.read(TAIL_BYTES).decode('utf-8', errors='replace')
-                    summary['tails']['BepInEx/LogOutput.log'] = {'bytes': info.st_size-offset, 'tail': tail, 'truncated': info.st_size-offset > TAIL_BYTES}
+            tail = _managed_log(game, managed)
+            if tail: summary['tails']['BepInEx/LogOutput.log'] = tail
         if not installed:
             player = summary['tails'].get('Player.log', {}).get('tail', '')
             if any(marker in player for marker in ('Crash!!!', 'Native Crash Reporting', 'Received signal ', 'FATAL ERROR:')):
                 summary['status'] = status = 'crashed'
             elif code < 0 or code >= 0x80000000:
                 summary['status'] = status = 'crashed'
+            if any(name in summary['tails'] for name in ('adapter-failed.json', 'adapter-failure.txt')):
+                summary['status'] = status = 'adapter-failed'
+                summary['message'] = 'BepInEx adapter startup failed.'
             if record.get('diagnostic_preloader_logs'):
                 game = Path(record['cwd']).absolute()
                 game = contained(session.root, game.relative_to(session.root).as_posix())
@@ -415,8 +449,12 @@ def finish_run(root, record, code, detail=''):
                 summary['steam_request_status'] = status
                 summary['status'] = status = 'preloader-failed'
                 summary['message'] = 'BepInEx preloader failed before adapter startup; game-process lifetime remains unverified.'
+            elif summary['installed_bootstrap'].get('status') == 'adapter-failed':
+                summary['steam_request_status'] = status
+                summary['status'] = status = 'adapter-failed'
+                summary['message'] = 'BepInEx adapter startup failed; game-process lifetime remains unverified.'
             write(contained(run, 'diagnostics.json'), summary)
-        session.event('launch-finished', summary['message'] or status, 'ERROR' if code or detail or status in ('crashed', 'failed', 'steam-request-failed', 'preloader-failed') else 'INFO',
+        session.event('launch-finished', summary['message'] or status, 'ERROR' if code or detail or status in ('crashed', 'failed', 'steam-request-failed', 'preloader-failed', 'adapter-failed') else 'INFO',
                       run=str(run), status=status, exit_code=code)
     except Exception as error:
         session.exception('run-diagnostics-failed', error)

@@ -170,7 +170,7 @@ class DiagnosticsChecks(unittest.TestCase):
         self.assertFalse((outside/'diagnostics.json').exists())
         self.assertEqual(result['tails'], {})
 
-    def installed_fixture(self):
+    def installed_fixture(self, managed=False, previous_log=None):
         from moonloader import public
         from moonloader.discovery import Installation
         from moonloader.storage import write
@@ -178,6 +178,9 @@ class DiagnosticsChecks(unittest.TestCase):
         (game/'MoonLab/logs').mkdir(parents=True); install.mkdir(parents=True)
         installation = Installation(str(game), 'steam', str(self.root/'steam'), True)
         deployed = {**public.empty(installation), 'generation':'a'*32, 'enabled':True}
+        if managed: deployed['managed'] = True
+        if previous_log is not None:
+            log = game/'BepInEx/LogOutput.log';log.parent.mkdir(parents=True);log.write_text(previous_log)
         write(install/'deployment.json',deployed)
         write(game/'MoonLab/owner.json',{'schema':public.SCHEMA,'data':str(install)})
         service = SimpleNamespace(root=data,install_root=lambda _:install,mode=lambda _:'installed')
@@ -290,6 +293,64 @@ class DiagnosticsChecks(unittest.TestCase):
         self.assertEqual([row['name'] for row in result['preloader_logs']],[path.name])
         self.assertEqual(result['process_exit'],'not observed by this collection')
         self.assertTrue((data/'logs/private-preloader.json').is_file())
+
+    def test_installed_adapter_sidecars_require_fresh_attributed_managed_run(self):
+        service,installation,record,_ = self.installed_fixture(managed=True)
+        native = self.bootstrap(installation,'run-0000000000000001-00000001')
+        (native.parent/'adapter-ready.json').write_text('{"success":true}')
+        failure = native.parent/'adapter-failure.txt';failure.write_text('x'*100000+'\nFatal adapter validation failed')
+        other = self.bootstrap(installation,'run-0000000000000002-00000001',generation='b'*32)
+        (other.parent/'adapter-failed.json').write_text('{"success":false,"error":"foreign generation"}')
+        result = diagnostics.collect_installed(service.root,record)
+        self.assertEqual(result['status'],'adapter-failed')
+        self.assertEqual({row['name'] for row in result['adapter_logs']},{'adapter-ready.json','adapter-failure.txt'})
+        captured = next(row for row in result['adapter_logs'] if row['name']=='adapter-failure.txt')
+        self.assertLessEqual(len(captured['tail']),diagnostics.TAIL_BYTES);self.assertTrue(captured['truncated'])
+        self.assertEqual(result['game_process_lifetime'],'unverified')
+        self.assertEqual(next(row for row in self.rows(service.root) if row['event']=='installed-bootstrap-collected')['level'],'ERROR')
+        Path(record['run']).mkdir(parents=True)
+        summary = diagnostics.finish_run(service.root,record,0)
+        self.assertEqual(summary['status'],'adapter-failed')
+        self.assertEqual(summary['steam_request_status'],'startup-unconfirmed')
+        self.assertIs(summary['game_startup_confirmed'],False)
+        from moonloader.storage import write
+        write(Path(installation.path)/'MoonLab/owner.json',{'schema':'foreign-owner'})
+        result = diagnostics.collect_installed(service.root,record)
+        self.assertEqual(result['status'],'collection-unavailable');self.assertNotIn('adapter_logs',result)
+
+    def test_stale_alias_and_native_only_adapter_files_are_not_attributed(self):
+        service,installation,record,_ = self.installed_fixture(managed=True)
+        native = self.bootstrap(installation,'run-0000000000000001-00000001')
+        failure = native.parent/'adapter-failure.txt';failure.write_text('old failure');os.utime(failure,ns=(1,1))
+        (native.parent/'adapter-failed.json').symlink_to(native)
+        result = diagnostics.collect_installed(service.root,record)
+        self.assertEqual(result['status'],'bootstrap-observed');self.assertEqual(result['adapter_logs'],[])
+        from moonloader.storage import load,write
+        path = service.install_root(installation)/'deployment.json';deployed=load(path);deployed.pop('managed');write(path,deployed)
+        (native.parent/'adapter-ready.json').write_text('{"success":true}')
+        result = diagnostics.collect_installed(service.root,record)
+        self.assertEqual(result['adapter_logs'],[])
+
+    def test_installed_managed_log_requires_changed_fresh_owned_deployment(self):
+        from moonloader.storage import write
+        service,installation,record,_ = self.installed_fixture(managed=True,previous_log='previous run\n')
+        log = Path(installation.path)/'BepInEx/LogOutput.log'
+        self.assertNotIn('managed_log',diagnostics.collect_installed(service.root,record))
+        with log.open('a') as stream: stream.write('current adapter failure\n')
+        result = diagnostics.collect_installed(service.root,record)
+        self.assertEqual(result['managed_log']['tail'],'current adapter failure\n')
+        os.utime(log,ns=(1,1))
+        self.assertNotIn('managed_log',diagnostics.collect_installed(service.root,record))
+        write(Path(installation.path)/'MoonLab/owner.json',{'schema':'foreign-owner'})
+        result = diagnostics.collect_installed(service.root,record)
+        self.assertEqual(result['status'],'collection-unavailable');self.assertNotIn('managed_log',result)
+
+    def test_private_adapter_failure_sidecar_is_error_even_with_exit_zero(self):
+        run = self.root/'runs/fixture';run.mkdir(parents=True)
+        (run/'adapter-failed.json').write_text('{"success":false,"error":"adapter startup failed"}')
+        result = diagnostics.finish_run(self.root,{'run':str(run)},0)
+        self.assertEqual(result['status'],'adapter-failed')
+        self.assertEqual(next(row for row in self.rows() if row['event']=='launch-finished')['level'],'ERROR')
 
 
 if __name__ == '__main__': unittest.main()
