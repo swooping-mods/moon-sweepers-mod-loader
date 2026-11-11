@@ -43,6 +43,16 @@ class GameAdapterChecks(unittest.TestCase):
                 document=copy.deepcopy(original);mutate(document['profiles'][0]);root=Path(temporary);self.fixture(root,document)
                 with self.assertRaises(ValueError):generate(root)
 
+    def test_legacy_profile_identity_cannot_be_reused_for_another_build(self):
+        original=json.loads((ROOT/CATALOG).read_text())
+        for field in ('GameAssembly.dll','MoonSweepers.exe','UnityPlayer.dll','version'):
+            with self.subTest(field=field),tempfile.TemporaryDirectory() as temporary:
+                document=copy.deepcopy(original);row=document['profiles'][0]
+                if field=='version':row[field]='1.0.6'
+                else:row['hashes'][field]='0'*64
+                root=Path(temporary);self.fixture(root,document)
+                with self.assertRaisesRegex(ValueError,'Legacy profile identity is frozen'):generate(root)
+
     def test_duplicate_identity_and_alias_refuse_generation(self):
         document=json.loads((ROOT/CATALOG).read_text());other=copy.deepcopy(document['profiles'][0]);other['id']='unqualified.second-build';document['profiles'].append(other)
         with tempfile.TemporaryDirectory() as temporary:

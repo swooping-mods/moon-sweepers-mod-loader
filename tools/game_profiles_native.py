@@ -10,6 +10,13 @@ ROOT = Path(__file__).resolve().parents[1]
 CATALOG = 'loader/moonloader/game_profiles.json'
 HEADER = 'runtime/loader/game_profiles.generated.h'
 CURRENT = 'moon-sweepers.steam.1.0.5.il2cpp108.win-x64'
+# Legacy binaries embed addresses and field layouts, so this ID must never be
+# repurposed for new code bytes. New builds require a distinct reviewed profile.
+LEGACY_HASHES = {
+    'GameAssembly.dll': '14f711a6a3b1b7cd803a03f85cc6c6201c5b546ab9b90329533f5cb8ae2e7f13',
+    'MoonSweepers.exe': '0e780f8e8d4bf26ed6bdd8a4068ac42a18846a66a80da7ba5c78f1917a093901',
+    'UnityPlayer.dll': 'bfafc49b185eb8427ad75e3648bcba3bf5b07455567ca05ae2b2e23bc1646c0c',
+}
 FILES = ('GameAssembly.dll', 'MoonSweepers.exe', 'UnityPlayer.dll')
 NATIVE_FIELDS = ('domain_rva', 'domain_ready_offset', 'image_min_rva', 'image_max_rva',
                  'update_token', 'late_update_token', 'late_update_rva',
@@ -49,6 +56,8 @@ def profiles(root=ROOT):
         hashes = row['hashes']
         if not isinstance(hashes,dict) or set(hashes)!=set(FILES) or any(not isinstance(hashes[n],str) or not re.fullmatch('[a-f0-9]{64}',hashes[n]) for n in FILES):
             raise ValueError('Invalid complete game identity')
+        if name == CURRENT and (row['version'] != '1.0.5' or hashes != LEGACY_HASHES):
+            raise ValueError('Legacy profile identity is frozen; use a distinct profile for another build')
         identity = tuple(hashes[n] for n in FILES)
         if identity in identities: raise ValueError('Ambiguous native game identity')
         identities.add(identity)

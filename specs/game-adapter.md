@@ -21,6 +21,8 @@ and checks that the committed header remains exact. `check()` returns the
 runtime receipt's `game_adapter` object; `legacy_profile_ids()` records the
 current build allowed to load legacy native binaries. Production has one real
 profile. There are no synthetic or speculative future-game rows in that catalog.
+The generator freezes the legacy profile ID's original version and three code
+hashes; a later build must use a distinct ID rather than widening legacy admission.
 
 The compiled profile table cannot be replaced by a player-edited deployment
 file. Installed and private startup hash the actual EXE, GameAssembly and
