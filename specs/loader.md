@@ -27,16 +27,16 @@ For an installed deployment whose current receipt explicitly declares `managed: 
 
 `tests/test_diagnostics.py` covers information/error tracebacks, rotation, unavailable/aliased storage, early CLI failures, an actual isolated Python abort, spawn failure/lease cleanup, private crash-tail collection, current-only managed output, ownership rejection and Steam request uncertainty. Qt worker/warning/Open logs behavior is also exercised in the private offscreen UI check; no game is needed for those checks.
 
-`loader/moonloader/discovery.py` owns supported game executable hashes and Steam discovery (app 5335510). The adapter targets the pinned Steam Windows x64 IL2CPP build. Manual discovery does not establish support for other storefront runtimes. Installed mode requests Steam launch using its selected compatibility runtime on Linux or native game on Windows. Private mode retains installed Proton Experimental and its separate launch route.
+`loader/moonloader/discovery.py` owns Steam discovery (app 5335510); `game_profiles.json` owns reviewed exact-hash game identities and adapter capabilities. `compatibility.py` composes those with the actual runtime and selected framework contracts. The initial adapter targets Steam Windows x64 IL2CPP 1.0.5. Manual discovery does not establish support for other storefront runtimes. Installed mode requests Steam launch using its selected compatibility runtime on Linux or native game on Windows. Private mode retains installed Proton Experimental and its separate launch route.
 
 `service.py`, `storage.py` and `launch.py` preserve private game-copy deployment, rollback/recovery, selected dependencies, editable per-mod settings, explicit launch plans, operation/session locks and process ownership. New data defaults to [installed-game deployment](public-deployment.md), which adds owned files to the existing Steam installation without copying game files; legacy data stays private. Private profiles start fresh and never use personal Steam/Bottles save data as a fallback. The app starts a game only via the Launch action; `--no-launch` disables it.
 
 `vendored/api/` is the content-pinned first-party SDK. `moonloader.packages` reexports its validator/resolver, and `moonloader.storage` reexports its portable storage functions while retaining loader locks/process identity locally. `moonloader.__init__` resolves the snapshot relative to the repository, never to a sibling development checkout. `tools/check_snapshot.py` verifies every pinned payload file and rejects extra/changed files and symlinks.
 
-The SDK pin is 0.6.0. It validates native v1–v7, ordinary/external managed mods,
+The SDK pin is 0.7.0. It validates native v1–v8, ordinary/external managed mods,
 and companions; the UI treats managed packages as selectable game mods. This
-default distribution hosts native mods. An explicitly attached checked managed
-runtime enables [private managed deployment](managed-runtime.md).
+default distribution includes the checked [managed host](managed-runtime.md)
+for installed and private modes, alongside the native runtime.
 `available_runtimes(installation)` accounts for the selected deployment mode in
 both UI readiness and service selection, and preparation repeats the runtime
 check before creating a game copy. A managed package can be stored without
@@ -46,6 +46,9 @@ typed frame, input and camera tables. The deployment includes a bounded startup
 plan and validates actual publications before committing provider startup; see
 [runtime services](runtime-services.md). Installed-game managed hosting and
 broader native/managed framework presentation remain separate qualification work.
+Native v8 instead uses the [game broker](game-adapter.md), with logical game
+requirements, scoped framework lookups and a profile-bound runtime plan v2.
+Legacy packages retain their current exact-build path.
 Native v7 additionally requires a nonempty `requires_host` map. Selection and
 preparation compare exact adapter ABI values against `host_capabilities` in the
 runtime receipt, treating absent/null maps as empty targets. A cached selection

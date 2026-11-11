@@ -254,9 +254,10 @@ checked files without rebuilding them.
 ### Mod authoring and project documentation
 
 The loader pins [Moon Sweepers API](https://github.com/swooping-mods/moon-sweepers-api)
-**0.6.1**. Native v6/v7 mods use its runtime registry; v7 declares exact adapter
+**0.7.0**. Native v6/v7 mods use its runtime registry; v7 declares exact adapter
 ABIs in `requires_host`. Unsupported hosts or missing capabilities reject before
-game preparation. Gameplay frameworks remain separate mods.
+game preparation. Native v8 adds declared game capabilities and a scoped broker;
+see [the game adapter contract](specs/game-adapter.md). Gameplay frameworks remain separate mods.
 
 - [Contributing](CONTRIBUTING.md): development and release workflow.
 - [Native mod authoring](specs/native-adapter.md): checked bindings in `sdk/native/`.

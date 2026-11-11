@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0 — Unreleased
+
+- Add a compatibility report for the selected game, mod requirements and framework providers, with explicit reasons for unknown or incompatible targets.
+- Introduce an opt-in native v8 game-adapter contract so new mods can use stable typed capabilities while build-specific bindings stay in the reviewed adapter.
+- Bind reviewed game profiles to native runtime support and preparation; preserve exact-build checks for existing native and managed packages.
+
+Only the existing Steam 1.0.5 game profile is qualified input. Synthetic multi-profile checks demonstrate the new contract; they do not establish compatibility with a later game release. Requirements matching and scoped gameplay verification remain separate.
+
 ## 0.2.1 — 2026-11-11
 
 - Check Steam Proton launch options before starting installed mods, preventing a successful Steam request from silently starting the game without its native mod bootstrap.

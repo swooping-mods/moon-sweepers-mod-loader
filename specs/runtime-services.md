@@ -2,7 +2,7 @@
 
 Native startup accepts package IDs using the SDK's lowercase alphanumeric groups separated by single hyphens, including numeric prefixes. API owner prefixes use the same package grammar; service names keep their separate letter-leading grammar.
 
-The pinned SDK 0.6 owns public C tables, interface/package validation and
+The pinned SDK 0.7 owns public C tables, interface/package validation and
 `runtime_plan.encode`. This loader owns the executable implementation. Domain
 framework APIs remain ordinary independent mod packages with opaque tables.
 
@@ -91,6 +91,12 @@ layouts. The plan parser accepts package numbers 1–7, and both v6/v7 packages
 use the runtime-services marker and publication checks. Required host adapters
 are checked before deployment through SDK `requires_host`/`host_capabilities`;
 they do not add special framework IDs or alter owner-scoped service discovery.
+
+The profile-bound v2 plan additionally admits native v8; v1 wire bytes remain
+unchanged for legacy callers. V8 uses its distinct broker-only startup context,
+the same runtime-services ABI marker, declared framework lookup scope and
+typed frame registry. It refuses raw hooks. See [game adapter](game-adapter.md)
+for admission, thread rules and current capability limits.
 
 The capability change passes the complete 101-test loader gate with no skips or
 exclusions. New checks cover actual v7 archive intake, missing/null/malformed or

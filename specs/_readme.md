@@ -3,6 +3,7 @@
 | Spec | Owning source | Read when |
 |---|---|---|
 | [Game and mod compatibility](game-compatibility.md) | `moonloader/{game_profiles,compatibility,discovery}.py`, service/UI/CLI and reviewed native profile catalog | Changing game-version admission, capability reports, immutable v8 mod requirements or compatibility evidence |
+| [Native game adapter](game-adapter.md) | `runtime/loader/{game_adapter,game_profile,mod_entry}.h`, compiled profile catalog and native proof | Changing v8 startup, game-service binding, native profile admission or clock thread rules |
 | [Downloaded mod imports](download-imports.md) | `loader/moonloader/downloads.py`, import controls, `vendored/import-profiles/` | Changing file/folder/ZIP imports, drag-and-drop or third-party layout recognition |
 | [Bundled mods](bundled-mods.md) | `vendored/mod-bundle*`, `tools/mod_bundle.py`, package seeding and platform builders/checkers | Changing the handpicked mod selection, dependency closure or distribution inputs |
 | [Native author adapter](native-adapter.md) | `sdk/native/`, `tools/check_native_sdk.py` | Building mods independently of the workshop or changing shared game bindings |
