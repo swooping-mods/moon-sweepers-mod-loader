@@ -32,7 +32,7 @@ Available for Windows x64 and Linux x64 with Steam Proton.
 | Recommended download | [v0.2.0 release](https://github.com/swooping-mods/moon-sweepers-mod-loader/releases/tag/v0.2.0) | Windows ZIP, portable Linux `.run`, AppImage and tar.gz, source ZIP and `SHA256SUMS`. Desktop downloads include Python/Qt and all nine starter packages. |
 | Development builds | [Successful Checks runs on main](https://github.com/swooping-mods/moon-sweepers-mod-loader/actions/workflows/check.yml?query=branch%3Amain) | The same formats and checked bundle from current development. Download `moon-sweepers-mod-loader-builds` under **Artifacts**; GitHub sign-in is required and artifacts expire after 14 days. |
 
-Version 0.2.0 is an experimental prerelease. See the [changelog](CHANGELOG.md)
+Version 0.2.0 is a full release. See the [changelog](CHANGELOG.md)
 and [Releases](https://github.com/swooping-mods/moon-sweepers-mod-loader/releases)
 for versioned downloads. The game itself is not included.
 
@@ -200,7 +200,8 @@ ignored `artifacts/`. The full host check includes Qt interactions;
 `python3 tools/check.py --host-only` explicitly excludes three Qt tests on runners
 without PySide6. CI builds Windows and all three Linux formats, checks their real
 entry points and bundled Qt, and runs the actual EXE on Windows. Version tags run the
-same gates before publishing prerelease assets.
+same gates before publishing prerelease assets. Full releases promote those
+checked files without rebuilding them.
 
 ### Mod authoring and project documentation
 

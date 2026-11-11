@@ -1,4 +1,4 @@
-# GitHub Actions checks and prerelease publishing
+# GitHub Actions checks and release channels
 
 `.github/workflows/check.yml` runs on main pushes, pull requests, manual dispatch
 and reusable workflow calls. Checkout/upload actions retain their reviewed
@@ -72,6 +72,28 @@ commit history and author-only procedures are not release notes. Release steps,
 including README/version/download-link upkeep and post-publication verification,
 are documented in the maintainer's ignored `.local/release-flow.md`.
 
-See [contributing](../CONTRIBUTING.md) for the release procedure. Only pushed version tags trigger publication; branch pushes and CI configuration
+See [contributing](../CONTRIBUTING.md) for the release procedure. Pushed version tags create prereleases; the explicit promotion workflow changes an
+existing checked release to full/latest. Branch pushes and CI configuration
 alone create no tag or release. Windows/game/co-op are distinct qualifications;
 these workflows do not claim gameplay compatibility.
+
+## Full release promotion
+
+Normal `v*` pushes retain the prerelease/default-not-latest behavior above.
+`.github/workflows/promote-release.yml` is a separate manual dispatch with an
+existing numeric tag input. Its only write-scoped job calls
+`tools/promote_release.py`; it does not build or upload assets. Promotion requires
+a published release, a successful push-triggered `release.yml` run for that
+exact tag commit and the complete six-asset inventory. The five platform/source
+asset digests must match the downloaded SHA256SUMS, whose own GitHub digest is
+also verified. A draft, missing files, changed digests or failed/other-tag CI
+evidence blocks promotion.
+
+The tool sets `prerelease=false` and `latest=true`, rechecks the release, verifies
+asset IDs/names/sizes/digests were preserved and confirms GitHub's latest endpoint.
+The manual workflow shares the tag publisher's concurrency group. The input is
+passed through an environment variable and validated as a numeric version before
+any remote operation. No released tag or binary changes. An older version may be
+promoted explicitly; it is checked against its own tag and publishing evidence,
+not the current source version. Local maintainer commands and README/channel
+upkeep remain in ignored `.local/release-flow.md`.

@@ -9,7 +9,7 @@
 - Current native runtime services, input, camera, interaction and dependency checks for supported v6/v7 packages.
 - Tag-triggered CI builds and checks every platform artifact, exercises the Windows EXE and all Linux entry points, then publishes the checked files with SHA-256 checksums.
 
-The game is not included. MarsSweepers import requires its separate supported BepInEx runtime and Private game copy mode; that runtime is not bundled. This is an experimental prerelease for the pinned Moon Sweepers Steam Windows x64 IL2CPP 1.0.5 build. Loader/package checks do not qualify native gameplay, saves or real co-op for every selected mod combination.
+The game is not included. MarsSweepers import requires its separate supported BepInEx runtime and Private game copy mode; that runtime is not bundled. This release targets the pinned Moon Sweepers Steam Windows x64 IL2CPP 1.0.5 build. Loader/package checks do not qualify native gameplay, saves or real co-op for every selected mod combination.
 
 ## 0.1.0
 
