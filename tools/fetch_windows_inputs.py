@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import shutil
 import urllib.request
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -12,15 +13,22 @@ ROOT = Path(__file__).resolve().parents[1]
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--lock', type=Path, default=ROOT/'vendored/windows-runtime.lock.json')
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
-    lock = json.loads((ROOT / 'vendored/windows-runtime.lock.json').read_text())
+    lock = json.loads(args.lock.read_text())
     for item in lock['files']:
         name = item['name']
         if Path(name).name != name or not item['url'].startswith('https://'):
             raise ValueError('Invalid locked input: ' + name)
         target = args.output / name
         if target.is_file() and hashlib.sha256(target.read_bytes()).hexdigest() == item['sha256']:
+            continue
+        if item.get('local_path'):
+            source = ROOT/item['local_path']
+            if not source.resolve().is_relative_to(ROOT) or source.is_symlink() or hashlib.sha256(source.read_bytes()).hexdigest() != item['sha256']:
+                raise ValueError('Vendored runtime identity mismatch: '+name)
+            shutil.copyfile(source, target)
             continue
         temporary = target.with_name(name + '.download')
         digest = hashlib.sha256()

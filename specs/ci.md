@@ -8,7 +8,9 @@ unfinished runs; ordinary checks, candidates and releases do not cancel one anot
 
 The Ubuntu 24.04 job uses installed Python/LLVM, runs focused host checks, stages
 exact hash-locked publisher inputs, and calls the offline Windows/Linux builders and
-package verifiers. No Python packages or source installers run.
+package verifiers. Wheels are copied as selected files, never installed. Build-only
+SquashFS packages are extracted without maintainer scripts. No package resolver,
+Python installer or system package install runs.
 `vendored/runtime-intake.md` records dependency review and scan limits.
 `tools/fetch_windows_inputs.py` stages the reviewed lock; changed bytes fail.
 Matching LGPL source archives remain inert distribution payloads.
@@ -21,14 +23,15 @@ used; no game starts. Only the artifact download step receives a read-only token
 Job/process timeouts bound failures.
 
 The artifact `moon-sweepers-mod-loader-builds` retains source/Windows ZIPs,
-the Linux x64 tar.gz,
+the portable Linux x64 tar.gz, `.run` and AppImage,
 SHA256SUMS and build/check receipts for 14 days. The manual release-candidate
 workflow reuses both build and Windows smoke jobs without publishing.
 
-Linux uses installed Python/PySide6. Ubuntu CI checks archive hashes and runs the
-actual Linux launcher with --help in a path containing spaces; --gui is a separate
-local smoke using installed PySide6. The Linux check receipt records that hosted
-GUI limit. See [Linux packaging](linux-packaging.md).
+Linux bundles its checked Python/PySide6 and desktop helper libraries. Ubuntu CI
+executes the real archive launcher and both single-file formats with isolated
+temporary data, verifies the bundled Qt/SVG and starter library, and exercises
+AppImage without FUSE. Host-only checks still exclude the three system-PySide6
+interaction cases; the local complete suite covers them. See [Linux packaging](linux-packaging.md).
 
 ## GitHub prereleases
 
@@ -39,19 +42,26 @@ Version comes from `loader/moonloader/__init__.py`, used by both builders, the
 Windows checker and `tools/release.py`.
 
 The publishing job downloads this run's tested artifact without rebuilding.
-`tools/release.py` checks both build versions/filenames, the exact three-archive
+`tools/release.py` checks build versions/filenames, the exact five-artifact
 checksum set, all archive digests and successful host/Windows/Linux package receipts. Only
 the documented Qt host exclusions are allowed. Native Windows execution is gated
 by the reusable job result, not inferred from static receipts.
 
 Only the publishing job receives `contents: write`. It uses installed `gh` and
-`GITHUB_TOKEN` to upload the source ZIP, Windows ZIP and SHA256SUMS into a draft
+`GITHUB_TOKEN` to upload the source ZIP, Windows ZIP, all three Linux downloads
+and SHA256SUMS into a draft
 release for the existing tag, then publishes the completed prerelease. Both create
 and edit explicitly set
 `--prerelease --latest=false`, so tested candidates never become stable/latest
 releases through this workflow. Existing releases/assets are not overwritten. A failed upload may leave a draft requiring
 inspection/removal before retry. Per-tag concurrency never cancels an active
 publication. No Nexus upload, catalog update or signing occurs.
+
+The release title is `Moon Sweepers Mod Loader vVERSION`. Notes come from the
+matching nonempty CHANGELOG.md section through the tag/version validator; raw
+commit history and author-only procedures are not release notes. Release steps,
+including README/version/download-link upkeep and post-publication verification,
+are documented in the maintainer's ignored `.local/release-flow.md`.
 
 See [contributing](../CONTRIBUTING.md) for the release procedure. Only pushed version tags trigger publication; branch pushes and CI configuration
 alone create no tag or release. Windows/game/co-op are distinct qualifications;

@@ -49,7 +49,7 @@ def main():
     # Retain the source layout for SDK resolution and user-replaceable LGPL libraries.
     with zipfile.ZipFile(out / f'moon-sweepers-mod-loader-{build.VERSION}-source.zip') as z:
         for n in z.namelist():
-            if n.startswith(('loader/', 'vendored/')):
+            if n.startswith(('loader/', 'vendored/')) and not n.startswith('vendored/appimage/'):
                 put(dest, n, z.read(n))
     shutil.copy2(work / 'Mod Loader.exe', dest / 'Mod Loader.exe')
     for item in lock['files']:
@@ -86,7 +86,7 @@ def main():
     shutil.copy2(ROOT / 'vendored/THIRD_PARTY_NOTICES.md', dest / 'THIRD_PARTY_NOTICES.md')
     shutil.copy2(ROOT / 'vendored/windows-runtime.lock.json', dest / 'LICENSES/runtime-manifest.json')
     shutil.copy2(ROOT / 'vendored/WINDOWS-LICENSES.md', dest / 'LICENSES/README.md')
-    put(dest, 'README.txt', b'Moon Sweepers Mod Loader - Windows x64\r\n\r\nExtract the entire ZIP, then double-click Mod Loader.exe. No Python install needed.\r\nSquishy Plushie, Futuristic Courier, Power Poles, Debug Menu (F4), and their five\r\ndependencies are included in the library, initially unchecked. Select mods and their\r\nrequired frameworks, select your supported game, Prepare files, then Launch.\r\nYou can also import other .msmod packages. The game is not included.\r\nApplication data uses LOCALAPPDATA/MoonLab/Loader.\r\nFor UI inspection: "Mod Loader.exe" --no-launch\r\n\r\nBundled Python, PySide6/Shiboken and Qt notices, licenses and source: LICENSES/.\r\nQt/PySide use LGPLv3. You may replace these libraries and debug their modifications.\r\nSee THIRD_PARTY_NOTICES.md and LICENSES/README.md.\r\n')
+    put(dest, 'README.txt', b'Moon Sweepers Mod Loader - Windows x64\r\n\r\nExtract the entire ZIP, then double-click Mod Loader.exe. No Python install needed.\r\nSquishy Plushie, Futuristic Courier, Power Poles, Debug Menu (F4), and their five\r\ndependencies are included in the library, initially unchecked. Select mods and their\r\nrequired frameworks, select your supported game, Prepare files, then Launch.\r\nUse Add mods... for files, Add folder... for extracted mods, or drop files/folders\r\nonto the window. MarsSweepers 0.6.1 needs the supported BepInEx runtime in\r\nPrivate game copy mode. The game is not included.\r\nApplication data uses LOCALAPPDATA/MoonLab/Loader.\r\nFor UI inspection: "Mod Loader.exe" --no-launch\r\n\r\nBundled Python, PySide6/Shiboken and Qt notices, licenses and source: LICENSES/.\r\nQt/PySide use LGPLv3. You may replace these libraries and debug their modifications.\r\nSee THIRD_PARTY_NOTICES.md and LICENSES/README.md.\r\n')
     archive = out / f'moon-sweepers-mod-loader-{build.VERSION}-windows-x64.zip'
     with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as z:
         for p in sorted(dest.rglob('*')):

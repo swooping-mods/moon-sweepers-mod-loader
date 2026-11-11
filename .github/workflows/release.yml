@@ -32,12 +32,14 @@ jobs:
       - name: Verify tag, receipts and every release asset
         env:
           RELEASE_TAG: ${{ github.ref_name }}
-        run: python3 tools/release.py verify-artifacts "$RELEASE_TAG" --artifacts incoming > release-assets.txt
+        run: |
+          python3 tools/release.py verify-artifacts "$RELEASE_TAG" --artifacts incoming > release-assets.txt
+          python3 tools/release.py notes "$RELEASE_TAG" > release-notes.md
       - name: Upload complete assets before publishing
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
           mapfile -t assets < release-assets.txt
-          gh release create "$RELEASE_TAG" "${assets[@]}" --repo "$GITHUB_REPOSITORY" --verify-tag --draft --prerelease --latest=false --title "Moon Sweepers Mod Loader $RELEASE_TAG (prerelease)" --generate-notes
+          gh release create "$RELEASE_TAG" "${assets[@]}" --repo "$GITHUB_REPOSITORY" --verify-tag --draft --prerelease --latest=false --title "Moon Sweepers Mod Loader $RELEASE_TAG" --notes-file release-notes.md
           gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease --latest=false

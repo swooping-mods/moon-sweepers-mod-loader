@@ -5,6 +5,11 @@ adds the existing `bepinex-il2cpp` / `BepInEx.IL2CPP/6-be791` backend in **Priva
 game copy** mode. Installed-game mode continues to refuse managed selections.
 Importing a package never downloads, attaches or executes a host.
 
+[Downloaded mod imports](download-imports.md) recognize the complete reviewed
+MarsSweepers 0.6.1 folder/ZIP and retain its external metadata and exact hashes.
+The import result explains the host/private-copy prerequisites; this convenience
+does not change host availability or installed-mode refusal.
+
 `loader/moonloader/managed.py` is the canonical deployment implementation. The
 workshop consumes an exact hash-pinned copy through its explicit
 `tools/sync_managed_runtime.py`; it does not maintain another editable adapter.

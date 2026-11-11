@@ -10,8 +10,7 @@ Available for Windows x64 and Linux x64 with Steam Proton.
 
 ![Moon Sweepers Mod Loader showing the nine bundled mods, import controls and mod details](loader/assets/mod-loader-screenshot.png)
 
-*Development preview with the bundled library. The Add mods, Add folder and
-drag-and-drop controls shown here are pending publication; see [adding mods](#adding-mods).*
+*The bundled library, mod details and file/folder import controls.*
 
 ## Contents
 
@@ -30,19 +29,28 @@ drag-and-drop controls shown here are pending publication; see [adding mods](#ad
 
 | Channel | Download | What it includes |
 | --- | --- | --- |
-| Current development builds | [Successful Checks runs on main](https://github.com/swooping-mods/moon-sweepers-mod-loader/actions/workflows/check.yml?query=branch%3Amain) | Windows, Linux and source archives, the nine bundled mods, and SHA-256 checksums. Open a successful run and download `moon-sweepers-mod-loader-builds` under **Artifacts**. GitHub sign-in is required; artifacts expire after 14 days. |
-| Tagged prerelease | [v0.1.0](https://github.com/swooping-mods/moon-sweepers-mod-loader/releases/tag/v0.1.0) | Older Windows and source ZIPs. This version uses private game copies and has no starter mod bundle or Linux archive. Follow its [version-specific instructions](https://github.com/swooping-mods/moon-sweepers-mod-loader/blob/v0.1.0/README.md). |
+| Recommended download | [v0.2.0 release](https://github.com/swooping-mods/moon-sweepers-mod-loader/releases/tag/v0.2.0) | Windows ZIP, portable Linux `.run`, AppImage and tar.gz, source ZIP and `SHA256SUMS`. Desktop downloads include Python/Qt and all nine starter packages. |
+| Development builds | [Successful Checks runs on main](https://github.com/swooping-mods/moon-sweepers-mod-loader/actions/workflows/check.yml?query=branch%3Amain) | The same formats and checked bundle from current development. Download `moon-sweepers-mod-loader-builds` under **Artifacts**; GitHub sign-in is required and artifacts expire after 14 days. |
 
-The instructions below describe current `main` builds. Tagged downloads are listed
-on [Releases](https://github.com/swooping-mods/moon-sweepers-mod-loader/releases);
-there is currently no stable release. The game itself is not included.
+Version 0.2.0 is an experimental prerelease. See the [changelog](CHANGELOG.md)
+and [Releases](https://github.com/swooping-mods/moon-sweepers-mod-loader/releases)
+for versioned downloads. The game itself is not included.
 
 ### Platform requirements
 
 | Platform | Archive | Start the loader | Requirements |
 | --- | --- | --- | --- |
 | Windows x64 | `moon-sweepers-mod-loader-VERSION-windows-x64.zip` | Extract the entire ZIP, then open **Mod Loader.exe**. Keep its adjacent folders. | Windows 10/11 x64 and Steam. Python and Qt are included; no administrator access is needed. The launcher is unsigned. |
-| Linux x64 | `moon-sweepers-mod-loader-VERSION-linux-x64.tar.gz` | Extract, then run `./Moon\ Sweepers\ Mod\ Loader` from the extracted folder. | Installed Python 3.11+, PySide6 6.8–6.x, and Steam Proton for the game. Set `MOON_LOADER_PYTHON=/path/to/python` to use an existing Python environment. |
+| Linux x64 — easiest | `moon-sweepers-mod-loader-VERSION-linux-x64.run` | Mark executable, then open the file. It extracts to your user cache and opens the loader. | Modern Linux desktop and Steam Proton. Python and Qt are included; no administrator access or package installation is needed. |
+| Linux x64 — AppImage | `moon-sweepers-mod-loader-VERSION-linux-x64.AppImage` | Mark executable, then open. If FUSE is unavailable, run it with `--appimage-extract-and-run`. | The same portable application and bundled mods. |
+| Linux x64 — archive | `moon-sweepers-mod-loader-VERSION-linux-x64.tar.gz` | Extract, then open **Moon Sweepers Mod Loader**. This is the single application entry point in the folder. | Python and Qt are included. Keep the adjacent folders. |
+
+On Linux, **Properties → Permissions → Is executable** in Dolphin enables a
+single-file download. From a terminal, use `chmod +x FILE`, then `./FILE`.
+Portable Linux builds require glibc 2.38+ (for example Ubuntu 24.04 or newer) on an
+x64 desktop; Steam/Proton and system
+graphics drivers remain external. `MOON_LOADER_PYTHON` can deliberately replace
+the included interpreter with your own environment.
 
 The source ZIP includes the native bootstrap but requires your own Python and
 PySide6. GitHub's automatic source-code archives require a [native build](#development).
@@ -66,7 +74,7 @@ files do not start the game.
 
 ## Bundled mods
 
-Current development builds include these handpicked mods and all five required
+Desktop releases include these handpicked mods and all five required
 dependencies:
 
 | Mod | Repository |
@@ -89,16 +97,8 @@ then download the mod's `.msmod` file and any required framework packages from
 their repositories. The index is a separate website; the loader imports local
 packages.
 
-### Available in published builds
-
-Click **Install mod package…** and select a `.msmod` file. Repeat for its
-dependencies, check the desired mods and frameworks, then **Prepare files** and
-launch. New imports stay unchecked; existing checkmarks are preserved.
-
-### Upcoming import controls
-
-The development preview shown above adds these methods. They are not yet included
-in the published `main` builds or v0.1.0 download:
+Version 0.2.0 supports these local import methods. Imported mods stay unchecked;
+existing versions and selections are preserved:
 
 | Method | Accepted input |
 | --- | --- |
@@ -106,7 +106,7 @@ in the published `main` builds or v0.1.0 download:
 | **Add mods…** | Select one or several `.msmod` or supported `.zip` files with the file picker. |
 | **Add folder…** | Choose an extracted folder containing `.msmod` files or unpacked packages with manifests. |
 
-This pending importer also recognizes the complete **MarsSweepers 0.6.1** download.
+The importer also recognizes the complete **MarsSweepers 0.6.1** download.
 Running it requires a separately attached supported BepInEx runtime and **Private
 game copy** mode. Standard loader downloads do not include that runtime, and
 importing does not attach it. Other raw third-party DLLs require a compatible mod
@@ -158,8 +158,8 @@ physical controllers require separate qualification.
 | --- | --- |
 | Missing dependency | Import and select the frameworks declared by the mod. **Select all** is convenient for the starter bundle. |
 | Unsupported game build | Check the installation selected in the loader. Compatibility uses executable hashes; renaming files does not make another build supported. |
-| Different buttons or an empty library | Check which build you downloaded. v0.1.0 predates the starter bundle; the screenshot also shows pending import controls. |
-| Linux loader does not open | Confirm Python 3.11+ and PySide6 6.8–6.x are available to the chosen interpreter. Use `MOON_LOADER_PYTHON` for an existing environment. |
+| Different buttons or an empty library | Check the version. v0.1.0 predates the starter bundle and new import controls; use v0.2.0 or a newer checked build. |
+| Linux loader does not open | Confirm executable permission and keep the complete extracted folder. Try the `.run` download or AppImage's `--appimage-extract-and-run` fallback. Remove an unintended `MOON_LOADER_PYTHON` override. |
 | Steam opens but mods do not load on Proton | Check the [Steam launch options](#proton-setup) and **View launch plan**. |
 
 Application data is stored in `%LOCALAPPDATA%/MoonLab/Loader` on Windows and
@@ -181,7 +181,7 @@ Use installed **Python 3.11+**, **PySide6 6.8–6.x** and the LLVM cross tools
 ./run.sh --no-launch --data local/review
 python3 tools/check.py
 python3 tools/build.py
-python3 tools/build_linux.py
+python3 tools/build_linux.py --inputs /path/to/reviewed-linux-inputs
 python3 tools/check_linux_bundle.py --gui
 ```
 
@@ -198,8 +198,8 @@ python3 tools/check_windows_bundle.py
 Builders download nothing. Build outputs and verification receipts go under
 ignored `artifacts/`. The full host check includes Qt interactions;
 `python3 tools/check.py --host-only` explicitly excludes three Qt tests on runners
-without PySide6. CI builds both platform archives, checks the Linux launcher,
-and runs the bundled Qt runtime and actual EXE on Windows. Version tags run the
+without PySide6. CI builds Windows and all three Linux formats, checks their real
+entry points and bundled Qt, and runs the actual EXE on Windows. Version tags run the
 same gates before publishing prerelease assets.
 
 ### Mod authoring and project documentation
@@ -222,6 +222,8 @@ Bundled mods retain their authorship and provenance in the
 [package lock](vendored/mod-bundle.json) and
 [third-party notices](vendored/THIRD_PARTY_NOTICES.md).
 
-The Windows bundle includes Python, Qt/PySide and Microsoft notices, licenses and
-matching Qt/PySide sources in `LICENSES/`. Its shared libraries remain replaceable.
+Both desktop bundles include Python, Qt/PySide notices, licenses and matching
+Qt/PySide sources in `LICENSES/`. Windows also retains Microsoft runtime notices;
+Linux includes portable Python, ICU and AppImage component notices/source.
+Shared libraries remain replaceable.
 No project-wide license has been assigned.

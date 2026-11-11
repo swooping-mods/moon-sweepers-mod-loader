@@ -28,6 +28,8 @@ def find_tools():
 
 
 def source_payload():
+    from moonloader.downloads import profiles
+    profiles()
     files = {}
     for folder in ('loader', 'vendored', 'sdk', 'runtime', 'tools', 'tests', 'specs', '.github'):
         for path in sorted((ROOT/folder).rglob('*')):
@@ -41,7 +43,7 @@ def source_payload():
                 files[path.relative_to(ROOT).as_posix()] = path.read_bytes()
     from mod_bundle import payload
     files.update(payload())
-    for name in ('README.md', 'CONTRIBUTING.md', '.gitignore', 'run.sh', 'Start-Mod-Loader.cmd'):
+    for name in ('README.md', 'CHANGELOG.md', 'CONTRIBUTING.md', '.gitignore', 'run.sh', 'Start-Mod-Loader.cmd'):
         files[name] = (ROOT/name).read_bytes()
     return files
 

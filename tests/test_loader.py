@@ -360,6 +360,46 @@ class LoaderChecks(unittest.TestCase):
                 self.assertEqual(service.state['selected'],['test-mod'])
             window.search.setText('missing');self.assertFalse(window.list.count());self.assertTrue(window.empty.isVisible())
             window.search.clear();window.resize(760,650);app.processEvents();self.assertFalse(window.details.isVisible())
+            from PySide6.QtWidgets import QFileDialog
+            from PySide6.QtCore import QMimeData, QUrl, QPoint, QPointF
+            from PySide6.QtGui import QDragEnterEvent, QDropEvent
+            def finish_import():
+                for _ in range(300):
+                    app.processEvents(); QTest.qWait(10)
+                    if not window._busy: return
+                self.fail('Mod import worker did not finish')
+            picked = self.root/'picked.msmod'; package(picked, 'picked-mod')
+            with patch.object(QFileDialog, 'getOpenFileNames', return_value=([str(picked)], '')):
+                window.import_button.click(); finish_import()
+            folder = self.root/'Downloaded folder'; folder.mkdir()
+            package(folder/'folder.msmod', 'folder-mod')
+            with patch.object(QFileDialog, 'getExistingDirectory', return_value=str(folder)):
+                window.import_folder_button.click(); finish_import()
+            dropped = self.root/'dropped.msmod'; package(dropped, 'dropped-mod')
+            mime = QMimeData(); mime.setUrls([QUrl.fromLocalFile(str(dropped))])
+            drag = QDragEnterEvent(QPoint(10,10), Qt.DropAction.CopyAction, mime, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+            QApplication.sendEvent(window.list.viewport(), drag); self.assertTrue(drag.isAccepted())
+            drop = QDropEvent(QPointF(10,10), Qt.DropAction.CopyAction, mime, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+            QApplication.sendEvent(window.list.viewport(), drop); finish_import(); self.assertTrue(drop.isAccepted())
+            self.assertTrue({'picked-mod','folder-mod','dropped-mod'} <= window.mods.keys())
+            self.assertEqual(service.state['selected'], ['test-mod'])
+            window._busy = True; window.update_actions()
+            rejected = QDragEnterEvent(QPoint(10,10), Qt.DropAction.CopyAction, mime, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+            window.dragEnterEvent(rejected); self.assertFalse(rejected.isAccepted())
+            self.assertFalse(window.import_folder_button.isEnabled())
+            window._busy = False; window.update_actions()
+            # Imported v7 packages must use the same capability receipt in the
+            # UI as they do in service selection/preparation.
+            mod = window.mods['test-mod'][0]; original_mod = copy.deepcopy(mod)
+            receipt_path = service.bundle/'runtime/receipt.json'; original_runtime = load(receipt_path)
+            mod.update(abi='MoonLab_ModStart/v7', runtime_api_abi=1, requires_host={'interaction':1})
+            write(receipt_path, {**original_runtime, 'runtime_api_abi':1, 'runtime_readiness_abi':1, 'host_capabilities':{'interaction':1}})
+            window.update_actions(); self.assertTrue(window.prepare_button.isEnabled())
+            write(receipt_path, {**original_runtime, 'runtime_api_abi':1})
+            window.update_actions(); self.assertFalse(window.prepare_button.isEnabled())
+            self.assertIn('interaction', window.message.text())
+            mod.clear(); mod.update(original_mod); write(receipt_path, original_runtime)
+            window.update_actions()
             from test_runtime_contracts import managed_package
             source=self.root/'managed-ui.msmod'
             managed_package(source,service.library()[0]['test-mod'][0]['game']['hashes'])

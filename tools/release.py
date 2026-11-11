@@ -13,11 +13,22 @@ def validate_tag(tag):
         raise ValueError(f'Release tag must match package version: v{VERSION}')
 
 
+def release_notes(tag, changelog=None):
+    validate_tag(tag)
+    text = (changelog or Path(__file__).resolve().parents[1]/'CHANGELOG.md').read_text()
+    match = re.search(r'^## '+re.escape(VERSION)+r'(?:[ \t][^\n]*)?\n(.*?)(?=^## |\Z)', text, re.M | re.S)
+    if not match or not match.group(1).strip():
+        raise ValueError('Missing release changelog for '+tag)
+    return match.group(1).strip()+'\n'
+
+
 def verify_artifacts(folder, tag):
     validate_tag(tag)
     names = [f'moon-sweepers-mod-loader-{VERSION}-{kind}.zip'
              for kind in ('source', 'windows-x64')]
     names.append(f'moon-sweepers-mod-loader-{VERSION}-linux-x64.tar.gz')
+    formats = [f'moon-sweepers-mod-loader-{VERSION}-linux-x64'+suffix for suffix in ('.run', '.AppImage')]
+    names.extend(formats)
     checksums = {}
     for line in (folder / 'SHA256SUMS').read_text().splitlines():
         digest, name = line.split('  ', 1)
@@ -25,7 +36,7 @@ def verify_artifacts(folder, tag):
             raise ValueError('Invalid or duplicate checksum')
         checksums[name] = digest
     if set(checksums) != set(names):
-        raise ValueError('Checksums must cover exactly this version\'s source, Windows and Linux archives')
+        raise ValueError('Checksums must cover exactly this version’s source, Windows and three Linux formats')
     for name, receipt_name in zip(names, ('build-receipt.json', 'windows-build-receipt.json', 'linux-build-receipt.json')):
         receipt = json.loads((folder / receipt_name).read_text())
         with (folder / name).open('rb') as stream:
@@ -34,7 +45,7 @@ def verify_artifacts(folder, tag):
             raise ValueError('Build receipt version/archive mismatch')
         if receipt['sha256'] != digest or checksums[name] != digest:
             raise ValueError('Release ZIP checksum mismatch: ' + name)
-    for name in ('checks.json', 'windows-checks.json', 'linux-checks.json'):
+    for name in ('checks.json', 'windows-checks.json', 'linux-checks.json', 'linux-formats-checks.json'):
         check = json.loads((folder / name).read_text())
         if check.get('success') is not True or check.get('failures', 0) or check.get('errors', 0) or check.get('skipped'):
             raise ValueError('Unsuccessful verification receipt: ' + name)
@@ -48,19 +59,35 @@ def verify_artifacts(folder, tag):
     if windows.get('sha256') != checksums[names[1]]:
         raise ValueError('Static Windows check belongs to a different ZIP')
     linux = json.loads((folder / 'linux-checks.json').read_text())
-    if linux.get('sha256') != checksums[names[2]] or not linux.get('actual_launcher_cli_passed'):
+    if (linux.get('sha256') != checksums[names[2]] or not linux.get('actual_launcher_cli_passed')
+            or not linux.get('gui_smoke_passed') or not linux.get('portable_desktop_libraries_passed')):
         raise ValueError('Linux launcher check belongs to a different archive or did not run')
+    linux_build = json.loads((folder/'linux-build-receipt.json').read_text())
+    fmt = json.loads((folder/'linux-formats-receipt.json').read_text())
+    tested = json.loads((folder/'linux-formats-checks.json').read_text())
+    if (not linux_build.get('python_qt_bundled') or fmt.get('version') != VERSION or tested.get('version') != VERSION
+            or fmt.get('source_archive_sha256') != checksums[names[2]]
+            or set(fmt.get('files', {})) != set(formats) or set(tested.get('files', {})) != set(formats)):
+        raise ValueError('Missing or mismatched portable Linux format receipts')
+    for name in formats:
+        digest = hashlib.sha256((folder/name).read_bytes()).hexdigest()
+        smoke = tested['files'][name]
+        if (checksums[name] != digest or fmt['files'][name] != digest or smoke.get('sha256') != digest
+                or not smoke.get('actual_cli_passed') or not smoke.get('bundled_gui_smoke_passed')):
+            raise ValueError('Single-file Linux artifact or actual launcher check mismatch: '+name)
     return [folder / name for name in names] + [folder / 'SHA256SUMS']
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=['validate-tag', 'verify-artifacts'])
+    parser.add_argument('command', choices=['validate-tag', 'verify-artifacts', 'notes'])
     parser.add_argument('tag')
     parser.add_argument('--artifacts', type=Path, default=Path('artifacts'))
     args = parser.parse_args()
     if args.command == 'validate-tag':
         validate_tag(args.tag)
+    elif args.command == 'notes':
+        print(release_notes(args.tag), end='')
     else:
         for path in verify_artifacts(args.artifacts, args.tag):
             print(path)

@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QFrame, QLabe
 from . import discovery, launch, packages
 from .catalog import CATEGORIES, description as catalog_description, matches
 from .theme import STYLE, COLORS
+from .storage import load
 
 
 def frame(name, horizontal=False, margins=(16, 12, 16, 12)):
@@ -37,6 +38,11 @@ class Job(QThread):
 class ModList(QListWidget):
     def __init__(self, parent=None):
         super().__init__(parent); self._wheel_remainder = 0
+        self.setAcceptDrops(True)
+
+    def dragEnterEvent(self, event): self.window().dragEnterEvent(event)
+    def dragMoveEvent(self, event): self.window().dragEnterEvent(event)
+    def dropEvent(self, event): self.window().dropEvent(event)
 
     def wheelEvent(self, event):
         if self.viewMode() == QListWidget.ViewMode.IconMode and self.verticalScrollMode() == QAbstractItemView.ScrollMode.ScrollPerPixel:
@@ -135,13 +141,16 @@ class Window(QMainWindow):
         self.view = service.state.get('view', 'grid'); self.mods = {}; self.installations = []; self.inspection = None
         self.job = None; self.process = None; self._busy = False; self._validation = ''
         self.setWindowTitle('Moon Sweepers · Mod Loader'); self.resize(1190, 760); self.setMinimumSize(700, 540)
+        self.setAcceptDrops(True)
         self.setStyleSheet(STYLE)
         icon_path = service.bundle / 'assets/electricity-toggle.svg'
         self.setWindowIcon(QIcon(str(icon_path)))
         central = QWidget(); self.setCentralWidget(central); layout = QVBoxLayout(central); layout.setContentsMargins(0,0,0,0); layout.setSpacing(0)
         header, head = frame('header', True)
-        titles = QVBoxLayout(); titles.setSpacing(2); titles.addWidget(label('Moon Sweepers', 'title')); titles.addWidget(label('Mod Loader', 'muted')); head.addLayout(titles); head.addStretch()
-        self.import_button = QPushButton('Install mod package…'); self.import_button.clicked.connect(self.import_package); head.addWidget(self.import_button); layout.addWidget(header)
+        titles = QVBoxLayout(); titles.setSpacing(2); titles.addWidget(label('Moon Sweepers', 'title')); titles.addWidget(label('Drop mod files or folders to add them', 'muted')); head.addLayout(titles); head.addStretch()
+        self.import_button = QPushButton('Add mods…'); self.import_button.clicked.connect(self.import_package); head.addWidget(self.import_button)
+        self.import_button.setToolTip('Add downloaded .msmod packages or supported ZIP files. You can select several.')
+        self.import_folder_button = QPushButton('Add folder…'); self.import_folder_button.clicked.connect(self.import_folder); head.addWidget(self.import_folder_button); layout.addWidget(header)
         setup, setup_layout = frame('header')
         row = QHBoxLayout(); row.addWidget(label('Game'))
         self.game = QComboBox(); self.game.setMinimumWidth(200); self.game.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon); self.game.currentIndexChanged.connect(self.game_changed); row.addWidget(self.game, 1)
@@ -159,6 +168,7 @@ class Window(QMainWindow):
         self.proton_hint.setWordWrap(True); self.proton_hint.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse); setup_layout.addWidget(self.proton_hint)
         toolbar, bar = frame('toolbar', True, (16, 8, 16, 8))
         self.search = QLineEdit(); self.search.setPlaceholderText('Search mods, categories or tags'); self.search.setAccessibleName('Search installed mods, categories or tags'); self.search.setClearButtonEnabled(True); self.search.textChanged.connect(self.render); bar.addWidget(self.search, 1)
+        self.search.setAcceptDrops(False)
         self.search.setToolTip('Search names, descriptions, categories and tags. Combine words, for example: vehicles automation.')
         self.filter = QComboBox(); self.filter.addItem('All mods', 'all'); self.filter.addItem('Enabled', 'enabled')
         for value, name in CATEGORIES.items(): self.filter.addItem(name, value)
@@ -174,7 +184,7 @@ class Window(QMainWindow):
         self.list = ModList(); self.list.setMouseTracking(True); self.list.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection); self.list.setResizeMode(QListWidget.ResizeMode.Adjust); self.list.setSpacing(0)
         self.list.setAccessibleName('Installed mods. Space toggles the focused mod.'); self.list.setItemDelegate(ModDelegate(self)); self.list.itemChanged.connect(self.checked); self.list.currentItemChanged.connect(self.show_details); self.list.itemDoubleClicked.connect(lambda item: self.details_dialog(item.data(Qt.ItemDataRole.UserRole)))
         center_layout.addWidget(self.list, 1)
-        self.empty = label('No mod packages installed. Use “Install mod package…” to add one.', 'muted'); self.empty.setWordWrap(True); self.empty.setMargin(24); center_layout.addWidget(self.empty)
+        self.empty = label('Drop mod files or folders here, or use Add mods… / Add folder….', 'muted'); self.empty.setWordWrap(True); self.empty.setMargin(24); center_layout.addWidget(self.empty)
         panes.addWidget(center, 1)
         self.details = QScrollArea(); self.details.setObjectName('details'); self.details.setFixedWidth(285); self.details.setWidgetResizable(True); self.details.setFrameShape(QFrame.Shape.NoFrame)
         detail_content, details = frame('detail-content', False, (18,18,18,18)); self.details.setWidget(detail_content)
@@ -270,11 +280,43 @@ class Window(QMainWindow):
             except (ValueError, OSError) as error: self.notice(str(error))
 
     def import_package(self):
-        path, _ = QFileDialog.getOpenFileName(self, 'Install a mod package', '', 'Moon mod packages (*.msmod)')
-        if path:
-            try:
-                mod = self.service.import_package(path); self.refresh_library(); self.notice(mod['name'] + ' installed. Check it to include it in the next launch.')
-            except Exception as error: self.notice(str(error))
+        if self._busy or self.process is not None: return
+        paths, _ = QFileDialog.getOpenFileNames(self, 'Add downloaded mods', '', 'Mod downloads (*.msmod *.zip);;All files (*)')
+        if paths: self.add_mod_paths(paths)
+
+    def import_folder(self):
+        if self._busy or self.process is not None: return
+        path = QFileDialog.getExistingDirectory(self, 'Choose a downloaded mod folder')
+        if path: self.add_mod_paths([path])
+
+    def dragEnterEvent(self, event):
+        urls = event.mimeData().urls()
+        if not self._busy and self.process is None and urls and all(url.isLocalFile() for url in urls):
+            event.acceptProposedAction()
+        else: event.ignore()
+
+    def dragMoveEvent(self, event): self.dragEnterEvent(event)
+
+    def dropEvent(self, event):
+        self.dragEnterEvent(event)
+        if event.isAccepted():
+            self.add_mod_paths([url.toLocalFile() for url in event.mimeData().urls()])
+
+    def add_mod_paths(self, paths):
+        if self._busy or self.process is not None: return
+        self.work('Adding downloaded mods…', lambda: self.service.import_downloads(paths), self.mods_added)
+
+    def mods_added(self, result):
+        self.refresh_library()
+        installed, errors = result['installed'], result['errors']
+        parts = []
+        if installed:
+            parts.append('Added ' + ', '.join(mod['name'] for mod in installed) + '. Select the mods and dependencies to use them.')
+        if any(mod['kind'] == packages.MANAGED_KIND for mod in installed):
+            parts.append('BepInEx mods need the supported BepInEx runtime and Private game copy mode before they can run.')
+        parts += [Path(item['path']).name + ': ' + item['error'] for item in errors[:5]]
+        if len(errors) > 5: parts.append(str(len(errors) - 5) + ' more downloads could not be added.')
+        self.notice('\n'.join(parts) or 'These mods are already included in this import.')
 
     def refresh_library(self):
         self.mods, errors = self.service.library(); self.render()
@@ -295,7 +337,7 @@ class Window(QMainWindow):
             if mod['id'] == old_id: self.list.setCurrentItem(item)
         if not self.list.currentItem() and self.list.count(): self.list.setCurrentRow(0)
         self.list.blockSignals(False); self.empty.setVisible(not self.list.count()); self.list.setVisible(bool(self.list.count()))
-        self.empty.setText('No matching mods. Clear the search or choose All mods.' if self.mods else 'No mod packages installed. Use “Install mod package…” to add one.')
+        self.empty.setText('No matching mods. Clear the search or choose All mods.' if self.mods else 'Drop mod files or folders here, or use Add mods… / Add folder….')
         self.show_details(self.list.currentItem()); self.update_actions()
 
     def checked(self, item):
@@ -373,8 +415,10 @@ class Window(QMainWindow):
         if ready and selected:
             try:
                 from .packages import resolve
+                runtime = load(self.service.bundle / 'runtime/receipt.json', {})
                 resolve({name:pair[0] for name,pair in self.mods.items()}, selected, self.inspection['hashes'],
-                        available_runtimes=self.service.available_runtimes(installation), runtime_api_abi=self.service.runtime_api_abi())
+                        available_runtimes=self.service.available_runtimes(installation), runtime_api_abi=self.service.runtime_api_abi(),
+                        runtime_readiness_abi=runtime.get('runtime_readiness_abi', 0), host_capabilities=runtime.get('host_capabilities') or {})
             except ValueError as error: ready=False; reason=str(error)
         active = self._busy or self.process is not None
         native = {name for name,(mod,_) in self.mods.items() if packages.game_mod(mod)}
@@ -387,7 +431,7 @@ class Window(QMainWindow):
         self.save_info.setText('Normal Steam saves · back up before save-affecting mods' if installed else 'Fresh private saves')
         self.proton_hint.setVisible(installed and sys.platform == 'linux')
         for widget in [self.disable_button, self.enable_button, self.uninstall_button]: widget.setVisible(installed); widget.setEnabled(not active)
-        for widget in [self.game,self.browse,self.rescan,self.import_button,self.list,self.remove_button,self.deployment_mode]: widget.setEnabled(not active)
+        for widget in [self.game,self.browse,self.rescan,self.import_button,self.import_folder_button,self.list,self.remove_button,self.deployment_mode]: widget.setEnabled(not active)
         if reason or self._validation and self.message.text() == self._validation: self.notice(reason)
         self._validation = reason
 

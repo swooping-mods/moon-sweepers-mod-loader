@@ -4,6 +4,9 @@ import json
 import os
 from pathlib import Path
 import sys
+# Portable Linux starts isolated Python, which omits the script directory.
+# Admit only this application's own modules rather than the caller's cwd.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 from moonloader import __version__
 from moonloader.service import Service
 from moonloader import discovery, launch
@@ -23,7 +26,7 @@ def main():
     parser.add_argument('--backup-steam-saves', type=Path, help='Back up this explicitly chosen Steam save folder and its sidecars')
     parser.add_argument('--normal-saves', choices=('backed-up', 'fresh'), help='Confirm existing Steam saves are backed up, or this is a fresh Steam profile')
     parser.add_argument('--game', type=Path)
-    parser.add_argument('--install', type=Path, help='Import a local .msmod package')
+    parser.add_argument('--install', type=Path, help='Add a local .msmod, supported ZIP download or mod folder')
     parser.add_argument('--no-launch', action='store_true', help='Disable game launching while inspecting the UI')
     parser.add_argument('--smoke-test', action='store_true', help='Check the desktop GUI with temporary data, then exit without starting a game')
     args = parser.parse_args()
@@ -33,7 +36,10 @@ def main():
     default = Path(os.environ.get('LOCALAPPDATA', Path.home() / 'AppData/Local')) / 'MoonLab/Loader' if sys.platform == 'win32' else Path(os.environ.get('XDG_DATA_HOME', Path.home() / '.local/share')) / 'moonlab-loader'
     service = Service(args.data or default, args.bundle)
     service.seed()
-    if args.install: service.import_package(args.install)
+    if args.install:
+        result = service.import_downloads([args.install])
+        if result['errors']:
+            raise ValueError('; '.join(item['path'] + ': ' + item['error'] for item in result['errors']))
     if args.game: service.add_installation(args.game)
     installations, errors = service.installations()
     if args.discover:
@@ -51,6 +57,8 @@ def main():
             service.uninstall(selected); print('Owned installed files removed; saves/settings preserved'); return 0
         if not args.plan and not args.prepare: return 0
         print(json.dumps({'prepared':str(service.prepare(selected))} if args.prepare else launch.plan(service, selected, check_client=False), indent=2)); return 0
+    from moonloader.linux_desktop import prepare as prepare_linux_desktop
+    prepare_linux_desktop()
     try: from PySide6.QtWidgets import QApplication
     except ImportError: raise ValueError('PySide6 is required for the desktop UI. See README.md; no dependency was downloaded.')
     from moonloader.ui import Window

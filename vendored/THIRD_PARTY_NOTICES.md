@@ -13,6 +13,19 @@ The application does not restrict replacement or debugging of these libraries.
 `vendored/windows-runtime.lock.json` pins the exact distribution inputs.
 Source-only use continues to use host-installed Python/PySide6.
 
+Linux desktop downloads bundle **CPython 3.13.18**, the selected Qt for Python /
+PySide6, Shiboken and Qt 6.8.3 libraries, ICU 73.2, and the small XCB/XKB desktop
+helpers named in `linux-runtime.lock.json`. Their original notices and Python's
+dependency license texts are in `LICENSES/`. Matching Qt/PySide/Wayland sources
+accompany the replaceable libraries. Python is from Astral's pinned
+python-build-standalone distribution; no pip or dependency installer ships.
+
+AppImage includes the Type-2 runtime at commit
+`fedfad51acc2860b2916a1eef32ba4a500ff31ef`; its MIT notice is retained in
+`vendored/appimage/LICENSE.txt`. Its FUSE, SquashFUSE, musl, mimalloc, zstd and zlib
+notices and sources accompany the payload. The SquashFS build executable is a
+build input, not an application payload. See [Linux runtime intake](linux-runtime-intake.md).
+
 The native bootstrap, diagnostic, application source, launcher and included SVG
 are original project code/artwork. `vendored/api/` is a first-party content-pinned
 snapshot from `swooping-mods/moon-sweepers-api`. It retains the MoonLab ABI.
@@ -23,5 +36,10 @@ bundled or activated. Steam, Proton, game binaries, extracted game assets and
 third-party mods are excluded. The maintainer's selected mods and dependencies
 are included as pinned prebuilt packages; see [bundle provenance](mod-bundle/README.md).
 Their applicable credits and licenses remain inside the packages.
+
+The [download recognition profiles](import-profiles/README.md) include the
+original first-party Mars compatibility companion, wrapper artwork and metadata.
+The upstream MarsSweepers DLL, voices and source are not bundled; users supply
+their own exact supported download. Import grants no redistribution rights.
 
 No project license is assigned.

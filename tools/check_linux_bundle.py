@@ -38,18 +38,26 @@ def check(out, gui=False):
             raise ValueError('Linux archive inventory mismatch')
         required={'Moon Sweepers Mod Loader','loader/main.py','loader/runtime/receipt.json',
                   'loader/runtime/windows-x64/version.dll','vendored/api/snapshot.json','README.md'}
+        linux_lock=json.loads((root/'vendored/linux-runtime.lock.json').read_text())
+        required.update('.runtime/desktop-libs/'+name for name in linux_lock['desktop_libraries'])
         if not required<=seen:
             raise ValueError('Missing Linux loader files')
         bundled = bundled_payload(root / 'loader/packages')
-        env={**os.environ,'MOON_LOADER_PYTHON':os.environ.get('MOON_LOADER_PYTHON','python3'),
+        env={**os.environ,
              'XDG_DATA_HOME':str(root/'temporary-user-data'),'QT_QPA_PLATFORM':'offscreen'}
+        env.pop('MOON_LOADER_PYTHON', None)
         command=[str(root/'Moon Sweepers Mod Loader')]
         subprocess.run(command+['--help'],env=env,check=True,capture_output=True,timeout=30)
+        desktop_env={**env,'QT_QPA_PLATFORM':'xcb'}
+        subprocess.run([str(root/'.runtime/python/bin/python3.13'),'-I','-c',
+            'import sys; sys.path.insert(0, sys.argv[1]); from moonloader.linux_desktop import prepare; prepare()',
+            str(root/'loader')],env=desktop_env,check=True,capture_output=True,timeout=30)
         if gui:
             subprocess.run(command+['--smoke-test'],env=env,check=True,capture_output=True,timeout=30)
     result={'success':True,'version':build.VERSION,'sha256':digest,
             'bundled_mods_checked':len(bundled),
             'files_checked':len(seen),'actual_launcher_cli_passed':True,
+            'portable_desktop_libraries_passed':True,
             'gui_smoke_passed':gui,'game_started':False,
             'limits':[] if gui else ['Linux GUI smoke requires installed PySide6; CLI launcher checked here.']}
     (out/'linux-checks.json').write_text(json.dumps(result,indent=2)+'\n')

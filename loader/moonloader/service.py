@@ -68,6 +68,10 @@ class Service:
             if manifest['id'] not in self.state['library']:
                 self.import_package(path, select=packages.game_mod(manifest) and manifest.get('default_selected', True))
 
+    def import_downloads(self, paths):
+        from .downloads import add
+        return add(self, paths)
+
     def library(self):
         result = {}; errors = {}
         for name, location in self.state['library'].items():

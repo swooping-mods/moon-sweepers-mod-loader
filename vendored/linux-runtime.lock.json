@@ -1,0 +1,301 @@
+{
+  "schema": "moon-loader-linux-runtime/v1",
+  "python": "3.13.18",
+  "python_minor": "3.13",
+  "pyside": "6.8.3",
+  "appimage_commit": "fedfad51acc2860b2916a1eef32ba4a500ff31ef",
+  "files": [
+    {
+      "name": "PySide6_Essentials-6.8.3-cp39-abi3-manylinux_2_28_x86_64.whl",
+      "role": "wheel",
+      "sha256": "fd57fa0c886ef99b3844173322c0023ec77cc946a0c9a0cdfbc2ac5c511053c1",
+      "url": "https://files.pythonhosted.org/packages/f0/b2/3205336262bf88d57f01503df81ede2a0b1eecbb2a7d58978a5e5625f7c1/PySide6_Essentials-6.8.3-cp39-abi3-manylinux_2_28_x86_64.whl"
+    },
+    {
+      "name": "shiboken6-6.8.3-cp39-abi3-manylinux_2_28_x86_64.whl",
+      "role": "wheel",
+      "sha256": "295a003466ca2cccf6660e2f2ceb5e6cef4af192a48a196a32d46b6f0c9ec5cb",
+      "url": "https://files.pythonhosted.org/packages/76/a1/f1958c9d00176044ab00464cd89b6969ef3a7d2ed12d316ff1eda3dec88f/shiboken6-6.8.3-cp39-abi3-manylinux_2_28_x86_64.whl"
+    },
+    {
+      "name": "cpython-3.13.18+20261026-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
+      "role": "python",
+      "sha256": "df15fe60d3ff55bf9dcf25824b5572756bb8816ff93865a273d3301d7066a8b7",
+      "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261026/cpython-3.13.18%2B20261026-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz"
+    },
+    {
+      "name": "runtime-x86_64",
+      "role": "appimage-runtime",
+      "url": "https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-x86_64",
+      "sha256": "617aa77314d57c8b8e4fae9c3f0b35af7b30d5529cb69e98f64f92510ed98a46",
+      "local_path": "vendored/appimage/runtime-x86_64"
+    },
+    {
+      "name": "type2-runtime-fedfad51.tar.gz",
+      "role": "appimage-source",
+      "url": "https://github.com/AppImage/type2-runtime/archive/fedfad51acc2860b2916a1eef32ba4a500ff31ef.tar.gz",
+      "sha256": "e27ea3c837e9c660e1a9a2993b673ae93bbb53077330efba8654031e302d4e8e"
+    },
+    {
+      "name": "ICU-73.2-LICENSE",
+      "role": "license",
+      "url": "https://raw.githubusercontent.com/unicode-org/icu/release-73-2/icu4c/LICENSE",
+      "sha256": "f3005e195ff74d8812cc1f182a1c446fab678d70a10e3dada497585befee5416"
+    },
+    {
+      "name": "qtwayland-everywhere-src-6.8.3.tar.xz",
+      "role": "source",
+      "url": "https://download.qt.io/archive/qt/6.8/6.8.3/submodules/qtwayland-everywhere-src-6.8.3.tar.xz",
+      "sha256": "20fe385887d21190165a3180c17dcfc8b9a0e1da4ec76865b6334bdc709994b0"
+    },
+    {
+      "name": "cpython-3.13.18+20261026-x86_64-unknown-linux-gnu-pgo+lto-full.tar.zst",
+      "role": "python-notices",
+      "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261026/cpython-3.13.18%2B20261026-x86_64-unknown-linux-gnu-pgo%2Blto-full.tar.zst",
+      "sha256": "f003449a05408c2e4b184f2a7abd1ea277081ff1a9100289075243ab5ed81207"
+    },
+    {
+      "name": "fuse-3.15.0.tar.xz",
+      "url": "https://github.com/libfuse/libfuse/releases/download/fuse-3.15.0/fuse-3.15.0.tar.xz",
+      "sha256": "70589cfd5e1cff7ccd6ac91c86c01be340b227285c5e200baa284e401eea2ca0",
+      "role": "appimage-source"
+    },
+    {
+      "name": "squashfuse-0.5.2.tar.gz",
+      "url": "https://github.com/vasi/squashfuse/archive/0.5.2.tar.gz",
+      "sha256": "db0238c5981dabbd80ee09ae15387f390091668ca060a7bc38047912491443d3",
+      "role": "appimage-source"
+    },
+    {
+      "name": "musl-1.2.5.tar.gz",
+      "url": "https://musl.libc.org/releases/musl-1.2.5.tar.gz",
+      "sha256": "a9a118bbe84d8764da0ea0d28b3ab3fae8477fc7e4085d90102b8596fc7c75e4",
+      "role": "appimage-source"
+    },
+    {
+      "name": "mimalloc-2.1.7.tar.gz",
+      "url": "https://github.com/microsoft/mimalloc/archive/refs/tags/v2.1.7.tar.gz",
+      "sha256": "0eed39319f139afde8515010ff59baf24de9e47ea316a315398e8027d198202d",
+      "role": "appimage-source"
+    },
+    {
+      "name": "zstd-1.5.6.tar.gz",
+      "url": "https://github.com/facebook/zstd/archive/refs/tags/v1.5.6.tar.gz",
+      "sha256": "30f35f71c1203369dc979ecde0400ffea93c27391bfd2ac5a9715d2173d92ff7",
+      "role": "appimage-source"
+    },
+    {
+      "name": "zlib-1.3.2.tar.gz",
+      "url": "https://zlib.net/fossils/zlib-1.3.2.tar.gz",
+      "sha256": "bb329a0a2cd0274d05519d61c667c062e06990d72e125ee2dfa8de64f0119d16",
+      "role": "appimage-source"
+    },
+    {
+      "name": "liblz4-1_1.9.4-1build1_amd64.deb",
+      "role": "build-library",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/l/lz4/liblz4-1_1.9.4-1build1_amd64.deb",
+      "sha256": "b9b69dedb126755f063396a6d3a3361066f9661f1c21cf5635cdd5ff6605796a"
+    },
+    {
+      "name": "liblzo2-2_2.10-2build4_amd64.deb",
+      "role": "build-library",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/l/lzo2/liblzo2-2_2.10-2build4_amd64.deb",
+      "sha256": "e0d13be155013138b8db4cfe68212b866080af661c78302c2eab0d2f9d0d454e"
+    },
+    {
+      "name": "squashfs-tools_4.6.1-1build1_amd64.deb",
+      "role": "build-tool",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/s/squashfs-tools/squashfs-tools_4.6.1-1build1_amd64.deb",
+      "sha256": "87fae263846bab255d4a51ad9fc623685497ad830db60758dde39589c9fdadcb"
+    },
+    {
+      "name": "qtbase-everywhere-src-6.8.3.tar.xz",
+      "role": "source",
+      "sha256": "56001b905601bb9023d399f3ba780d7fa940f3e4861e496a7c490331f49e0b80",
+      "url": "https://download.qt.io/archive/qt/6.8/6.8.3/submodules/qtbase-everywhere-src-6.8.3.tar.xz"
+    },
+    {
+      "name": "pyside-setup-everywhere-src-6.8.3.tar.xz",
+      "role": "source",
+      "sha256": "d2c896f7f1a6a7ea4c9f98cfe317272fd139703ddf612b86999f09e48aeef0e6",
+      "url": "https://download.qt.io/official_releases/QtForPython/pyside6/PySide6-6.8.3-src/pyside-setup-everywhere-src-6.8.3.tar.xz"
+    },
+    {
+      "name": "qtsvg-everywhere-src-6.8.3.tar.xz",
+      "role": "source",
+      "sha256": "35eb516460f00f264eb504baa253432384351cf23fb9980a5857190e8deef438",
+      "url": "https://download.qt.io/archive/qt/6.8/6.8.3/submodules/qtsvg-everywhere-src-6.8.3.tar.xz"
+    },
+    {
+      "name": "libxcb-icccm4_0.4.1-1.1build3_amd64.deb",
+      "role": "desktop-library",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/x/xcb-util-wm/libxcb-icccm4_0.4.1-1.1build3_amd64.deb",
+      "sha256": "9e0e349f3904cd5bc07fea45498c4d03527a5d1178edd78555e84fdbd3793708"
+    },
+    {
+      "name": "libxcb-image0_0.4.0-2build1_amd64.deb",
+      "role": "desktop-library",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/x/xcb-util-image/libxcb-image0_0.4.0-2build1_amd64.deb",
+      "sha256": "6af300eeef5523aa0d8dbfab3a23c1fe7006ecc19f8abdc5c636d734d7bb5287"
+    },
+    {
+      "name": "libxcb-keysyms1_0.4.0-1build4_amd64.deb",
+      "role": "desktop-library",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/x/xcb-util-keysyms/libxcb-keysyms1_0.4.0-1build4_amd64.deb",
+      "sha256": "6c261aae923175b88a032018c530873ffb40f2bf96b045fdda42bd8bc74cb1c3"
+    },
+    {
+      "name": "libxcb-render-util0_0.3.9-1build4_amd64.deb",
+      "role": "desktop-library",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/x/xcb-util-renderutil/libxcb-render-util0_0.3.9-1build4_amd64.deb",
+      "sha256": "95d895ceb921e38e4edd85555b407b1a0564d8ad097ec7566e261764ce27787b"
+    },
+    {
+      "name": "libxcb-util1_0.4.0-1build3_amd64.deb",
+      "role": "desktop-library",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/x/xcb-util/libxcb-util1_0.4.0-1build3_amd64.deb",
+      "sha256": "b6ff05729519514bddcbcd460f8be7e55c986daa5a97ecdc612b2815614194ab"
+    },
+    {
+      "name": "libxkbcommon-x11-0_1.6.0-1build1_amd64.deb",
+      "role": "desktop-library",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/libx/libxkbcommon/libxkbcommon-x11-0_1.6.0-1build1_amd64.deb",
+      "sha256": "3befe840ce612ddfc0998d8610c6eed295726722a78e75cd08520bbd75065a23"
+    },
+    {
+      "name": "libxcb-cursor0_0.1.4-1build1_amd64.deb",
+      "role": "desktop-library",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/universe/x/xcb-util-cursor/libxcb-cursor0_0.1.4-1build1_amd64.deb",
+      "sha256": "137cf52479b5a9d8c5926d70d311af04be41941a32ee777340d704cc458c06d8"
+    },
+    {
+      "name": "libx11-xcb1_1.8.7-1build1_amd64.deb",
+      "role": "desktop-library",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/libx/libx11/libx11-xcb1_1.8.7-1build1_amd64.deb",
+      "sha256": "7d0d357e47cd6e1042be34da1d37cea313420b000035e71e855087c8268ab127"
+    },
+    {
+      "name": "libxcb-randr0_1.15-1ubuntu2_amd64.deb",
+      "role": "desktop-library",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/libx/libxcb/libxcb-randr0_1.15-1ubuntu2_amd64.deb",
+      "sha256": "b5cb519823a05a617b543dc9b6a9289b7648b20048244abe021caa706309835a"
+    },
+    {
+      "name": "libxcb-render0_1.15-1ubuntu2_amd64.deb",
+      "role": "desktop-library",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/libx/libxcb/libxcb-render0_1.15-1ubuntu2_amd64.deb",
+      "sha256": "7d83a0668b1a693b5ea2e496206e8371fb6beda4c54a2b4b3902005915c272c5"
+    },
+    {
+      "name": "libxcb-shape0_1.15-1ubuntu2_amd64.deb",
+      "role": "desktop-library",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/libx/libxcb/libxcb-shape0_1.15-1ubuntu2_amd64.deb",
+      "sha256": "ad57fed687ec9c2a4808b8e30ab1753d57daeddc9ad7fb883bfa0701f6da57c8"
+    },
+    {
+      "name": "libxcb-shm0_1.15-1ubuntu2_amd64.deb",
+      "role": "desktop-library",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/libx/libxcb/libxcb-shm0_1.15-1ubuntu2_amd64.deb",
+      "sha256": "229d1280d459f1ba44c22939d3f9b61d9d20932d9a646b3fe4ce50be4cdf2325"
+    },
+    {
+      "name": "libxcb-sync1_1.15-1ubuntu2_amd64.deb",
+      "role": "desktop-library",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/libx/libxcb/libxcb-sync1_1.15-1ubuntu2_amd64.deb",
+      "sha256": "14286795a258593259923619073e50c15345673befae2733f7b0577b07359aa8"
+    },
+    {
+      "name": "libxcb-xfixes0_1.15-1ubuntu2_amd64.deb",
+      "role": "desktop-library",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/libx/libxcb/libxcb-xfixes0_1.15-1ubuntu2_amd64.deb",
+      "sha256": "0b2ab64af92a71e3d1a35e3c819880ee28d04bfac81360df68ae8d8e9663ebd2"
+    },
+    {
+      "name": "libxcb-xkb1_1.15-1ubuntu2_amd64.deb",
+      "role": "desktop-library",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/libx/libxcb/libxcb-xkb1_1.15-1ubuntu2_amd64.deb",
+      "sha256": "53bc0a58834c981fa8ce5c3ab6195387e5c8a417039d82cc7a8b49724fa53228"
+    },
+    {
+      "name": "libxkbcommon0_1.6.0-1build1_amd64.deb",
+      "role": "desktop-library",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/libx/libxkbcommon/libxkbcommon0_1.6.0-1build1_amd64.deb",
+      "sha256": "2b9caeb423efb540296a1cb20b872cc630c23908407ecb5c1c787a617622d664"
+    }
+  ],
+  "wheel_members": [
+    "PySide6/Qt/lib/libQt6Core.so.6",
+    "PySide6/Qt/lib/libQt6DBus.so.6",
+    "PySide6/Qt/lib/libQt6Gui.so.6",
+    "PySide6/Qt/lib/libQt6OpenGL.so.6",
+    "PySide6/Qt/lib/libQt6Svg.so.6",
+    "PySide6/Qt/lib/libQt6WaylandClient.so.6",
+    "PySide6/Qt/lib/libQt6WaylandEglClientHwIntegration.so.6",
+    "PySide6/Qt/lib/libQt6Widgets.so.6",
+    "PySide6/Qt/lib/libQt6XcbQpa.so.6",
+    "PySide6/Qt/lib/libicudata.so.73",
+    "PySide6/Qt/lib/libicui18n.so.73",
+    "PySide6/Qt/lib/libicuuc.so.73",
+    "PySide6/Qt/plugins/iconengines/libqsvgicon.so",
+    "PySide6/Qt/plugins/imageformats/libqsvg.so",
+    "PySide6/Qt/plugins/platforms/libqoffscreen.so",
+    "PySide6/Qt/plugins/platforms/libqwayland-egl.so",
+    "PySide6/Qt/plugins/platforms/libqwayland-generic.so",
+    "PySide6/Qt/plugins/platforms/libqxcb.so",
+    "PySide6/Qt/plugins/wayland-decoration-client/libadwaita.so",
+    "PySide6/Qt/plugins/wayland-decoration-client/libbradient.so",
+    "PySide6/Qt/plugins/wayland-graphics-integration-client/libdmabuf-server.so",
+    "PySide6/Qt/plugins/wayland-graphics-integration-client/libdrm-egl-server.so",
+    "PySide6/Qt/plugins/wayland-graphics-integration-client/libqt-plugin-wayland-egl.so",
+    "PySide6/Qt/plugins/wayland-graphics-integration-client/libshm-emulation-server.so",
+    "PySide6/Qt/plugins/wayland-graphics-integration-client/libvulkan-server.so",
+    "PySide6/Qt/plugins/wayland-graphics-integration-server/libqt-wayland-compositor-dmabuf-server-buffer.so",
+    "PySide6/Qt/plugins/wayland-graphics-integration-server/libqt-wayland-compositor-drm-egl-server-buffer.so",
+    "PySide6/Qt/plugins/wayland-graphics-integration-server/libqt-wayland-compositor-linux-dmabuf-unstable-v1.so",
+    "PySide6/Qt/plugins/wayland-graphics-integration-server/libqt-wayland-compositor-shm-emulation-server.so",
+    "PySide6/Qt/plugins/wayland-graphics-integration-server/libqt-wayland-compositor-vulkan-server.so",
+    "PySide6/Qt/plugins/wayland-graphics-integration-server/libqt-wayland-compositor-wayland-egl.so",
+    "PySide6/Qt/plugins/wayland-graphics-integration-server/libqt-wayland-compositor-wayland-eglstream-controller.so",
+    "PySide6/Qt/plugins/wayland-shell-integration/libfullscreen-shell-v1.so",
+    "PySide6/Qt/plugins/wayland-shell-integration/libivi-shell.so",
+    "PySide6/Qt/plugins/wayland-shell-integration/libqt-shell.so",
+    "PySide6/Qt/plugins/wayland-shell-integration/libwl-shell-plugin.so",
+    "PySide6/Qt/plugins/wayland-shell-integration/libxdg-shell.so",
+    "PySide6/Qt/plugins/xcbglintegrations/libqxcb-egl-integration.so",
+    "PySide6/Qt/plugins/xcbglintegrations/libqxcb-glx-integration.so",
+    "PySide6/QtCore.abi3.so",
+    "PySide6/QtGui.abi3.so",
+    "PySide6/QtSvg.abi3.so",
+    "PySide6/QtWidgets.abi3.so",
+    "PySide6/__init__.py",
+    "PySide6/_config.py",
+    "PySide6/_git_pyside_version.py",
+    "PySide6/libpyside6.abi3.so.6.8",
+    "PySide6/support/__init__.py",
+    "PySide6/support/deprecated.py",
+    "PySide6/support/generate_pyi.py",
+    "shiboken6/Shiboken.abi3.so",
+    "shiboken6/__init__.py",
+    "shiboken6/_config.py",
+    "shiboken6/_git_shiboken_module_version.py",
+    "shiboken6/libshiboken6.abi3.so.6.8"
+  ],
+  "desktop_libraries": [
+    "libxcb-randr.so.0",
+    "libxcb-render.so.0",
+    "libxcb-shape.so.0",
+    "libxcb-shm.so.0",
+    "libxcb-sync.so.1",
+    "libxcb-xfixes.so.0",
+    "libxcb-xkb.so.1",
+    "libX11-xcb.so.1",
+    "libxkbcommon.so.0",
+    "libxcb-util.so.1",
+    "libxcb-icccm.so.4",
+    "libxcb-keysyms.so.1",
+    "libxcb-render-util.so.0",
+    "libxcb-image.so.0",
+    "libxcb-cursor.so.0",
+    "libxkbcommon-x11.so.0"
+  ]
+}
