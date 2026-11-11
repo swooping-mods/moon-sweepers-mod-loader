@@ -83,8 +83,10 @@ __declspec(dllexport) int MoonLab_ModStart_v8(const MoonModContextV8 *context) {
 
 `unity.clock` ABI 1 is a 16-byte AMD64 table with a 32-byte sample. Callers
 initialize sample size/ABI. `sample` returns zero without calling Unity outside
-an admitted game-thread frame. Success supplies Unity scaled `timeAsDouble`,
-scaled `deltaTime` and zero-extended unsigned32 `frameCount` (which can wrap).
+an admitted game-thread frame. Success supplies Unity scaled time and `deltaTime`
+as doubles, plus zero-extended unsigned32 `frameCount` (which can wrap). The
+adapter may widen the engine's single-precision time; the C storage type does
+not promise additional source precision or a particular retained Unity getter.
 Existing frame callbacks carry a borrowed walker for legacy consumers; v8
 adapter-only consumers treat it as opaque and never dereference game internals.
 The clock contract does not imply other game services.
