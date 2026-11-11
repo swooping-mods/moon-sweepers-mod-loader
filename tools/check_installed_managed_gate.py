@@ -18,10 +18,19 @@ def main():
     runtime = max((dotnet.parent/'shared/Microsoft.NETCore.App').iterdir(), key=lambda p: tuple(map(int,p.name.split('-')[0].split('.'))))
     output = ROOT/'artifacts/installed-managed-gate'; output.mkdir(parents=True, exist_ok=True)
     source = (ROOT/'runtime/bepinex/Adapter.cs').read_text()
-    actual_gate = source[source.index('internal static class InstalledSelection'):]
+    actual_gate = source[source.index('internal static class AdapterFailure'):]
     checks = '''
 internal static class Checks {
- static void Main() {
+ static void Main(string[] args) {
+  if(args.Length!=0) {
+   string output=AdapterFailure.Fallback(args[1]);
+   try {
+    if(args[0]=="--blocked-output")Directory.CreateDirectory(output);
+    InstalledSelection.RequireReady(()=>2u,()=>throw new Exception("must not wait"),2);
+   }
+   catch(Exception error) { AdapterFailure.Stop(error,output,_=>throw new IOException("controlled logger failure")); }
+   throw new Exception("fatal gate returned");
+  }
   int reads=0,waits=0;
   InstalledSelection.RequireReady(()=>++reads<3?0u:1u,()=>waits++,4);
   if(reads!=3||waits!=2)throw new Exception("pending/ready sequencing");
@@ -45,11 +54,22 @@ internal static class Checks {
 '''
     file = output/'GateChecks.cs'; file.write_text('using System; using System.IO;\n'+actual_gate+checks)
     binary = output/'GateChecks.dll'
-    subprocess.run([str(dotnet),str(compiler),'/nologo','/noconfig','/nostdlib+','/target:exe','/out:'+str(binary),
+    subprocess.run([str(dotnet),str(compiler),'/nologo','/noconfig','/nostdlib+','/nullable:enable','/target:exe','/out:'+str(binary),
                     *['/reference:'+str(p) for p in runtime.glob('*.dll')],str(file)],check=True,timeout=60)
     (output/'GateChecks.runtimeconfig.json').write_text(json.dumps({'runtimeOptions':{'tfm':'net'+runtime.name.split('.')[0]+'.0','framework':{'name':'Microsoft.NETCore.App','version':runtime.name}}}))
     run=subprocess.run([str(dotnet),str(binary)],capture_output=True,text=True,check=True,timeout=20)
-    record={'success':True,'adapter_source_sha256':hashlib.sha256(source.encode()).hexdigest(),'runtime':runtime.name,'stdout':run.stdout,'game_started':False}
+    fallback=output/'writable-host'; expected=fallback/'MoonLab/evidence/adapter-failure.txt'
+    env=__import__('os').environ.copy(); unrelated=output/'untrusted-inherited-evidence';env['MOONLAB_BEPINEX_EVIDENCE']=str(unrelated)
+    failure=subprocess.run([str(dotnet),str(binary),'--admission-failure',str(fallback)],env=env,capture_output=True,text=True,timeout=20)
+    if failure.returncode!=23 or not expected.is_file() or 'selection was rejected' not in expected.read_text() or unrelated.exists():
+        raise ValueError('Fatal admission must exit 23 and preserve the known fallback report despite failed logging')
+    blocked=output/'blocked-host/MoonLab/evidence';blocked.parent.mkdir(parents=True,exist_ok=True);blocked.write_text('preserve blocking file')
+    no_report=subprocess.run([str(dotnet),str(binary),'--blocked-output',str(output/'blocked-host')],env=env,capture_output=True,text=True,timeout=20)
+    if no_report.returncode!=23 or blocked.read_text()!='preserve blocking file':
+        raise ValueError('Unwritable fallback or failed logger must not prevent fatal exit 23')
+    record={'success':True,'adapter_source_sha256':hashlib.sha256(source.encode()).hexdigest(),'runtime':runtime.name,'stdout':run.stdout,
+            'fatal_admission_exit_code':failure.returncode,'fatal_admission_report':str(expected.relative_to(output)),
+            'unwritable_fallback_exit_code':no_report.returncode,'inherited_evidence_ignored':True,'game_started':False}
     (output/'result.json').write_text(json.dumps(record,indent=2)+'\n'); print(run.stdout.strip())
 
 

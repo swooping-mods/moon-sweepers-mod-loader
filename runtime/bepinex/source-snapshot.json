@@ -1,7 +1,7 @@
 {
   "schema": "moon-managed-adapter-source/v1",
   "files": {
-    "runtime/bepinex/Adapter.cs": "ac3a78cc357945463fa40d50c0490885780553666b31ae8fd97bd2f4f8a1f267",
+    "runtime/bepinex/Adapter.cs": "f74b755f0859597676205d86de1f64143030e376d83bc3689c70cbd6394f0da3",
     "runtime/bepinex/ApiCheck.cs": "0348cde52842099b78c46b82f76fa0c652a9fd2aece39a692ac274e0d6122b40",
     "runtime/bepinex/BindingRepairs.cs": "15c26ff8a747291de30393c3990be828e14d65aae78f3e2da57ac967bdc4d9f9",
     "runtime/bepinex/FileIntegrity.cs": "af616b2d259e86b4021b15baac74aa0f27acbfc9fad4ce7d0728cc89ea8dfa67",

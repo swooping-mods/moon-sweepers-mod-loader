@@ -19,6 +19,9 @@ public sealed class Adapter : BasePatcher
         string? output = null;
         try
         {
+            // Until installed admission succeeds, inherited evidence variables
+            // are untrusted. Keep fatal startup reports in this host's folder.
+            output = AdapterFailure.Fallback(Paths.BepInExRootPath);
             // Installed mode relies on the resident bootstrap's exact enabled
             // generation/inventory validation. Private mode retains its existing
             // synchronous save guard and independent allowlist validation.
@@ -30,7 +33,7 @@ public sealed class Adapter : BasePatcher
             var measurements = Environment.GetEnvironmentVariable("MOONLAB_ADAPTER_PROFILE") == "1"
                 ? new StartupMeasurements() : null;
             output = Environment.GetEnvironmentVariable("MOONLAB_BEPINEX_EVIDENCE")
-                ?? Path.Combine(Paths.BepInExRootPath,"MoonLab","evidence");
+                ?? output;
             Directory.CreateDirectory(output);
             string game = Path.Combine(Path.GetDirectoryName(Paths.ExecutablePath)!, "GameAssembly.dll");
             var profile = GameProfiles.Match(new(Paths.ExecutablePath,
@@ -101,12 +104,22 @@ public sealed class Adapter : BasePatcher
 
 internal static class AdapterFailure
 {
+    internal static string Fallback(string bepinexRoot) => Path.Combine(bepinexRoot,"MoonLab","evidence");
+
     internal static void Stop(Exception error, string? output, Action<Exception> log)
     {
         // Reporting must never turn a fatal adapter error into a caught patcher
         // exception that lets upstream continue loading managed plugins.
         try { log(error); } catch { }
-        try { if (output != null) File.WriteAllText(Path.Combine(output,"adapter-failure.txt"),error.ToString()); } catch { }
+        try
+        {
+            if (output != null)
+            {
+                Directory.CreateDirectory(output);
+                File.WriteAllText(Path.Combine(output,"adapter-failure.txt"),error.ToString());
+            }
+        }
+        catch { }
         Environment.Exit(23);
     }
 }
