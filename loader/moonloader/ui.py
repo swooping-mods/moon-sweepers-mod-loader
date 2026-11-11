@@ -9,7 +9,7 @@ from PySide6.QtCore import QUrl
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QFrame, QLabel, QPushButton,
     QLineEdit, QComboBox, QHBoxLayout, QVBoxLayout, QListWidget, QListWidgetItem, QAbstractItemView,
     QStyledItemDelegate, QStyle, QStyleOptionButton, QScrollArea, QFileDialog, QMessageBox, QDialog, QPlainTextEdit)
-from . import discovery, launch, packages, steam_options
+from . import discovery, launch, packages, steam_options, diagnostics
 from .catalog import CATEGORIES, description as catalog_description, matches
 from .theme import STYLE, COLORS
 from .storage import load
@@ -32,7 +32,9 @@ class Job(QThread):
     def __init__(self, action, parent): super().__init__(parent); self.action = action
     def run(self):
         try: self.finished_value.emit(self.action())
-        except Exception as error: self.failed.emit(str(error))
+        except Exception as error:
+            self.parent().diagnostics.exception('worker-error', error)
+            self.failed.emit(str(error))
 
 
 class ModList(QListWidget):
@@ -137,6 +139,7 @@ class ModDelegate(QStyledItemDelegate):
 class Window(QMainWindow):
     def __init__(self, service, no_launch=False):
         super().__init__(); self.service = service; self.no_launch = no_launch
+        self.diagnostics = diagnostics.start(service.root)
         QImageReader.setAllocationLimit(32)
         self.view = service.state.get('view', 'grid'); self.mods = {}; self.installations = []; self.inspection = None
         self.job = None; self.process = None; self._busy = False; self._validation = ''
@@ -150,7 +153,8 @@ class Window(QMainWindow):
         titles = QVBoxLayout(); titles.setSpacing(2); titles.addWidget(label('Moon Sweepers', 'title')); titles.addWidget(label('Drop mod files or folders to add them', 'muted')); head.addLayout(titles); head.addStretch()
         self.import_button = QPushButton('Add mods…'); self.import_button.clicked.connect(self.import_package); head.addWidget(self.import_button)
         self.import_button.setToolTip('Add downloaded .msmod packages or supported ZIP files. You can select several.')
-        self.import_folder_button = QPushButton('Add folder…'); self.import_folder_button.clicked.connect(self.import_folder); head.addWidget(self.import_folder_button); layout.addWidget(header)
+        self.import_folder_button = QPushButton('Add folder…'); self.import_folder_button.clicked.connect(self.import_folder); head.addWidget(self.import_folder_button)
+        self.logs_button = QPushButton('Open logs'); self.logs_button.setToolTip('Open local loader diagnostics. Logs are never uploaded automatically.'); self.logs_button.clicked.connect(self.open_logs); head.addWidget(self.logs_button); layout.addWidget(header)
         setup, setup_layout = frame('header')
         row = QHBoxLayout(); row.addWidget(label('Game'))
         self.game = QComboBox(); self.game.setMinimumWidth(200); self.game.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon); self.game.currentIndexChanged.connect(self.game_changed); row.addWidget(self.game, 1)
@@ -214,7 +218,20 @@ class Window(QMainWindow):
     def current_mod(self):
         item = self.list.currentItem(); return item.data(Qt.ItemDataRole.UserRole) if item else None
 
-    def notice(self, text): self.message.setText(text); self.message.setVisible(bool(text))
+    def notice(self, text):
+        if text and text != self.message.text(): self.diagnostics.event('notice', text)
+        self.message.setText(text); self.message.setVisible(bool(text))
+
+    def report_error(self, error):
+        self.diagnostics.exception('operation-error', error)
+        self.notice(str(error))
+
+    def open_logs(self):
+        self.diagnostics.event('logs-opened', 'Opening local loader diagnostics')
+        if self.diagnostics.error:
+            self.notice('Could not save logs: '+self.diagnostics.error); return
+        if not QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.diagnostics.folder))):
+            self.notice('Could not open the logs folder: '+str(self.diagnostics.folder))
 
     def scan(self):
         previous = self.service.state.get('installation', '')
@@ -226,7 +243,9 @@ class Window(QMainWindow):
         if not self.installations: self.game.addItem('No game found — choose Browse…')
         else: self.game.setCurrentIndex(next((i for i,x in enumerate(self.installations) if x.path == previous),0))
         self.game_changed()
-        if errors: self.notice('Some Steam libraries could not be read. Browse to the game folder if needed.')
+        if errors:
+            self.diagnostics.event('discovery-errors', 'Some Steam libraries could not be read', 'WARNING', errors=errors)
+            self.notice('Some Steam libraries could not be read. Browse to the game folder if needed.')
 
     def game_changed(self, *_):
         installation = self.current_installation(); self.inspection = None
@@ -235,7 +254,8 @@ class Window(QMainWindow):
             self.service.state['installation'] = installation.path; self.service.save()
             try:
                 self.inspection = discovery.inspect(installation); self.game_status.setText(self.inspection['reason'])
-            except (ValueError, OSError) as error: self.game_status.setText(str(error))
+            except (ValueError, OSError) as error:
+                self.diagnostics.exception('inspection-error', error); self.game_status.setText(str(error))
         else: self.game_status.setText('Steam detection checks native and Flatpak libraries. Browse to its installation folder to add a game manually.')
         self.update_actions()
 
@@ -258,7 +278,7 @@ class Window(QMainWindow):
         if self.service.mode(installation) != 'installed' or not self.service.state['selected']: return True
         try:
             if self.service.save_policy_ready(installation): return True
-        except (ValueError, OSError) as error: self.notice(str(error)); return False
+        except (ValueError, OSError) as error: self.report_error(error); return False
         dialog = QMessageBox(self); dialog.setWindowTitle('Normal Steam saves')
         dialog.setText('Installed mods use your normal Steam saves. Back up the save folder and sidecars before enabling mods that change saved worlds. Removing DLLs does not restore saves.')
         backup = dialog.addButton('Back up Steam save folder…', QMessageBox.ButtonRole.AcceptRole)
@@ -270,7 +290,7 @@ class Window(QMainWindow):
             source = QFileDialog.getExistingDirectory(self, 'Choose your Steam save folder, including sidecars')
             if not source: return False
             try: self.service.backup_saves(installation, source)
-            except (ValueError, OSError) as error: self.notice(str(error)); return False
+            except (ValueError, OSError) as error: self.report_error(error); return False
         elif chosen in (existing, fresh): self.service.accept_normal_saves(installation, 'backed-up' if chosen == existing else 'fresh')
         else: return False
         return True
@@ -279,7 +299,7 @@ class Window(QMainWindow):
         path = QFileDialog.getExistingDirectory(self, 'Choose Moon Sweepers game folder')
         if path:
             try: self.service.add_installation(path); self.scan()
-            except (ValueError, OSError) as error: self.notice(str(error))
+            except (ValueError, OSError) as error: self.report_error(error)
 
     def import_package(self):
         if self._busy or self.process is not None: return
@@ -311,6 +331,7 @@ class Window(QMainWindow):
     def mods_added(self, result):
         self.refresh_library()
         installed, errors = result['installed'], result['errors']
+        if errors: self.diagnostics.event('import-errors', 'Some mod imports failed', 'ERROR', errors=errors)
         parts = []
         if installed:
             parts.append('Added ' + ', '.join(mod['name'] for mod in installed) + '. Select the mods and dependencies to use them.')
@@ -322,7 +343,9 @@ class Window(QMainWindow):
 
     def refresh_library(self):
         self.mods, errors = self.service.library(); self.render()
-        if errors: self.notice('Package check failed: ' + '; '.join(name + ': ' + error for name,error in errors.items()))
+        if errors:
+            self.diagnostics.event('package-errors', 'Package validation failed', 'ERROR', errors=errors)
+            self.notice('Package check failed: ' + '; '.join(name + ': ' + error for name,error in errors.items()))
 
     def render(self, *_):
         old = self.current_mod(); old_id = old['id'] if old else ''
@@ -358,7 +381,7 @@ class Window(QMainWindow):
         self.service.state['selected'] = sorted(name for name,(mod,_) in self.mods.items() if packages.game_mod(mod)) if enabled else []
         try: self.service.save()
         except (ValueError,OSError) as error:
-            self.service.state['selected'] = previous; self.notice(str(error)); return
+            self.service.state['selected'] = previous; self.report_error(error); return
         self.render()
 
     def set_view(self, view):
@@ -403,7 +426,7 @@ class Window(QMainWindow):
             from .packages import installed
             folder = self.mods[mod['id']][1]; installed(folder)
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
-        except (ValueError,OSError) as error: self.notice(str(error))
+        except (ValueError,OSError) as error: self.report_error(error)
 
     def remove_mod(self):
         mod = self.current_mod()
@@ -443,9 +466,10 @@ class Window(QMainWindow):
         try:
             record = launch.plan(self.service, self.current_installation(), check_client=False)
             self.text_dialog('Launch plan · no game started', json.dumps(record, indent=2))
-        except (ValueError,OSError) as error: self.notice(str(error))
+        except (ValueError,OSError) as error: self.report_error(error)
 
     def work(self, text, action, done):
+        self.diagnostics.event('operation-start', text)
         self._busy=True; self.notice(text); self.update_actions(); self.job=Job(action,self)
         self.job.finished_value.connect(done); self.job.failed.connect(self.notice); self.job.finished.connect(self.job_done); self.job.start()
 
@@ -478,7 +502,8 @@ class Window(QMainWindow):
             try:
                 result = steam_options.apply(installation, self.service.root, preview)
                 self.notice(result.get('message', 'Steam options are already ready.')); dialog.accept(); self.update_actions()
-            except (ValueError, OSError) as error: info.setText(str(error))
+            except (ValueError, OSError) as error:
+                self.diagnostics.exception('steam-setup-error', error); info.setText(str(error))
         apply.clicked.connect(apply_options); dialog.exec()
 
     def start_game(self):
@@ -501,6 +526,7 @@ class Window(QMainWindow):
             if hasattr(self.process,'_moon_lease'): self.process._moon_lease.__exit__(None,None,None)
             self.process=None
             detail=launch.failure_detail(self.launch_record)
+            diagnostics.finish_run(self.service.root, self.launch_record, code, detail)
             self.notice(('Steam request finished; Steam owns the game process. ' if self.launch_record.get('mode') == 'installed' else detail+'. ' if detail else 'Game closed. ')+'Exit code '+str(code)+'. Logs: '+self.launch_record['run']); self.update_actions()
 
     def resizeEvent(self, event):
@@ -509,4 +535,6 @@ class Window(QMainWindow):
 
     def closeEvent(self, event):
         if self._busy: self.notice('Wait for the current file operation to finish before closing.'); event.ignore()
-        else: event.accept()  # A user-started game is left alone when the loader closes.
+        else:
+            self.diagnostics.event('window-closed', 'Loader closed; a user-started game is left running.')
+            event.accept()  # A user-started game is left alone when the loader closes.

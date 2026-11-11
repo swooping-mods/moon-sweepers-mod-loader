@@ -8,12 +8,20 @@ import sys
 # Admit only this application's own modules rather than the caller's cwd.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from moonloader import __version__
-from moonloader.service import Service
-from moonloader import discovery, launch, steam_options
+from moonloader import diagnostics
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Moon Sweepers Mod Loader '+__version__)
+    session = diagnostics.start(diagnostics.requested_root(sys.argv[1:]))
+    diagnostics.install_exception_hooks()
+    session.event('application-start', 'Moon Sweepers Mod Loader '+__version__)
+    from moonloader.service import Service
+    from moonloader import discovery, launch, steam_options
+    class Parser(argparse.ArgumentParser):
+        def error(self, message):
+            session.event('cli-error', message, 'ERROR')
+            super().error(message)
+    parser = Parser(description='Moon Sweepers Mod Loader '+__version__)
     parser.add_argument('--data', type=Path)
     parser.add_argument('--bundle', type=Path, default=Path(__file__).resolve().parent)
     parser.add_argument('--discover', action='store_true')
@@ -35,7 +43,7 @@ def main():
     if args.smoke_test:
         from check_portable_windows import main as smoke_test
         return smoke_test()
-    default = Path(os.environ.get('LOCALAPPDATA', Path.home() / 'AppData/Local')) / 'MoonLab/Loader' if sys.platform == 'win32' else Path(os.environ.get('XDG_DATA_HOME', Path.home() / '.local/share')) / 'moonlab-loader'
+    default = diagnostics.default_root()
     service = Service(args.data or default, args.bundle)
     service.seed()
     if args.install:
@@ -70,6 +78,7 @@ def main():
     prepare_linux_desktop()
     try: from PySide6.QtWidgets import QApplication
     except ImportError: raise ValueError('PySide6 is required for the desktop UI. See README.md; no dependency was downloaded.')
+    diagnostics.install_qt_handler()
     from moonloader.ui import Window
     app=QApplication(sys.argv[:1]); app.setApplicationName('Moon Sweepers Mod Loader'); app.setOrganizationName('MoonLab')
     window=Window(service,args.no_launch); window.show(); return app.exec()
@@ -78,4 +87,5 @@ def main():
 if __name__ == '__main__':
     try: raise SystemExit(main())
     except (ValueError,OSError) as error:
+        diagnostics.exception('application-error', error)
         print('Mod loader: '+str(error),file=sys.stderr); raise SystemExit(2)

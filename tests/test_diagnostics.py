@@ -1,0 +1,174 @@
+"""Local diagnostics retain actionable failures without hiding the original error."""
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+from types import SimpleNamespace
+import unittest
+import shutil
+from unittest.mock import Mock, patch
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT/'loader'))
+from moonloader import diagnostics, launch
+from moonloader.storage import locked
+
+
+class DiagnosticsChecks(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory(); self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+
+    def rows(self, root=None):
+        return [json.loads(line) for line in ((root or self.root)/'logs/loader.jsonl').read_text().splitlines()]
+
+    def test_info_and_error_keep_levels_session_and_traceback(self):
+        logger = diagnostics.Session(self.root)
+        self.assertTrue(logger.event('prepared', 'Files ready'))
+        try: raise ValueError('broken package')
+        except ValueError as error: self.assertTrue(logger.exception('prepare-error', error))
+        rows = self.rows(); self.assertEqual([r['level'] for r in rows], ['INFO', 'ERROR'])
+        self.assertEqual(rows[0]['session'], rows[1]['session'])
+        self.assertIn('ValueError: broken package', rows[1]['traceback'])
+        self.assertIn('test_info_and_error', rows[1]['traceback'])
+
+    def test_rotation_and_large_messages_remain_bounded(self):
+        logger = diagnostics.Session(self.root, max_bytes=1500, backups=2)
+        for index in range(80): logger.event('progress', 'x'*300, index=index)
+        logger.event('oversize', 'y'*100000, huge_detail='z'*100000)
+        files = list((self.root/'logs').glob('loader.jsonl*'))
+        self.assertEqual(len(files), 3)
+        self.assertTrue(all(path.stat().st_size <= 1500 for path in files))
+        self.assertTrue(self.rows()[-1]['details_truncated'])
+        self.assertNotIn('huge_detail', self.rows()[-1])
+
+    def test_simultaneous_sessions_serialize_rotation_without_losing_rows(self):
+        code = ('import sys;sys.path.insert(0,sys.argv[1]);from moonloader.diagnostics import Session;'
+                's=Session(sys.argv[2],max_bytes=4096,backups=8);'
+                'exec("for i in range(60):\\n assert s.event(\'parallel\',sys.argv[3],index=i)")')
+        processes = [subprocess.Popen([sys.executable,'-c',code,str(ROOT/'loader'),str(self.root),name]) for name in ('one','two')]
+        self.assertEqual([p.wait(timeout=20) for p in processes], [0,0])
+        files = list((self.root/'logs').glob('loader.jsonl*'))
+        self.assertTrue(all(p.stat().st_size <= 4096 for p in files))
+        rows = [json.loads(line) for p in files for line in p.read_text().splitlines()]
+        self.assertEqual({(row['message'], row['index']) for row in rows}, {(name,i) for name in ('one','two') for i in range(60)})
+
+    def test_logging_failure_and_alias_do_not_replace_original_error(self):
+        self.root.joinpath('logs').write_text('blocked directory')
+        logger = diagnostics.Session(self.root)
+        error = ValueError('original error')
+        self.assertFalse(logger.exception('failure', error)); self.assertTrue(logger.error)
+        self.assertEqual(str(error), 'original error')
+        self.root.joinpath('logs').unlink(); self.root.joinpath('logs').mkdir()
+        outside = self.root/'outside'; outside.write_text('preserve')
+        self.root.joinpath('logs/loader.jsonl').symlink_to(outside)
+        self.assertFalse(logger.event('notice', 'must not append'))
+        self.assertEqual(outside.read_text(), 'preserve')
+
+    def test_unhandled_python_and_thread_exceptions_keep_stderr_reporting(self):
+        diagnostics.start(self.root)
+        import threading
+        previous, old_thread = sys.excepthook, threading.excepthook
+        with patch.object(diagnostics.Session, 'fatal_output'), patch.object(sys, 'excepthook') as stderr, patch.object(threading, 'excepthook') as thread_stderr:
+            diagnostics.install_exception_hooks()
+            error = RuntimeError('unhandled fixture')
+            sys.excepthook(RuntimeError, error, None)
+            args = SimpleNamespace(exc_value=error, thread=SimpleNamespace(name='fixture-worker'))
+            threading.excepthook(args)
+            stderr.assert_called_once(); thread_stderr.assert_called_once()
+        sys.excepthook, threading.excepthook = previous, old_thread
+        rows = self.rows()
+        self.assertEqual([r['event'] for r in rows[-2:]], ['unhandled-exception', 'unhandled-thread-exception'])
+
+    def test_bad_cli_arguments_are_logged_in_explicit_data_directory(self):
+        data = self.root/'cli-data'
+        result = subprocess.run([sys.executable, str(ROOT/'loader/main.py'), '--data', str(data), '--unknown-fixture-option'], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn('unrecognized arguments', result.stderr)
+        self.assertTrue(any(r['event']=='cli-error' and '--unknown-fixture-option' in r['message'] for r in self.rows(data)))
+
+    def test_cli_operation_failure_retains_full_traceback(self):
+        data = self.root/'cli-data'
+        result = subprocess.run([sys.executable, str(ROOT/'loader/main.py'), '--data', str(data), '--bundle', str(self.root/'empty-bundle'), '--game', str(self.root/'missing'), '--prepare'], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 2)
+        row = next(r for r in self.rows(data) if r['event']=='application-error')
+        self.assertIn('ValueError', row['traceback']); self.assertIn('MoonSweepers.exe', row['message'])
+
+    def test_core_import_failure_is_logged_before_application_imports(self):
+        app = self.root/'broken-app'; package = app/'moonloader'; package.mkdir(parents=True)
+        for name in ('__init__.py','diagnostics.py'):
+            shutil.copyfile(ROOT/'loader/moonloader'/name, package/name)
+        shutil.copyfile(ROOT/'loader/main.py',app/'main.py')
+        (package/'service.py').write_text('raise ImportError("Synthetic damaged application import")\n')
+        data = self.root/'broken-data'
+        result = subprocess.run([sys.executable,str(app/'main.py'),'--data',str(data)],capture_output=True,text=True,timeout=15)
+        self.assertNotEqual(result.returncode,0)
+        self.assertIn('Synthetic damaged application import',result.stderr)
+        row = next(r for r in self.rows(data) if r['event']=='unhandled-exception')
+        self.assertIn('ImportError',row['traceback'])
+
+    def test_fatal_python_crash_keeps_traceback_in_private_log(self):
+        data = self.root/'fatal-data'
+        code = ('import os,sys;sys.path.insert(0,sys.argv[1]);'
+                'from moonloader import diagnostics;'
+                'diagnostics.start(sys.argv[2]);diagnostics.install_exception_hooks();'
+                'exec("if os.name != \'nt\':\\n import resource;resource.setrlimit(resource.RLIMIT_CORE,(0,0))");'
+                'os.abort()')
+        result = subprocess.run([sys.executable, '-c', code, str(ROOT/'loader'), str(data)], capture_output=True, text=True, timeout=15)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Fatal Python error', (data/'logs/crash.log').read_text())
+
+    def test_spawn_failure_keeps_launch_log_and_releases_lease(self):
+        service = SimpleNamespace(root=self.root, prepare=Mock())
+        record = {'mode':'installed','order':[],'platform':'linux','command':['missing-program'],
+                  'run':str(self.root/'runs/fixture'),'cwd':str(self.root)}
+        with patch.object(launch, 'plan', return_value=record), patch.object(launch, 'assert_inactive'), patch('subprocess.Popen', side_effect=OSError('spawn failed')):
+            with self.assertRaisesRegex(OSError, 'spawn failed'): launch.start(service, None)
+        self.assertTrue((self.root/'runs/fixture/launch.json').is_file())
+        self.assertTrue(any(r['event']=='launch-error' and 'spawn failed' in r['traceback'] for r in self.rows()))
+        with locked(self.root, 'session.lock'): pass
+
+    def test_private_crash_collects_only_current_run_bounded_tails(self):
+        run = self.root/'installs/id/runs/fixture'; run.mkdir(parents=True)
+        (run/'Player.log').write_text('x'*100000+'\nCrash!!!\n')
+        (run/'loader.jsonl').write_text('{"case":"mod-start-failed","success":false}\n')
+        outside = self.root/'unrelated-profile'; outside.mkdir(); (outside/'secret-save').write_text('do not read')
+        summary = diagnostics.finish_run(self.root, {'run':str(run),'mode':'private'}, 0)
+        self.assertEqual(summary['status'], 'crashed')
+        self.assertEqual(next(row for row in self.rows() if row['event']=='launch-finished')['level'], 'ERROR')
+        self.assertEqual(set(summary['tails']), {'Player.log','loader.jsonl'})
+        self.assertTrue(summary['tails']['Player.log']['truncated'])
+        self.assertLessEqual(len(summary['tails']['Player.log']['tail']), diagnostics.TAIL_BYTES)
+        self.assertTrue((run/'diagnostics.json').is_file())
+
+    def test_steam_request_exit_is_never_a_game_crash_or_startup_confirmation(self):
+        run = self.root/'runs/fixture'; run.mkdir(parents=True)
+        for code, status in ((0, 'startup-unconfirmed'), (1, 'steam-request-failed'), (-11, 'steam-request-failed')):
+            result = diagnostics.finish_run(self.root, {'run':str(run),'mode':'installed'}, code)
+            self.assertEqual(result['status'], status)
+            self.assertIs(result['game_startup_confirmed'], False)
+
+    def test_managed_log_preserves_only_updated_private_output(self):
+        game = self.root/'installs/id/game'; (game/'BepInEx').mkdir(parents=True)
+        path = game/'BepInEx/LogOutput.log'; path.write_text('previous run\n')
+        run = self.root/'installs/id/runs/fixture'; run.mkdir(parents=True)
+        record = {'run':str(run),'cwd':str(game),'mode':'private'}
+        diagnostics.prepare_run(self.root, record)
+        self.assertNotIn('BepInEx/LogOutput.log', diagnostics.finish_run(self.root, record, 1)['tails'])
+        with path.open('a') as stream: stream.write('current failure\n')
+        tail = diagnostics.finish_run(self.root, record, 1)['tails']['BepInEx/LogOutput.log']['tail']
+        self.assertEqual(tail, 'current failure\n')
+        path.write_text('new startup and a longer replacement failure\n')
+        tail = diagnostics.finish_run(self.root, record, 1)['tails']['BepInEx/LogOutput.log']['tail']
+        self.assertEqual(tail, path.read_text())
+
+    def test_outside_run_cannot_be_written(self):
+        outside = self.root/'outside'; outside.mkdir()
+        result = diagnostics.finish_run(self.root/'data', {'run':str(outside)}, 1)
+        self.assertFalse((outside/'diagnostics.json').exists())
+        self.assertEqual(result['tails'], {})
+
+
+if __name__ == '__main__': unittest.main()

@@ -6,7 +6,7 @@ import shutil
 import subprocess
 import sys
 import uuid
-from . import packages, steam_options
+from . import packages, steam_options, diagnostics
 from .discovery import APP_ID, library_roots
 from .storage import contained, load, write, sha, locked, assert_inactive, process_birth
 from .settings import environment as settings_environment
@@ -174,24 +174,30 @@ def prepare_proton(record):
 
 def start(service, installation):
     """Only a human Launch action should call this during the agent launch pause."""
+    logger = diagnostics.start(service.root)
+    logger.event('launch-request', 'Checking selected mods and launch setup')
     lease = locked(service.root, 'session.lock')
-    lease.__enter__()
+    acquired = False
     try:
+        lease.__enter__(); acquired = True
         assert_inactive(service.root)
         return _start_locked(service, installation, lease)
-    except Exception:
-        lease.__exit__(*sys.exc_info())
+    except Exception as error:
+        logger.exception('launch-error', error)
+        if acquired: lease.__exit__(*sys.exc_info())
         raise
 
 
 def _start_locked(service, installation, lease):
     record = plan(service, installation)
+    logger = diagnostics.start(service.root)
     if record.get('mode') == 'installed' and record['order']:
         steam_options.require_ready(installation, record['platform'])
     service.prepare(installation, _session_owner=True)
     if record.get('mode') == 'installed':
         run = Path(record['run']); run.mkdir(parents=True, exist_ok=True)
         write(run / 'launch.json', record)
+        logger.event('steam-request-starting', 'Files prepared; requesting Steam launch. Game startup remains unconfirmed.', run=str(run), mods=record.get('order', []), platform=record.get('platform'))
         env = {k:v for k,v in os.environ.items() if not k.startswith('MOONLAB_')}
         with (run / 'process.log').open('wb') as output:
             process = subprocess.Popen(record['command'], cwd=record['cwd'], env=env,
@@ -202,7 +208,9 @@ def _start_locked(service, installation, lease):
         return process, record
     if record['platform'] == 'linux': prepare_proton(record)
     run = Path(record['run']); contained(service.root, run.relative_to(service.root).as_posix()).mkdir(parents=True)
+    diagnostics.prepare_run(service.root, record)
     write(run / 'launch.json', record)
+    logger.event('private-game-starting', 'Files prepared; starting the private game process.', run=str(run), mods=record.get('order', []), platform=record.get('platform'))
     env = os.environ.copy()
     # A normal launch must never inherit automation/cheat switches from a shell.
     for name in list(env):
