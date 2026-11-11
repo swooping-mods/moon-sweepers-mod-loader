@@ -17,6 +17,11 @@ build compiles the original managed adapter with the runner's installed SDK and
 includes its checked BepInEx/CoreCLR host in all normal artifacts. Package smoke
 checks confirm managed backend availability without starting a game/plugin.
 Publication rejects missing managed-runtime build/check receipts.
+The be.791 input is an exact vendored host/compiler-reference selection because
+the original publisher returns HTTP 403 to hosted runners. Staging checks its
+locked hash locally; source downloads retain the derivation and reference
+notices. Desktop builders exclude that entire source-only input directory and
+package checks reject leaks. The original retired native VM is absent.
 `tools/fetch_windows_inputs.py` stages the reviewed lock; changed bytes fail.
 Matching LGPL source archives remain inert distribution payloads.
 The reviewed Microsoft license DOCX inputs are vendored at unchanged hashes

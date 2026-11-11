@@ -85,7 +85,9 @@ The qualified adapter profile is Moon Sweepers Steam 1.0.5 / Unity 6000.6 /
 IL2CPP 108. Production packaging replaces upstream CoreCLR 6.0.7 with
 maintained CoreCLR 10.0.15. The offline compiler still uses the reviewed upstream
 .NET 6 reference assemblies for compatible adapter assembly signatures; the
-retired runtime is never copied into normal packages. The maintained host has
+retired native VM and hosting configuration are never copied into desktop
+packages. Exact managed .NET 6 compiler-reference images are permitted only in
+the inert source-only build selection described above. The maintained host has
 its own startup and Mars world qualification below; older retained receipts
 qualify only their original runtime. Arbitrary game/Unity profiles remain
 unsupported.

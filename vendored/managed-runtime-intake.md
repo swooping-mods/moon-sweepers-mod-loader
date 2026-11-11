@@ -5,7 +5,8 @@ its exact BepInEx and Il2CppInterop source archives, and the Microsoft
 `Microsoft.NETCore.App.Runtime.win-x64` 10.0.15 package. Staging is inert and
 offline builds reject changed bytes. No package restore, installer or upstream
 build hook executes. Original adapter compilation uses the installed SDK and
-reviewed reference assemblies; normal packages discard upstream CoreCLR 6.0.7.
+reviewed reference assemblies. Desktop packages replace upstream native CoreCLR
+6.0.7; inert managed compiler-reference images remain source-only as described below.
 
 Hosted runners receive HTTP 403 from the original be.791 download endpoint.
 The required source-only input is therefore the deterministic vendored
