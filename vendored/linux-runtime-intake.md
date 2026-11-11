@@ -40,3 +40,14 @@ runtime is retained under `vendored/appimage/` with its MIT notice. Its source
 commit is `fedfad51acc2860b2916a1eef32ba4a500ff31ef`; original component source
 archives and FUSE patches/build scripts accompany the application. Build-only
 SquashFS packages are not application payloads. See [component terms](LINUX-LICENSES.md).
+
+## CI-only graphics loader
+
+Ubuntu Noble libegl1 and libglvnd0 1.7.0-1build1 are locked as ci-library inputs.
+Their publisher hashes come from the retained signature-verified main Packages
+index. Packages were unpacked without installation; control/triggers, ELF
+dependencies and copyright were inspected. ClamAV 1.5.4 (signatures 2026-10-19,
+23 days old) scanned the packages and materialized members: 20 files, zero
+detections. Static triage had 12 reviewed container/native/license-URL leads,
+zero gaps. These MIT runtime libraries support only headless CI Qt checks and
+are not delivered or used to qualify real graphics drivers. No ldconfig runs.

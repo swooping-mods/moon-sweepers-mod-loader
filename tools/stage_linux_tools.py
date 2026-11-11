@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Extract the hash-locked build-only SquashFS tool without running a package installer."""
+"""Extract the hash-locked build/CI-only libraries and SquashFS tool without running a package installer."""
 import argparse
 import io
 from pathlib import Path
@@ -12,7 +12,7 @@ from linux_runtime import locked_inputs, safe
 def stage(inputs, output):
     lock = locked_inputs(inputs)
     for item in lock['files']:
-        if item['role'] not in ('build-tool', 'build-library'):
+        if item['role'] not in ('build-tool', 'build-library', 'ci-library'):
             continue
         path = inputs/item['name']
         raw = subprocess.check_output(['ar', 'p', str(path), 'data.tar.zst'])

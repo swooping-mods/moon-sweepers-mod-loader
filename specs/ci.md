@@ -22,6 +22,12 @@ smoke test, then runs `Mod Loader.exe --smoke-test`. Temporary application data 
 used; no game starts. Only the artifact download step receives a read-only token.
 Job/process timeouts bound failures.
 
+The headless Ubuntu runner lacks EGL. Two hash-locked Ubuntu Noble libglvnd
+packages provide libEGL/GLdispatch only for CI offscreen checks, extracted by
+`stage_linux_tools.py` without installers or ldconfig. Their search path is
+limited to Linux build/check steps. They are not shipped as graphics drivers;
+desktop users still need system graphics/display libraries.
+
 The artifact `moon-sweepers-mod-loader-builds` retains source/Windows ZIPs,
 the portable Linux x64 tar.gz, `.run` and AppImage,
 SHA256SUMS and build/check receipts for 14 days. The manual release-candidate

@@ -221,6 +221,18 @@
       "role": "desktop-library",
       "url": "https://archive.ubuntu.com/ubuntu/pool/main/libx/libxkbcommon/libxkbcommon0_1.6.0-1build1_amd64.deb",
       "sha256": "2b9caeb423efb540296a1cb20b872cc630c23908407ecb5c1c787a617622d664"
+    },
+    {
+      "name": "libegl1_1.7.0-1build1_amd64.deb",
+      "role": "ci-library",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/libg/libglvnd/libegl1_1.7.0-1build1_amd64.deb",
+      "sha256": "e549f7776216f7bd3b1c216729fb40a97a562e2eb7c563cde632b4931f9a4e57"
+    },
+    {
+      "name": "libglvnd0_1.7.0-1build1_amd64.deb",
+      "role": "ci-library",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/libg/libglvnd/libglvnd0_1.7.0-1build1_amd64.deb",
+      "sha256": "33f5e07c74f73c2bfb44086ae0f9e6da52acd6c104d30ffe8fd768d8253d5e82"
     }
   ],
   "wheel_members": [
