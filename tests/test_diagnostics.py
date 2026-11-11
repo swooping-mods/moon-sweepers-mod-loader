@@ -226,5 +226,70 @@ class DiagnosticsChecks(unittest.TestCase):
         result = diagnostics.collect_installed(service.root,record)
         self.assertEqual(result['status'],'collection-unavailable');self.assertEqual(result['logs'],[])
 
+    def test_private_preloader_failure_is_error_even_when_runner_exits_zero(self):
+        game = self.root/'installs/id/game'; game.mkdir(parents=True)
+        run = self.root/'installs/id/runs/fixture'; run.mkdir(parents=True)
+        old = game/'preloader_20261111_120000_001.log'; old.write_text('old failure')
+        record = {'run':str(run),'cwd':str(game),'mode':'private'}
+        diagnostics.prepare_run(self.root,record)
+        old.write_text('rewritten prior filename must not be attributed to this launch')
+        stale = game/'preloader_20261111_120001_001.log'; stale.write_text('stale new name');os.utime(stale,ns=(1,1))
+        (game/'preloader_20261311_120001_001.log').write_text('invalid month')
+        (game/'preloader_20261111_120001_2.log').write_text('malformed suffix')
+        (game/'preloader_20261111_120001_003.log').symlink_to(old)
+        (game/'preloader_20261111_120001_004.log').hardlink_to(old)
+        fresh = game/'preloader_20261111_120002_001.log'
+        fresh.write_text('x'*100000+"\nSystem.IO.FileNotFoundException: Microsoft.Extensions.Logging.Abstractions\n at Doorstop.Entrypoint.Start()\n")
+        result = diagnostics.finish_run(self.root,record,0)
+        self.assertEqual(result['status'],'preloader-failed')
+        self.assertEqual([row['name'] for row in result['preloader_logs']],[fresh.name])
+        self.assertLessEqual(len(result['preloader_logs'][0]['tail']),diagnostics.TAIL_BYTES)
+        self.assertTrue(result['preloader_logs'][0]['truncated'])
+        self.assertIn('Microsoft.Extensions.Logging.Abstractions',result['preloader_logs'][0]['tail'])
+        self.assertEqual(next(r for r in self.rows() if r['event']=='launch-finished')['level'],'ERROR')
+
+    def test_preloader_file_count_and_incomplete_baseline_are_bounded(self):
+        game = self.root/'installs/id/game'; game.mkdir(parents=True)
+        run = self.root/'installs/id/runs/fixture'; run.mkdir(parents=True)
+        record = {'run':str(run),'cwd':str(game),'mode':'private'}
+        diagnostics.prepare_run(self.root,record)
+        for index in range(20):
+            (game/f'preloader_20261111_120001_{index:03d}.log').write_text('fresh preloader failure')
+        result = diagnostics.finish_run(self.root,record,0)
+        self.assertEqual(len(result['preloader_logs']),16)
+        record['diagnostic_preloader_logs']['complete'] = False
+        result = diagnostics.finish_run(self.root,record,0)
+        self.assertNotIn('preloader_logs',result)
+
+    def test_installed_preloader_capture_requires_current_owner_and_watch(self):
+        from moonloader.storage import write
+        service,installation,record,_ = self.installed_fixture()
+        path = Path(installation.path)/'preloader_20261111_120001_001.log'
+        path.write_text('System.IO.FileNotFoundException: Microsoft.Extensions.Logging.Abstractions')
+        result = diagnostics.collect_installed(service.root,record)
+        self.assertEqual(result['status'],'preloader-failed')
+        self.assertEqual([row['name'] for row in result['preloader_logs']],[path.name])
+        self.assertEqual(result['game_process_lifetime'],'unverified')
+        self.assertEqual(result['game_crash'],'not established')
+        write(Path(installation.path)/'MoonLab/owner.json',{'schema':'foreign-owner'})
+        result = diagnostics.collect_installed(service.root,record)
+        self.assertEqual(result['status'],'collection-unavailable')
+        self.assertNotIn('preloader_logs',result)
+
+    def test_open_logs_collects_private_preloader_before_process_exit(self):
+        from moonloader.storage import write
+        data = self.root/'data'; install = data/'installs/private'; game = install/'game'; game.mkdir(parents=True)
+        run = install/'runs/fixture'; run.mkdir(parents=True)
+        record = {'mode':'private','cwd':str(game),'run':str(run)}
+        diagnostics.prepare_run(data,record)
+        write(run/'launch.json',record); write(data/'active.json',{'state':'running','run':str(run)})
+        path = game/'preloader_20261111_120001_001.log'; path.write_text('Doorstop failed before adapter startup')
+        service = SimpleNamespace(root=data,install_root=lambda _:install,mode=lambda _:'private')
+        result = diagnostics.collect_selected_installed(service,None)
+        self.assertEqual(result['status'],'preloader-failed')
+        self.assertEqual([row['name'] for row in result['preloader_logs']],[path.name])
+        self.assertEqual(result['process_exit'],'not observed by this collection')
+        self.assertTrue((data/'logs/private-preloader.json').is_file())
+
 
 if __name__ == '__main__': unittest.main()

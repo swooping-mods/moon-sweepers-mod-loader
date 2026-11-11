@@ -17,6 +17,7 @@ import uuid
 MAX_BYTES = 2 * 1024 * 1024
 BACKUPS = 4
 TAIL_BYTES = 64 * 1024
+_PRELOADER = re.compile(r'preloader_(\d{8}_\d{6})_\d{3}\.log')
 _current = None
 
 
@@ -183,6 +184,51 @@ def install_qt_handler():
     return old
 
 
+def _preloader_name(name):
+    match = _PRELOADER.fullmatch(name)
+    if not match: return False
+    try: datetime.strptime(match.group(1), '%Y%m%d_%H%M%S')
+    except ValueError: return False
+    return True
+
+
+def _preloader_snapshot(game):
+    from itertools import islice
+    entries = list(islice(game.iterdir(), 4097))
+    return {'names': [item.name for item in entries[:4096] if _preloader_name(item.name)],
+            'complete': len(entries) <= 4096, 'since_ns': time.time_ns()}
+
+
+def _preloader_logs(game, baseline):
+    """Doorstop writes these before either the normal host log or adapter exists."""
+    from itertools import islice
+    from .storage import contained
+    if not isinstance(baseline, dict) or baseline.get('complete') is not True: return []
+    since = baseline.get('since_ns')
+    if not isinstance(since, int) or since < 1: return []
+    previous = set(baseline.get('names', [])); candidates = []
+    for entry in islice(game.iterdir(), 4096):
+        if not _preloader_name(entry.name) or entry.name in previous: continue
+        try:
+            path = contained(game, entry.name); info = path.stat()
+            if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or info.st_mtime_ns < since or not info.st_size: continue
+            candidates.append((info.st_mtime_ns, path))
+        except (OSError, ValueError): continue
+    result = []
+    for _, path in sorted(candidates, reverse=True)[:16]:
+        try:
+            path = contained(game, path.name)
+            with path.open('rb') as stream:
+                stream.seek(0, 2); size = stream.tell(); stream.seek(max(0, size-TAIL_BYTES))
+                tail = stream.read(TAIL_BYTES).decode('utf-8', errors='replace')
+            if tail:
+                result.append({'name': path.name, 'path': str(path), 'bytes': size,
+                               'tail': tail, 'truncated': size > TAIL_BYTES,
+                               'failure': 'BepInEx preloader failed before adapter startup'})
+        except (OSError, ValueError): continue
+    return result
+
+
 def prepare_run(root, record):
     """Mark the private managed log so an unchanged previous run is not copied."""
     if record.get('mode') == 'installed': return
@@ -190,6 +236,7 @@ def prepare_run(root, record):
         from .storage import contained
         root = Path(root).absolute(); game = Path(record['cwd']).absolute()
         game = contained(root, game.relative_to(root).as_posix())
+        record['diagnostic_preloader_logs'] = _preloader_snapshot(game)
         path = contained(game, 'BepInEx/LogOutput.log')
         info = path.stat() if path.is_file() else None
         prefix = b''
@@ -212,7 +259,8 @@ def prepare_installed(service, installation, record):
         deployed = public.receipt(data, installation)
         watch = {'mode': 'installed', 'cwd': installation.path, 'run': record['run'],
                  'installed_log_watch': {'installation': installation.record(),
-                     'generation': deployed['generation'], 'data': str(data), 'since_ns': time.time_ns()}}
+                     'generation': deployed['generation'], 'data': str(data), 'since_ns': time.time_ns(),
+                     'preloader_baseline': _preloader_snapshot(Path(installation.path))}}
         record['installed_log_watch'] = watch['installed_log_watch']
         write(contained(data, 'diagnostics-watch.json'), watch)
     except Exception as error:
@@ -244,6 +292,7 @@ def collect_installed(root, record):
             raise ValueError('Installed diagnostic generation changed')
         since = meta['since_ns']
         if not isinstance(since, int) or since < 1: raise ValueError('Invalid installed diagnostic start time')
+        result['preloader_logs'] = _preloader_logs(game, meta.get('preloader_baseline'))
         folder = contained(game, 'MoonLab/logs')
         if folder.is_dir():
             from itertools import islice
@@ -267,9 +316,9 @@ def collect_installed(root, record):
                     result['logs'].append({'run': path.parent.name, 'path': str(path), 'bytes': size,
                                            'tail': tail, 'truncated': size > TAIL_BYTES})
         result.update(installation=installation.identity, generation=generation,
-                      status='bootstrap-observed' if result['logs'] else 'no-attributed-bootstrap-log-yet')
+                      status='preloader-failed' if result['preloader_logs'] else 'bootstrap-observed' if result['logs'] else 'no-attributed-bootstrap-log-yet')
         write(_log_path(session.root, 'installed-bootstrap.json'), result)
-        session.event('installed-bootstrap-collected', result['status'], logs=len(result['logs']))
+        session.event('installed-bootstrap-collected', result['status'], 'ERROR' if result['preloader_logs'] else 'INFO', logs=len(result['logs']), preloader_logs=len(result['preloader_logs']))
     except Exception as error:
         result.update(status='collection-unavailable', message=str(error))
         try:
@@ -281,10 +330,25 @@ def collect_installed(root, record):
 
 
 def collect_selected_installed(service, installation):
-    """Explicit Open logs refresh, including evidence produced after request exit."""
+    """Open logs refresh, including a preloader failure blocked on its dialog."""
     try:
-        from .storage import contained, load
-        if service.mode(installation) != 'installed': return
+        from .storage import contained, load, write
+        if service.mode(installation) != 'installed':
+            active = load(contained(service.root, 'active.json'), {})
+            if not active.get('run'): return
+            data = service.install_root(installation); run = Path(active['run']).absolute()
+            if run.parent != data/'runs': return
+            run = contained(service.root, run.relative_to(service.root).as_posix())
+            record = load(contained(run, 'launch.json'), {})
+            if record.get('run') != str(run) or record.get('cwd') != str(data/'game'): return
+            game = contained(service.root, (data/'game').relative_to(service.root).as_posix())
+            logs = _preloader_logs(game, record.get('diagnostic_preloader_logs'))
+            result = {'schema':'moon-loader-private-preloader/v1', 'run':str(run),
+                      'status':'preloader-failed' if logs else 'no-attributed-preloader-log-yet',
+                      'process_exit':'not observed by this collection', 'preloader_logs':logs}
+            write(_log_path(service.root, 'private-preloader.json'), result)
+            if logs: start(service.root).event('private-preloader-failed', 'BepInEx preloader failed before adapter startup', 'ERROR', logs=len(logs), run=str(run))
+            return result
         record = load(contained(service.install_root(installation), 'diagnostics-watch.json'))
         if record: return collect_installed(service.root, record)
     except Exception as error:
@@ -336,11 +400,23 @@ def finish_run(root, record, code, detail=''):
                 summary['status'] = status = 'crashed'
             elif code < 0 or code >= 0x80000000:
                 summary['status'] = status = 'crashed'
+            if record.get('diagnostic_preloader_logs'):
+                game = Path(record['cwd']).absolute()
+                game = contained(session.root, game.relative_to(session.root).as_posix())
+                preloader = _preloader_logs(game, record['diagnostic_preloader_logs'])
+                if preloader:
+                    summary['preloader_logs'] = preloader
+                    summary['status'] = status = 'preloader-failed'
+                    summary['message'] = 'BepInEx preloader failed before adapter startup.'
         write(contained(run, 'diagnostics.json'), summary)
         if installed and record.get('installed_log_watch'):
             summary['installed_bootstrap'] = collect_installed(root, record)
+            if summary['installed_bootstrap'].get('preloader_logs'):
+                summary['steam_request_status'] = status
+                summary['status'] = status = 'preloader-failed'
+                summary['message'] = 'BepInEx preloader failed before adapter startup; game-process lifetime remains unverified.'
             write(contained(run, 'diagnostics.json'), summary)
-        session.event('launch-finished', detail or status, 'ERROR' if code or detail or status in ('crashed', 'failed', 'steam-request-failed') else 'INFO',
+        session.event('launch-finished', summary['message'] or status, 'ERROR' if code or detail or status in ('crashed', 'failed', 'steam-request-failed', 'preloader-failed') else 'INFO',
                       run=str(run), status=status, exit_code=code)
     except Exception as error:
         session.exception('run-diagnostics-failed', error)
