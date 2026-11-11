@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.1 — 2026-11-11
+
+- Check Steam Proton launch options before starting installed mods, preventing a successful Steam request from silently starting the game without its native mod bootstrap.
+- Add **Steam setup…** with current/proposed options and an explicit **Apply required launch options** action. Quit Steam before applying; existing DLL overrides, supported wrappers and game arguments are preserved, and the previous configuration is backed up and verified.
+- Missing, ambiguous or unsupported Steam settings provide manual setup guidance. Windows keeps its normal launch arguments without Proton environment syntax.
+
+The AppImage startup failure was reproduced with the released nine-mod payload in an isolated Linux/Proton game copy: no mods initialized without the version DLL override; all nine initialized with it. The test uses a private Proton bridge instead of changing the user's Steam configuration or saves. Native Windows gameplay and loaded-world/co-op compatibility remain separately unqualified.
+
 ## 0.2.0 — 2026-11-11
 
 - Windows portable ZIP and Linux portable archive, `.run` and AppImage downloads. Python and Qt are included in the desktop builds.

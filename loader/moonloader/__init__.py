@@ -3,4 +3,4 @@ from pathlib import Path
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "vendored/api/python"))
-__version__ = "0.2.0"
+__version__ = "0.2.1"

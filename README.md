@@ -29,10 +29,10 @@ Available for Windows x64 and Linux x64 with Steam Proton.
 
 | Channel | Download | What it includes |
 | --- | --- | --- |
-| Recommended download | [v0.2.0 release](https://github.com/swooping-mods/moon-sweepers-mod-loader/releases/tag/v0.2.0) | Windows ZIP, portable Linux `.run`, AppImage and tar.gz, source ZIP and `SHA256SUMS`. Desktop downloads include Python/Qt and all nine starter packages. |
+| Recommended download | [v0.2.1 release](https://github.com/swooping-mods/moon-sweepers-mod-loader/releases/tag/v0.2.1) | Windows ZIP, portable Linux `.run`, AppImage and tar.gz, source ZIP and `SHA256SUMS`. Desktop downloads include Python/Qt and all nine starter packages. |
 | Development builds | [Successful Checks runs on main](https://github.com/swooping-mods/moon-sweepers-mod-loader/actions/workflows/check.yml?query=branch%3Amain) | The same formats and checked bundle from current development. Download `moon-sweepers-mod-loader-builds` under **Artifacts**; GitHub sign-in is required and artifacts expire after 14 days. |
 
-Version 0.2.0 is a full release. See the [changelog](CHANGELOG.md)
+Version 0.2.1 is a full release. See the [changelog](CHANGELOG.md)
 and [Releases](https://github.com/swooping-mods/moon-sweepers-mod-loader/releases)
 for versioned downloads. The game itself is not included.
 
@@ -66,8 +66,9 @@ PySide6. GitHub's automatic source-code archives require a [native build](#devel
    then reopen Steam. See [Proton setup](#proton-setup) for manual setup.
 4. Check the mods you want and their required frameworks. **Select all** selects
    the whole library, including mods hidden by search or filters.
-5. Click **Prepare files**, resolve any reported dependency or compatibility
-   problems, then click **Launch via Steam**.
+5. Click **Launch via Steam**. It applies the selected mods before requesting
+   launch; resolve any reported dependency or compatibility problems first.
+   **Prepare files** can apply them separately without starting the game.
 
 Search covers names, descriptions, categories and tags. Grid, Details and Text
 views share the same filters and selections. Importing packages and preparing
