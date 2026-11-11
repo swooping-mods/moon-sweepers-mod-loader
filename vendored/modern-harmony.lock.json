@@ -1,0 +1,168 @@
+{
+  "schema": "moon-loader-modern-harmony/v1",
+  "files": [
+    {
+      "name": "harmonyx.2.16.1.nupkg",
+      "url": "https://api.nuget.org/v3-flatcontainer/harmonyx/2.16.1/harmonyx.2.16.1.nupkg",
+      "sha256": "b08dfb7a2d3e46ebf23dc34837de004b541b6dc07e0be8e99c29c9061e46f659",
+      "id": "HarmonyX",
+      "version": "2.16.1",
+      "members": {
+        "lib/netstandard2.0/0Harmony.dll": "BepInEx/core/0Harmony.dll"
+      },
+      "member_sha256": {
+        "lib/netstandard2.0/0Harmony.dll": "70e7647876b6c3d874ea99b56627a95d1dce2e1dd791981a002578a2febc9bbd"
+      },
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/BepInEx/HarmonyX",
+        "commit": "02a98f540fa12ac4656f189a3cf67b0c96cc68f7"
+      }
+    },
+    {
+      "name": "mono.cecil.0.11.6.nupkg",
+      "url": "https://api.nuget.org/v3-flatcontainer/mono.cecil/0.11.6/mono.cecil.0.11.6.nupkg",
+      "sha256": "d2a23832aaa948ba9a01acc42b5726e34c5f995958f1b30d45c0e7c70b3a72d5",
+      "id": "Mono.Cecil",
+      "version": "0.11.6",
+      "members": {
+        "lib/netstandard2.0/Mono.Cecil.dll": "BepInEx/core/Mono.Cecil.dll",
+        "lib/netstandard2.0/Mono.Cecil.Rocks.dll": "BepInEx/core/Mono.Cecil.Rocks.dll",
+        "lib/netstandard2.0/Mono.Cecil.Mdb.dll": "BepInEx/core/Mono.Cecil.Mdb.dll",
+        "lib/netstandard2.0/Mono.Cecil.Pdb.dll": "BepInEx/core/Mono.Cecil.Pdb.dll"
+      },
+      "member_sha256": {
+        "lib/netstandard2.0/Mono.Cecil.dll": "831dca77470d85cb6ffbea3072daa7a3df5b7c9fcfd9c3f43674a9be99d4bfcf",
+        "lib/netstandard2.0/Mono.Cecil.Rocks.dll": "bf992f3dce364ebcc3200fa7832ef07e20b4e2dbc3a8a6213ce44e3d239db984",
+        "lib/netstandard2.0/Mono.Cecil.Mdb.dll": "28cb367972bdc1cd43e4006306af2fd96d37f4ed4b239ee90e1dc7237a93af7f",
+        "lib/netstandard2.0/Mono.Cecil.Pdb.dll": "a332332633fbcb20e8d50e49b4db7bd1557721417122cf0c5f4c42f2332391d0"
+      },
+      "repository": {
+        "url": "https://github.com/jbevain/cecil",
+        "tag": "0.11.6"
+      }
+    },
+    {
+      "name": "monomod.backports.1.1.2.nupkg",
+      "url": "https://api.nuget.org/v3-flatcontainer/monomod.backports/1.1.2/monomod.backports.1.1.2.nupkg",
+      "sha256": "a1785c9cca34ac36437299a119585085ac7494579bf434f719f4a8a1eb0ea37f",
+      "id": "MonoMod.Backports",
+      "version": "1.1.2",
+      "members": {
+        "lib/net6.0/MonoMod.Backports.dll": "BepInEx/core/MonoMod.Backports.dll"
+      },
+      "member_sha256": {
+        "lib/net6.0/MonoMod.Backports.dll": "cdd6e9f7bcdb98d2c002f63bfbe85ae80ea36261190a741e64283d769a6c6502"
+      },
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/MonoMod/MonoMod.git",
+        "commit": "a1b82852b2574742776af08818487b90b0bfab93"
+      }
+    },
+    {
+      "name": "monomod.core.1.3.6.nupkg",
+      "url": "https://api.nuget.org/v3-flatcontainer/monomod.core/1.3.6/monomod.core.1.3.6.nupkg",
+      "sha256": "52bc588ae30703560a81a217874a864c2bbeb00996d2c5762edeb7b7e3f40bdd",
+      "id": "MonoMod.Core",
+      "version": "1.3.6",
+      "members": {
+        "lib/net6.0/MonoMod.Core.dll": "BepInEx/core/MonoMod.Core.dll",
+        "lib/net6.0/MonoMod.Iced.dll": "BepInEx/core/MonoMod.Iced.dll"
+      },
+      "member_sha256": {
+        "lib/net6.0/MonoMod.Core.dll": "0dec3b654ac027ea14054a284b3a43746aa5b6545be4a38e7aa2c3ad342d5df0",
+        "lib/net6.0/MonoMod.Iced.dll": "444fed35719e1ca28e86b2a89275a135a89dd4f533d71d5eb0d47ac7392ea349"
+      },
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/MonoMod/MonoMod",
+        "branch": "refs/heads/reorganize",
+        "commit": "a74a1cf0d15c5e82dfa6ef8bbe7a131b60bed3fd"
+      }
+    },
+    {
+      "name": "monomod.ilhelpers.1.1.0.nupkg",
+      "url": "https://api.nuget.org/v3-flatcontainer/monomod.ilhelpers/1.1.0/monomod.ilhelpers.1.1.0.nupkg",
+      "sha256": "b1ea044f97eab32398f20ec37cda4b407353754558dd4ff10a86050b852b38ac",
+      "id": "MonoMod.ILHelpers",
+      "version": "1.1.0",
+      "members": {
+        "lib/net6.0/MonoMod.ILHelpers.dll": "BepInEx/core/MonoMod.ILHelpers.dll"
+      },
+      "member_sha256": {
+        "lib/net6.0/MonoMod.ILHelpers.dll": "0081403bdcef3340f78c7ccded0be6ae0507b397ee8b9980b44f01bf9f93aed1"
+      },
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/MonoMod/MonoMod.git",
+        "commit": "a1b82852b2574742776af08818487b90b0bfab93"
+      }
+    },
+    {
+      "name": "monomod.runtimedetour.25.3.6.nupkg",
+      "url": "https://api.nuget.org/v3-flatcontainer/monomod.runtimedetour/25.3.6/monomod.runtimedetour.25.3.6.nupkg",
+      "sha256": "77cda69dc62b3ffa2ca359287e8fc964d4ed0b3d791ae151d60ea28dfb4c918d",
+      "id": "MonoMod.RuntimeDetour",
+      "version": "25.3.6",
+      "members": {
+        "lib/net6.0/MonoMod.RuntimeDetour.dll": "BepInEx/core/MonoMod.RuntimeDetour.dll"
+      },
+      "member_sha256": {
+        "lib/net6.0/MonoMod.RuntimeDetour.dll": "e89a552790c2eaee57653494486cd906176ccfe679b239e6029361cf6fefe616"
+      },
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/MonoMod/MonoMod",
+        "branch": "refs/heads/reorganize",
+        "commit": "a74a1cf0d15c5e82dfa6ef8bbe7a131b60bed3fd"
+      }
+    },
+    {
+      "name": "monomod.utils.25.0.14.nupkg",
+      "url": "https://api.nuget.org/v3-flatcontainer/monomod.utils/25.0.14/monomod.utils.25.0.14.nupkg",
+      "sha256": "0bfa50b12ae705289e18e52a436eec153edc74bbbec16cb38883f024fd9e9ef3",
+      "id": "MonoMod.Utils",
+      "version": "25.0.14",
+      "members": {
+        "lib/net6.0/MonoMod.Utils.dll": "BepInEx/core/MonoMod.Utils.dll"
+      },
+      "member_sha256": {
+        "lib/net6.0/MonoMod.Utils.dll": "cf3eef6fc75b5a136a30bccb9415e3ee85d6892492eb8f5e889ba3d3484a37ae"
+      },
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/MonoMod/MonoMod",
+        "branch": "refs/heads/reorganize",
+        "commit": "a74a1cf0d15c5e82dfa6ef8bbe7a131b60bed3fd"
+      }
+    }
+  ],
+  "notice_files": {
+    "Cecil-0.11.6-LICENSE.txt": "13d58ecbed676511c0c4c4009bff107025e50007ff5e7901dc562700ec62509e",
+    "HarmonyX-2.16.1-LICENSE": "1aaf59a35b7d0bc58cdc4ffe303558974ad5acae6700ba9e04a182e9f6cb5c8b",
+    "HarmonyX-2.16.1.nuspec": "b6ae75120208a13ac7ce827a567174b8648446bf14047310fa48eb081eb61202",
+    "HarmonyX-upstream-LICENSE": "07cfa3e4aa04ae179d538735629ac69d272b8c3ffc58a20ebdba5e8b63f9f42f",
+    "Mono.Cecil-0.11.6.nuspec": "52fa41faa56134d176e8816347f040c01837d8c4458d43fef0166c27559d4bd9",
+    "MonoMod-Backports-ILHelpers-LICENSE": "0b64833222e3c6a426ad29362d26334619fe02eaf2b89ea9c37805521896c920",
+    "MonoMod-current-LICENSE": "0b64833222e3c6a426ad29362d26334619fe02eaf2b89ea9c37805521896c920",
+    "MonoMod.Backports-1.1.2.nuspec": "bb5e0425a3bc994ab07c243241e24cedcd471fdece1ac5db67ad1015057b84c1",
+    "MonoMod.Core-1.3.6-LICENSE.txt": "93a47598376fd3f276b631e75149340087153c6ff1635a53c5790249e9124e2d",
+    "MonoMod.Core-1.3.6.nuspec": "8ae401b0ed33d98c31cf2b6a73119975d8e20641be92a0fb93436b309fec0949",
+    "MonoMod.ILHelpers-1.1.0.nuspec": "7fc5f03a5ef99d83058260ac8ac14370be8aa54ee2a0609dd25891df82d26063",
+    "MonoMod.RuntimeDetour-25.3.6.nuspec": "73c797e6da0789d5e09806807fe6c950ddf51bd86e945f114604ee07503f6783",
+    "MonoMod.Utils-25.0.14.nuspec": "f2165a38c20e9db93ec9cca4837734abe93de8c12ac3832216e6561c0cb48343"
+  },
+  "framework": "net6.0 implementation on maintained .NET10; Harmony andCecil netstandard2.0",
+  "replaces": [
+    "0Harmony.dll",
+    "MonoMod.RuntimeDetour.dll",
+    "MonoMod.Utils.dll",
+    "MonoMod.Backports.dll",
+    "Mono.Cecil.dll",
+    "Mono.Cecil.Rocks.dll",
+    "Mono.Cecil.Mdb.dll",
+    "Mono.Cecil.Pdb.dll"
+  ],
+  "platform_dependencies": "System.Text.Json/System.Reflection.Emit use maintained .NET10 platform assemblies, no legacy NuGet runtime replacements."
+}
