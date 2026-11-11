@@ -69,8 +69,9 @@ native and managed evidence attributable without redirecting normal Steam saves.
 
 Launch passes only native IDs to ModStart and enables the separate managed
 host with its own evidence path and `winhttp` override on Proton. Managed-only
-launches have an empty native startup plan, retain the synchronous private
-profile guard and seal the empty native registry. Native capacity counts only
+launches have an empty native startup plan and seal the empty native registry.
+Private mode retains its synchronous profile guard; installed mode preserves
+normal Steam save paths. Native capacity counts only
 native entries; total selection capacity remains the package contract's bound.
 External provenance is generic metadata and never a native DLL fallback.
 
@@ -78,9 +79,9 @@ The qualified adapter profile is Moon Sweepers Steam 1.0.5 / Unity 6000.6 /
 IL2CPP 108. Production packaging replaces upstream CoreCLR 6.0.7 with
 maintained CoreCLR 10.0.15. The offline compiler still uses the reviewed upstream
 .NET 6 reference assemblies for compatible adapter assembly signatures; the
-retired runtime is never copied into normal packages. New runtime execution
-requires its own private startup qualification; older retained world receipts
-below qualify only their original runtime. Arbitrary game/Unity profiles remain
+retired runtime is never copied into normal packages. The maintained host has
+its own startup and Mars world qualification below; older retained receipts
+qualify only their original runtime. Arbitrary game/Unity profiles remain
 unsupported.
 
 Modern HarmonyX 2.16.1 / MonoMod RuntimeDetour 25.3.6 provides .NET 10-aware
@@ -101,7 +102,9 @@ trampoline tests cover zero/eight arguments, by-reference/void, value types,
 legacy instance-signature semantics and forced GC; static scope-aware member
 and interface checks remain distinct from actual engine qualification.
 Managed plugin lifecycle follows BepInEx metadata. Mixed package dependency
-ordering establishes package closure, not a native/managed startup rendezvous.
+ordering establishes package closure. Installed mode also waits for resident
+native readiness before managed plugin startup; this does not establish scene
+readiness or arbitrary plugin-to-plugin startup ordering.
 SDK 0.5 managed consumers may declare native `requires_apis` with
 `runtime_api_abi: 1`. Both selection and preparation require readiness ABI 1 in
 the native receipt before copying game data. The source C# connector queries the
@@ -138,3 +141,18 @@ terminal/stacking shortcut arbitration, save/reload and normal exit. This is a
 mixed-backend request test, not cargo placement or general hook-composition
 qualification. The initial historical-package shortcut timeout is preserved
 as a failed attempt in that record.
+
+For v0.2.1, maintained CoreCLR 10.0.15 passes the original managed interop probe
+(native object roundtrip, restored Harmony hooks, injected class and natural
+component callbacks), and Mars solo movement/save/menu/reload/shutdown in both
+private and installed modes. Installed qualification uses standard Steam save
+paths in an owned Steam/Proton fixture; preparation creates no game, prefix or
+profile copy. Disable, re-enable and uninstall each pass actual startup checks,
+with original game hashes preserved and mutable BepInEx caches retained.
+The actual Steam handoff is substituted by an authentic private Proton bridge
+to avoid personal installation/profile writes. Gamescope segfaults on teardown
+after Unity shutdown and runner exit 0; compositor teardown remains a failed
+check. Native Windows gameplay and two-account co-op remain unqualified.
+Exact test identities/results are in the workshop's existing
+[adapter verification record](../../moon-sweepers-modding/verification/2026-11-10-bepinex-adapter.md)
+and ignored `.local/release-0.2.1/` receipts.

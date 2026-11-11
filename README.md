@@ -110,18 +110,23 @@ existing versions and selections are preserved:
 
 The importer also recognizes the complete **MarsSweepers 0.6.1** download.
 The supported BepInEx adapter/runtime is included in release and prerelease
-downloads. Select **Private game copy** to run Mars; installed-game mode supports
-native mods only. The first managed launch generates game bindings locally and
-can take longer. Mars itself is supplied separately and starts unchecked after
+downloads. Use **Existing Steam game** to run native and BepInEx mods through
+your normal Steam installation, without copying the game. The first managed
+launch generates game bindings locally and can take longer. Mars itself is
+supplied separately and starts unchecked after
 import. Its compatibility companion adds bounded multiplayer messages, initial
 state retries and host setting checks; real co-op remains unqualified. Other raw
 third-party DLLs require a compatible mod package. See the
 [managed runtime contract](specs/managed-runtime.md).
 
-Creating the first private copy needs a clean game folder. If this loader has
-already applied native mods to **Existing Steam game**, use **Uninstall loader**
-in that mode before switching to **Private game copy**. This keeps saves and
-settings. An existing private copy remains available.
+If Mars was imported with an older loader, import the complete download again
+to pick up the updated compatibility companion. Existing library packages are
+kept immutable.
+
+**Private game copy** remains optional and needs a clean source game folder to
+create its first copy. Uninstall preserves settings and logs, so it does not
+automatically produce a clean source for this option. Existing private copies
+remain available.
 
 ## Compatibility and saves
 
@@ -150,11 +155,12 @@ For manual setup, open the game's **Properties → General → Launch Options** 
 Steam. With no existing options, use:
 
 ```sh
-WINEDLLOVERRIDES="version=n,b" %command%
+WINEDLLOVERRIDES="version=n,b;winhttp=n,b" %command%
 ```
 
-If you already use launch options, merge the `version=n,b` override while keeping
-your other overrides, wrappers and arguments. **View launch plan** shows the
+Native mods require `version=n,b`; BepInEx also requires `winhttp=n,b`. If you
+already use launch options, merge the required overrides while keeping your
+other overrides, wrappers and arguments. **View launch plan** shows the
 selected deployment mode and launch settings. A successful Steam launch request
 does not confirm that the game started or loaded mods.
 
