@@ -49,3 +49,21 @@ The desktop exposes the mode selector, normal-save choice, preparation, next-lau
 `tests/test_installed_managed.py` checks no-copy managed-only/mixed deployment, immutable-read package races, enable/disable, update rollback, foreign runtime refusal and mutable-cache preservation. The executable `tools/check_installed_managed_gate.py --dotnet PATH` tests the actual C# gate without a game. Native bootstrap checks cover managed-only manifests and required host inventory entries. `tests/test_steam_options.py` checks synthetic account selection, native/Flatpak roots, option merging, Windows no-op behavior, stopped-client admission, stale previews and mid-apply config changes. `tests/test_installed.py` uses synthetic targets for original preservation, legacy/private behavior, aliases, ownership conflicts, running-process detection, fault recovery, updates, save backups, Steam launch semantics and cross-volume staging. `native_public_checks.c` exercises the actual C parser/guard ordering with mocked IO/crypto. `tools/check_installed_ui.py` runs only in private headless Gamescope. Current routine results remain in `artifacts/checks.json` and the build receipts; game/platform observations must be reported separately.
 
 The v0.2.1 investigation reproduced the missing-override failure using the released v0.2.0 AppImage (SHA-256 `9dbeeac998f13c16d0d7a1ab56c2d69d918b297ec4c2563265b6a945876df4a6`). The actual AppImage prepared all nine starter mods into a separate supported game copy. A real offscreen Unity/Proton process initialized none without the override, and all nine plus `load-complete` with `version=n,b`. Private Proton execution replaced the Steam `-applaunch` handoff to preserve personal configuration/saves; this is bootstrap/menu qualification, not a personal-installation, loaded-world or native Windows replay. Hardware rendering reported NVIDIA RTX 2080 Ti. Private processes/prefixes were cleaned up and original game hashes remained unchanged. Gamescope itself exited with a teardown segmentation fault after each successful child receipt; compositor teardown is a failed check, not game startup evidence. Current task receipts remain in ignored `.local/release-0.2.1/`.
+
+The released v0.2.1 AppImage (`7850cda976c4c497d2ea47cbeba90c17e995d5f76fad207e1a2063c999926cff`)
+also passes the actual player launch path on this Flatpak Steam system. The
+unmodified AppImage opens normally through FUSE with existing user data and nine
+selected packages. Launch opens setup for the initially empty Steam options;
+Apply refuses while Steam is running, then saves/verifies the required override
+with Steam closed. Reopened Steam retains it. The actual Launch button prepares
+and invokes `flatpak run com.valvesoftware.Steam -applaunch 5335510`; Steam starts
+the installed game using its normal compatibility prefix. Fresh native evidence
+confirms all nine packages and load-complete, and the main menu renders on RTX
+2080 Ti. Normal Quit Game completes; the existing save files and original game
+binaries remain unchanged (only Player/Player-prev logs change). No loader game
+or prefix copy is created. The display is headless and audio uses an owned null
+sink; no private Proton bridge substitutes for Steam in this run. Gamescope
+still fails during teardown after the normal game quit and AppImage exit 0.
+This qualifies native starter-mod menu startup, not loaded personal worlds,
+managed selections, native Steam clients, native Windows or co-op. Receipts and
+captures are retained under ignored `.local/steam-player-021/`.

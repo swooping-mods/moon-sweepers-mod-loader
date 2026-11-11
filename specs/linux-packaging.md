@@ -17,7 +17,7 @@ The archive also retains the [nine handpicked packages](bundled-mods.md), their
 lock and provenance. The package checker verifies their exact inventory and
 hashes; the optional GUI smoke asserts first-run import and unchecked defaults.
 It also carries the same checked BepInEx adapter/maintained Windows CoreCLR host
-as Windows, for private managed game copies under Proton. The archive checker
+as Windows, for installed and private managed deployment under Proton. The archive checker
 validates every host byte and the portable smoke verifies backend availability;
 no managed plugin or game binding is included or started by those checks.
 
