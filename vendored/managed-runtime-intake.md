@@ -7,6 +7,32 @@ offline builds reject changed bytes. No package restore, installer or upstream
 build hook executes. Original adapter compilation uses the installed SDK and
 reviewed reference assemblies; normal packages discard upstream CoreCLR 6.0.7.
 
+Hosted runners receive HTTP 403 from the original be.791 download endpoint.
+The required source-only input is therefore the deterministic vendored
+`managed-build-inputs/BepInEx-be791-host-and-compile-refs.zip`, with mandatory
+`local_path` staging. Its derivation manifest retains the exact upstream archive
+SHA-256 and every selected/excluded member hash. Only the original 41 host
+members and 172 managed compiler-reference images are retained; all 15 native
+CLR/JIT/debug/hosting and runtime-configuration members are absent. Source
+distributions retain this build input and the exact .NET 6.0.7 compiler-image
+MIT license/notices/package metadata; desktop distributions exclude the whole
+directory. The original full upstream runtime archive is never distributed.
+The 165 platform compiler images match Microsoft's official runtime pack
+6.0.7 byte-for-byte; the remaining seven match the application dependencies
+below. The build still consumes these images only as compiler metadata and
+deploys the maintained CoreCLR 10 platform.
+
+The derived selection and its three added reference notice/metadata files were
+individually scanned on 2026-11-11: ClamAV 1.5.4/database 28179 reported zero
+detections across all 216 files, with no coverage alerts; static review retained
+234 expected executable-image/documentation leads and zero gaps. Manual review
+confirmed exact correspondence to previously screened inputs, the Microsoft
+MIT reference-image rights and the absence of a retired native VM. Two actual
+offline builds, before and after selection, produced identical SHA-256 tables
+for all 308 managed deployment files and identical native bootstrap bytes.
+Only the attachment's input-lock provenance digest changed. This is input and
+output equivalence, not a new game/runtime qualification claim.
+
 Seven separate application libraries from that release remain necessary:
 Microsoft.Extensions Logging/Abstractions, Options, Primitives,
 DependencyInjection/Abstractions and Microsoft.Bcl.AsyncInterfaces 6.0.0.

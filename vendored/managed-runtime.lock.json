@@ -16,10 +16,14 @@
       "role": "source"
     },
     {
-      "name": "BepInEx-Unity.IL2CPP-win-x64-be791.zip",
-      "url": "https://builds.bepinex.dev/projects/bepinex_be/791/BepInEx-Unity.IL2CPP-win-x64-6.0.0-be.791%2Bb782da4.zip",
-      "sha256": "bb1c510909b69522733791f3a0817a487379a52da6468a492f1c9c19b3ec6f9a",
-      "role": "bepinex"
+      "name": "BepInEx-be791-host-and-compile-refs.zip",
+      "url": "https://raw.githubusercontent.com/swooping-mods/moon-sweepers-mod-loader/main/vendored/managed-build-inputs/BepInEx-be791-host-and-compile-refs.zip",
+      "sha256": "341fa0d21c59a1a44a123eba7eb5bf946d154cc4793bdcd50e685ac7d3bb7138",
+      "role": "bepinex",
+      "local_path": "vendored/managed-build-inputs/BepInEx-be791-host-and-compile-refs.zip",
+      "upstream_url": "https://builds.bepinex.dev/projects/bepinex_be/791/BepInEx-Unity.IL2CPP-win-x64-6.0.0-be.791%2Bb782da4.zip",
+      "upstream_sha256": "bb1c510909b69522733791f3a0817a487379a52da6468a492f1c9c19b3ec6f9a",
+      "derivation_manifest": "vendored/managed-build-inputs/derivation.json"
     },
     {
       "name": "microsoft.netcore.app.runtime.win-x64.10.0.15.nupkg",

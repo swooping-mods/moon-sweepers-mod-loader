@@ -44,6 +44,12 @@ shown in the UI before that full integrity check; preparation repeats it.
 archives and maintained Windows CoreCLR input bytes. Explicit staging uses
 `tools/fetch_windows_inputs.py --lock vendored/managed-runtime.lock.json --output
 local/managed-inputs`; offline builders never fetch or install dependencies.
+The be.791 input is a mandatory vendored source-only selection under
+`vendored/managed-build-inputs/`, avoiding the publisher's hosted-runner HTTP
+403 without retaining its retired native VM. Exact managed compiler references
+and complete reference-image rights travel only with source distributions;
+desktop packages exclude that directory. Derivation preserves every consumed
+host/reference byte, and before/after builds retain the same deployed hashes.
 `tools/managed_bundle.py` compiles only this repository's original adapter using
 an installed SDK, replaces the entire retired upstream `dotnet/` closure,
 retains exact runtime licenses and component sources/notices, and seals a complete
