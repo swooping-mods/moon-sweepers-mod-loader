@@ -168,7 +168,10 @@ static DWORD __stdcall worker(PTR unused){
     }
     if((U64)update_address<(U64)game+native_profile->image_min_rva||(U64)update_address>=(U64)game+native_profile->image_max_rva)fail("dispatch-update-address");
     if(!moon_interaction_bind(domain,game))fail("interaction-bind-failed");
-    if(!game_clock_bind(domain,game))fail("game-clock-binding");
+    if(!game_clock_bind(domain,game)){
+        if(game_clock_bind_failure)event(game_clock_bind_failure,0);
+        fail("game-clock-binding");
+    }
     /* Include every maximum-length ID plus separators and termination. */
     static WCHAR ids[MOONLAB_MAX_NATIVE_MODS*65+1];
     n=GetEnvironmentVariableW(L"MOONLAB_MODS",ids,MOONLAB_MAX_NATIVE_MODS*65+1);

@@ -26,29 +26,29 @@ static PTR GetProcAddress(PTR,const char *);
 #include "../runtime/loader/game_adapter.h"
 #include "../runtime/loader/mod_entry.h"
 #define CHECK(x) do{if(!(x)){fprintf(stderr,"line %d: %s\n",__LINE__,#x);return 1;}}while(0)
-static unsigned int engine_calls,metadata_calls,bad_arity,bad_flags,bad_return,absent_icall;
+static unsigned int engine_calls,metadata_calls,bad_arity,bad_flags,bad_return,bad_time_return,absent_icall;
 static unsigned int selected_adapter;
-static struct {double time;float delta;int frame;} state_a={21,.25f,12};
-static struct {unsigned char relocation[64];int frame;double time;float delta;} state_b={{0},12,21,.25f};
+static struct {float time;float delta;int frame;} state_a={21,.25f,12};
+static struct {unsigned char relocation[64];int frame;float time;float delta;} state_b={{0},12,21,.25f};
 static int frame_a(void){engine_calls++;return state_a.frame;}
-static double time_a(void){engine_calls++;return state_a.time;}
+static float time_a(void){engine_calls++;return state_a.time;}
 static float delta_a(void){engine_calls++;return state_a.delta;}
 static int frame_b(void){engine_calls++;return state_b.frame;}
-static double time_b(void){engine_calls++;return state_b.time;}
+static float time_b(void){engine_calls++;return state_b.time;}
 static float delta_b(void){engine_calls++;return state_b.delta;}
 static const PTR *assemblies(PTR domain,U64 *count){static const PTR images[1]={(PTR)1};(void)domain;metadata_calls++;*count=1;return images;}
 static PTR image(PTR assembly){return assembly;}
 static PTR klass(PTR assembly,const char *ns,const char *name){(void)assembly;return !strcmp(ns,"UnityEngine")&&!strcmp(name,"Time")?(PTR)1:0;}
-static PTR method(PTR type,const char *name,int argc){(void)type;(void)argc;return !strcmp(name,"get_frameCount")?(PTR)1:!strcmp(name,"get_timeAsDouble")?(PTR)2:!strcmp(name,"get_deltaTime")?(PTR)3:0;}
+static PTR method(PTR type,const char *name,int argc){(void)type;(void)argc;return !strcmp(name,"get_frameCount")?(PTR)1:!strcmp(name,"get_time")?(PTR)2:!strcmp(name,"get_deltaTime")?(PTR)3:0;}
 static unsigned int arity(PTR m){(void)m;return bad_arity;}
 static unsigned int flags(PTR m,unsigned int *implementation){(void)m;*implementation=0;return bad_flags?0:0x10;}
 static PTR result(PTR m){return m;}
-static char *type_name(PTR m){return (char *)(bad_return?"System.Int64":m==(PTR)1?"System.Int32":m==(PTR)2?"System.Double":"System.Single");}
+static char *type_name(PTR m){return (char *)(bad_return?"System.Int64":m==(PTR)1?"System.Int32":m==(PTR)2&&bad_time_return?"System.Double":"System.Single");}
 static void release(PTR p){(void)p;}
 static PTR resolve(const char *name){
     if(absent_icall)return 0;
     if(!strcmp(name,"UnityEngine.Time::get_frameCount()"))return selected_adapter?(PTR)frame_b:(PTR)frame_a;
-    if(!strcmp(name,"UnityEngine.Time::get_timeAsDouble()"))return selected_adapter?(PTR)time_b:(PTR)time_a;
+    if(!strcmp(name,"UnityEngine.Time::get_time()"))return selected_adapter?(PTR)time_b:(PTR)time_a;
     if(!strcmp(name,"UnityEngine.Time::get_deltaTime()"))return selected_adapter?(PTR)delta_b:(PTR)delta_a;
     return 0;
 }
@@ -94,11 +94,12 @@ int main(int argc,char **argv){
         CHECK(moon_mod_entry(module,8,&entry)==expected);CHECK(!engine_calls);free(data);return 0;
     }
     CHECK(!game_find("unity.clock",1,16));CHECK(!engine_calls);
-    bad_arity=1;CHECK(!game_clock_bind((PTR)1,(PTR)2));bad_arity=0;
-    bad_flags=1;CHECK(!game_clock_bind((PTR)1,(PTR)2));bad_flags=0;
-    bad_return=1;CHECK(!game_clock_bind((PTR)1,(PTR)2));bad_return=0;
-    absent_icall=1;CHECK(!game_clock_bind((PTR)1,(PTR)2));absent_icall=0;
-    CHECK(!engine_calls);CHECK(game_clock_bind((PTR)1,(PTR)2));CHECK(metadata_calls);
+    bad_arity=1;CHECK(!game_clock_bind((PTR)1,(PTR)2));CHECK(equal(game_clock_bind_failure,"clock-frame-signature"));bad_arity=0;
+    bad_flags=1;CHECK(!game_clock_bind((PTR)1,(PTR)2));CHECK(equal(game_clock_bind_failure,"clock-frame-signature"));bad_flags=0;
+    bad_return=1;CHECK(!game_clock_bind((PTR)1,(PTR)2));CHECK(equal(game_clock_bind_failure,"clock-frame-return"));bad_return=0;
+    bad_time_return=1;CHECK(!game_clock_bind((PTR)1,(PTR)2));CHECK(equal(game_clock_bind_failure,"clock-time-return"));bad_time_return=0;
+    absent_icall=1;CHECK(!game_clock_bind((PTR)1,(PTR)2));CHECK(equal(game_clock_bind_failure,"clock-frame-icall"));absent_icall=0;
+    CHECK(!engine_calls);CHECK(game_clock_bind((PTR)1,(PTR)2));CHECK(!game_clock_bind_failure);CHECK(metadata_calls);
     update_address=code[0];late_update_address=code[1];vehicle_address=code[2];
     void *framework=dlopen(argv[3],RTLD_NOW|RTLD_LOCAL);CHECK(framework);
     void *feature=dlopen(argv[4],RTLD_NOW|RTLD_LOCAL);CHECK(feature);

@@ -53,6 +53,13 @@ class GameAdapterChecks(unittest.TestCase):
                 root=Path(temporary);self.fixture(root,document)
                 with self.assertRaisesRegex(ValueError,'Legacy profile identity is frozen'):generate(root)
 
+    def test_duplicate_catalog_keys_refuse_generation(self):
+        document=json.loads((ROOT/CATALOG).read_text())
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary);path,header=self.fixture(root,document)
+            path.write_text(path.read_text().replace('"version": "1.0.5"','"version": "ignored", "version": "1.0.5"',1))
+            with self.assertRaisesRegex(ValueError,'Duplicate profile catalog key: version'):generate(root)
+
     def test_duplicate_identity_and_alias_refuse_generation(self):
         document=json.loads((ROOT/CATALOG).read_text());other=copy.deepcopy(document['profiles'][0]);other['id']='unqualified.second-build';document['profiles'].append(other)
         with tempfile.TemporaryDirectory() as temporary:

@@ -76,11 +76,15 @@ that independently locates game memory or system functions.
 ## Implemented clock service
 
 `unity.clock` ABI 1 is a 16-byte typed table on AMD64. Its 32-byte sample contains
-size, ABI, Unity scaled timeAsDouble, scaled deltaTime and zero-extended
+size, ABI, Unity scaled Time.time widened from float to double, scaled deltaTime and zero-extended
 unsigned 32-bit frameCount (which may wrap). The Windows binder checks zero-argument
-static getter signatures and exact Int32/Double/Single return types, then caches
+static getter signatures and exact Int32/Single/Single return types, then caches
 the known native icalls once. It performs this work only when a selected module
 requires the clock; an unused capability creates no per-frame work.
+The current build strips timeAsDouble; the public double field retains Time.time's
+float precision and its pause/timeScale behavior. It does not substitute a realtime
+clock. Binding failures emit bounded stage names without addresses before the
+terminal game-clock-binding event.
 
 Sampling requires Ready and an admitted shared Update-frame scope. The first
 observed game frame establishes thread identity atomically. Foreign threads

@@ -28,10 +28,18 @@ def digest(profile):
                                      ensure_ascii=True).encode()).hexdigest()
 
 
+def unique_object(pairs):
+    result = {}
+    for name,value in pairs:
+        if name in result: raise ValueError('Duplicate profile catalog key: '+name)
+        result[name] = value
+    return result
+
+
 def profiles(root=ROOT):
     path = Path(root)/CATALOG
     if path.is_symlink() or path.stat().st_size>256*1024: raise ValueError('Profile catalog alias/size refused')
-    document = json.loads(path.read_text())
+    document = json.loads(path.read_text(),object_pairs_hook=unique_object)
     if set(document) != {'schema', 'profiles'} or document['schema'] != 'moon-game-profiles/v1':
         raise ValueError('Unsupported game profile catalog')
     rows = document['profiles']

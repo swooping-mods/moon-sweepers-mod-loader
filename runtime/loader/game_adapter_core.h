@@ -7,7 +7,7 @@ static unsigned int game_plan_admitted,game_frame_depth;
 static DWORD game_frame_thread;
 static const void *game_find(const char *,unsigned int,unsigned int);
 static MoonGameAdapterApiV1 game_adapter_api={sizeof(MoonGameAdapterApiV1),MOON_GAME_ADAPTER_ABI,0,0,game_find};
-static struct {int (*frame)(void);double (*time)(void);float (*delta)(void);} game_clock;
+static struct {int (*frame)(void);float (*time)(void);float (*delta)(void);} game_clock;
 static int game_double_valid(double value){union{double f;U64 u;}x={value};return (x.u&0x7ff0000000000000ull)!=0x7ff0000000000000ull;}
 static int game_clock_sample(MoonGameClockSampleV1 *out){
     if(!out||out->size<sizeof(*out)||out->abi!=MOON_GAME_CLOCK_ABI||!game_plan_admitted
@@ -17,7 +17,7 @@ static int game_clock_sample(MoonGameClockSampleV1 *out){
     if(!thread||thread!=GetCurrentThreadId()||!game_frame_depth
        ||!game_clock.frame||!game_clock.time||!game_clock.delta)return 0;
     /* Affinity is checked before any engine call, including the cheap getters. */
-    MoonGameClockSampleV1 value={sizeof(value),MOON_GAME_CLOCK_ABI,game_clock.time(),(double)game_clock.delta(),(unsigned int)game_clock.frame()};
+    MoonGameClockSampleV1 value={sizeof(value),MOON_GAME_CLOCK_ABI,(double)game_clock.time(),(double)game_clock.delta(),(unsigned int)game_clock.frame()};
     if(!game_double_valid(value.time_seconds)||!game_double_valid(value.delta_seconds)||value.time_seconds<0||value.delta_seconds<0)return 0;
     *out=value;return 1;
 }
