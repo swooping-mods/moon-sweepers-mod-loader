@@ -24,10 +24,35 @@ in the library on first start, initially unchecked. Existing versions and
 checkmarks are preserved. See the [bundle details](specs/bundled-mods.md).
 
 Select the mods and their required frameworks, or use **Select all**, choose the
-supported game installation, then **Prepare files** and
-**Launch**. Search matches names, descriptions, categories and tags. Grid, Details
-and Text views share the same filters and enabled selections. Add other packages
-with **Install mod package**.
+supported game installation, then **Prepare files** and **Launch**. Search matches
+names, descriptions, categories and tags. Grid, Details and Text views share the
+same filters and enabled selections.
+
+## Install more mods
+
+Find more mods in the [Moon Sweepers Mod Index](https://github.com/swooping-mods/mod-index).
+Download the mod's `.msmod` file and any required framework packages from their
+repositories.
+
+Updated loader builds offer three ways to add them:
+
+- **Drag and drop:** drop one or more `.msmod` files onto the loader window.
+  You can also drop supported ZIP downloads or extracted mod folders.
+- **Add mods…:** select one or several `.msmod` or supported `.zip` files with
+  the file picker.
+- **Add folder…:** choose an extracted mod folder. It can contain several
+  `.msmod` files or unpacked packages with their manifests.
+
+The new file/folder/drop controls require an updated loader build. Older builds
+use **Install mod package** to select a `.msmod` file.
+
+New imports stay unchecked, and existing checkmarks are preserved. Select the
+mods and their required frameworks, click **Prepare files**, then **Launch**.
+
+Updated builds also recognize the complete **MarsSweepers 0.6.1** folder/ZIP.
+Running it requires the supported BepInEx runtime and **Private game copy** mode;
+importing does not attach that runtime. Other raw third-party DLLs need a
+compatible mod package.
 
 ## Game compatibility and saves
 
