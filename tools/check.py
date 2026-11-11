@@ -33,7 +33,11 @@ def main():
     excluded = []
     included = []
     for test in flatten(suite):
-        if args.host_only and test._testMethodName in ("test_gui_checkboxes_views_filter_and_no_launch", "test_grid_wheel_travel_ignores_global_lines_and_preserves_precise_input"):
+        if args.host_only and test._testMethodName in (
+            "test_gui_checkboxes_views_filter_and_no_launch",
+            "test_grid_wheel_travel_ignores_global_lines_and_preserves_precise_input",
+            "test_ui_categories_tags_and_enabled_combine_in_every_view",
+        ):
             excluded.append(test.id())
         else:
             included.append(test)

@@ -7,7 +7,7 @@ snapshot used by the loader. Gameplay mods and their assets belong with their au
 
 Use installed Python 3.11+, LLVM cross tools and PySide6 6.x. Run
 `python3 tools/check.py` for the complete host suite. `--host-only` explicitly
-excludes the two Qt interaction checks when PySide6 is unavailable.
+excludes the three Qt interaction checks when PySide6 is unavailable.
 `python3 tools/build.py` builds the native runtime and source distribution offline.
 See [Windows packaging](specs/windows-packaging.md) for the bundled Windows build
 and [CI](specs/ci.md) for runner behavior. Dependency updates require a new review;

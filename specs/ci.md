@@ -13,7 +13,7 @@ package verifier. No Python packages or source installers run.
 `tools/fetch_windows_inputs.py` stages the reviewed lock; changed bytes fail.
 Matching LGPL source archives remain inert distribution payloads.
 
-Host-only checks explicitly exclude the two Linux Qt interaction cases; the local
+Host-only checks explicitly exclude the three Linux Qt interaction cases; the local
 full suite covers those. A downstream Windows Server 2022 job checks the Windows
 ZIP digest, extracts into a path containing spaces, runs the bundled Python/Qt/SVG
 smoke test, then runs `Mod Loader.exe --smoke-test`. Temporary application data is

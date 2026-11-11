@@ -18,7 +18,7 @@ class ReleaseChecks(unittest.TestCase):
             sums.append(digest + '  ' + name + '\n')
             (root / receipt).write_text(json.dumps({'version': VERSION, 'archive': name, 'sha256': digest}))
         (root / 'SHA256SUMS').write_text(''.join(sums))
-        (root / 'checks.json').write_text(json.dumps({'success': True, 'tests_run': 40, 'failures': 0, 'errors': 0, 'skipped': [], 'excluded': ['test_loader.LoaderChecks.test_gui_checkboxes_views_filter_and_no_launch', 'test_loader.LoaderChecks.test_grid_wheel_travel_ignores_global_lines_and_preserves_precise_input']}))
+        (root / 'checks.json').write_text(json.dumps({'success': True, 'tests_run': 40, 'failures': 0, 'errors': 0, 'skipped': [], 'excluded': ['test_loader.LoaderChecks.test_gui_checkboxes_views_filter_and_no_launch', 'test_loader.LoaderChecks.test_grid_wheel_travel_ignores_global_lines_and_preserves_precise_input', 'test_categories.CategoryChecks.test_ui_categories_tags_and_enabled_combine_in_every_view']}))
         (root / 'windows-checks.json').write_text(json.dumps({'success': True, 'sha256': digest}))
 
     def test_tag_must_match_package_version(self):

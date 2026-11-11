@@ -79,7 +79,7 @@ python3 tools/check.py
 python3 tools/build.py
 ```
 
-Checks cover the package/API snapshot, dependency resolution, deployment recovery, profile isolation, native dispatcher and offscreen Qt interactions. `--host-only` explicitly excludes the two Qt tests for CI runners without PySide6. The native build requires installed `clang`, `lld-link` and `llvm-dlltool`; it downloads nothing. Build outputs and verification receipts remain ignored under `artifacts/`.
+Checks cover the package/API snapshot, dependency resolution, deployment recovery, profile isolation, native dispatcher and offscreen Qt interactions. `--host-only` explicitly excludes the three Qt tests for CI runners without PySide6. The native build requires installed `clang`, `lld-link` and `llvm-dlltool`; it downloads nothing. Build outputs and verification receipts remain ignored under `artifacts/`.
 
 To reproduce the Windows package offline, provide the previously screened publisher
 files matching `vendored/windows-runtime.lock.json`:
