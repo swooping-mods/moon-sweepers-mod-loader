@@ -37,3 +37,24 @@ network-disabled container passed a real Harmony prefix/postfix installation,
 unmodified older BepInEx IL2CPP assembly correctly exposed its missing
 `IDetour.Config` implementations. This host check is distinct from native
 Windows, Unity/IL2CPP, multiplayer or user-mod qualification.
+
+`tools/check_managed_compat.py` compiles the original Cecil metadata auditor in
+`tests/fixtures/static_managed_compat_audit.cs`. It reads candidate assemblies as
+data in an existing rootless, network-disabled container. The audit compares
+named detour/compatibility TypeRefs, member names, method arity/instance flags,
+parameter and return signatures, field types and recursive abstract interface
+requirements against the actual selected dependencies. It does not execute the
+candidate assemblies. Its `--self-test` builds original synthetic old/new
+contracts: an unchanged contract passes, while a removed type/field, changed
+method signature and added required interface getter are independently detected.
+
+An isolated compatibility candidate passed the eight-module metadata audit:
+four BepInEx modules, Il2CppInterop.Runtime/HarmonySupport, the renamed legacy
+Utils assembly and the first-party compatibility helper. The six BepInEx/Interop
+modules covered 103 TypeRefs and 136 MemberRefs; the renamed Utils assembly
+covered another 83 TypeRefs and 728 MemberRefs. No missing links or required
+interface implementations remained in those checked scopes. Original unpatched
+BepInEx correctly fails the same audit, including the three missing
+`IDetour.Config` implementations. Dynamic string-based lookup, native ABI,
+generic inherited-base remapping and custom-modifier identity remain separate
+checks; metadata closure does not establish successful runtime startup.
