@@ -3,6 +3,10 @@
 Install and select local `.msmod` packages, check dependencies and compatibility,
 and launch Moon Sweepers with the selected mods.
 
+![Moon Sweepers Mod Loader showing the nine bundled mods, import controls and mod details](loader/assets/mod-loader-screenshot.png)
+
+*Preview of the updated loader with the bundled mod library.*
+
 ## Download and install
 
 Get a checked build from [GitHub Releases](https://github.com/swooping-mods/moon-sweepers-mod-loader/releases).
