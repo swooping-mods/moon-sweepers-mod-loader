@@ -26,6 +26,7 @@ def main():
     parser.add_argument('--bundle', type=Path, default=Path(__file__).resolve().parent)
     parser.add_argument('--discover', action='store_true')
     parser.add_argument('--plan', action='store_true')
+    parser.add_argument('--compatibility', action='store_true', help='Report mod requirements for this game without importing, selecting, preparing or launching mods')
     parser.add_argument('--steam-setup', action='store_true', help='Preview Steam launch options without changing them')
     parser.add_argument('--apply-steam-setup', action='store_true', help='Explicitly apply the previewed Proton override; quit Steam first')
     parser.add_argument('--prepare', action='store_true', help='Apply files for the selected mode; never starts a game')
@@ -40,23 +41,30 @@ def main():
     parser.add_argument('--no-launch', action='store_true', help='Disable game launching while inspecting the UI')
     parser.add_argument('--smoke-test', action='store_true', help='Check the desktop GUI with temporary data, then exit without starting a game')
     args = parser.parse_args()
+    if args.compatibility and any((args.install, args.prepare, args.mode, args.disable, args.enable,
+                                  args.uninstall_loader, args.backup_steam_saves, args.normal_saves,
+                                  args.apply_steam_setup, args.plan, args.discover, args.steam_setup)):
+        raise ValueError('Compatibility reporting is read-only; use it separately from other operations')
     if args.smoke_test:
         from check_portable_windows import main as smoke_test
         return smoke_test()
     default = diagnostics.default_root()
     service = Service(args.data or default, args.bundle)
-    service.seed()
+    if not args.compatibility: service.seed()
     if args.install:
         result = service.import_downloads([args.install])
         if result['errors']:
             raise ValueError('; '.join(item['path'] + ': ' + item['error'] for item in result['errors']))
-    if args.game: service.add_installation(args.game)
+    requested = discovery.manual(args.game) if args.game and args.compatibility else None
+    if args.game and not args.compatibility: service.add_installation(args.game)
     installations, errors = service.installations()
     if args.discover:
         print(json.dumps({'installations':[x.record() for x in installations], 'errors':errors}, indent=2)); return 0
-    if args.steam_setup or args.apply_steam_setup or args.plan or args.prepare or args.mode or args.disable or args.enable or args.uninstall_loader or args.backup_steam_saves or args.normal_saves:
-        selected = next((x for x in installations if x.path == service.state['installation']), installations[0] if len(installations) == 1 else None)
+    if args.compatibility or args.steam_setup or args.apply_steam_setup or args.plan or args.prepare or args.mode or args.disable or args.enable or args.uninstall_loader or args.backup_steam_saves or args.normal_saves:
+        selected = requested or next((x for x in installations if x.path == service.state['installation']), installations[0] if len(installations) == 1 else None)
         if not selected: raise ValueError('Choose an installation with --game PATH')
+        if args.compatibility:
+            print(json.dumps(service.compatibility(selected), indent=2)); return 0
         if args.steam_setup or args.apply_steam_setup:
             library, _ = service.library()
             preview = steam_options.inspect(selected, managed=any(library[name][0]['kind'] == 'bepinex-il2cpp' for name in service.state['selected'] if name in library))

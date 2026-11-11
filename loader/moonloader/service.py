@@ -38,10 +38,11 @@ def tree(root):
 
 
 class Service:
-    def __init__(self, root, bundle):
+    def __init__(self, root, bundle, *, profile_catalog=None):
         self.root = Path(root).expanduser().absolute()
         contained(self.root, 'state.json')
         self.bundle = Path(bundle).absolute()
+        self.profile_catalog = profile_catalog
         self.root.mkdir(parents=True, exist_ok=True)
         self.state = load(self.root / 'state.json', {'schema': 'moon-loader-state/v1', 'library': {}, 'selected': [], 'view': 'grid', 'installations': [], 'installation': '', 'default_mode': 'installed', 'deployment_modes': {}})
         if self.state.get('schema') != 'moon-loader-state/v1': raise ValueError('Unsupported loader state')
@@ -112,25 +113,51 @@ class Service:
         if installation is not None:
             from . import managed
             receipt = load(self.bundle / 'runtime/receipt.json', {})
-            if managed.available(self.bundle, receipt) and (self.mode(installation) == 'private' or receipt.get('installed_managed_abi') == 1):
+            if isinstance(receipt, dict) and managed.available(self.bundle, receipt) and (self.mode(installation) == 'private' or receipt.get('installed_managed_abi') == 1):
                 result.add((packages.MANAGED_KIND, packages.MANAGED_ABI))
         return result
 
     def runtime_api_abi(self):
         return load(self.bundle / 'runtime/receipt.json', {}).get('runtime_api_abi', 0)
 
+    def inspect(self, installation):
+        from . import game_profiles
+        catalog = self.profile_catalog
+        if catalog is None:
+            path = self.bundle / 'moonloader/game_profiles.json'
+            catalog = game_profiles.load(path if path.exists() else None)
+        return discovery.inspect(installation, catalog)
+
+    def compatibility(self, installation, selected=None, *, library=None, inspection=None):
+        from .compatibility import report
+        return report(self, installation, selected, library=library, inspection=inspection)
+
+    def mod_compatibility(self, installation, name, *, library=None, inspection=None):
+        """Inspect one mod and its dependencies without selecting any package."""
+        library = self.library()[0] if library is None else library
+        chosen = set()
+        def visit(identity):
+            if identity in chosen: return
+            chosen.add(identity)
+            if identity not in library: return
+            manifest = library[identity][0]
+            for dependency in manifest.get('requires', []): visit(dependency)
+            for need in manifest.get('requires_apis', []):
+                owner = need['api'].split('.', 1)[0]
+                if need.get('optional') and owner in self.state['selected']: visit(owner)
+        visit(name)
+        return self.compatibility(installation, sorted(chosen), library=library, inspection=inspection)
+
     def selected(self, installation):
-        result = discovery.inspect(installation)
-        if not result['compatible']: raise ValueError(result['reason'])
         library, errors = self.library()
         for name in self.state['selected']:
             if name in errors: raise ValueError(errors[name])
-        if not self.state['selected'] and self.mode(installation) == 'installed': return [], library
-        order = packages.resolve({name: pair[0] for name, pair in library.items()}, self.state['selected'], result['hashes'],
-                                 available_runtimes=self.available_runtimes(installation), runtime_api_abi=self.runtime_api_abi(),
-                                 runtime_readiness_abi=load(self.bundle / 'runtime/receipt.json', {}).get('runtime_readiness_abi', 0),
-                                 host_capabilities=load(self.bundle / 'runtime/receipt.json', {}).get('host_capabilities') or {})
-        return order, library
+        result = self.compatibility(installation, library=library)
+        self._last_compatibility = result
+        if not result['allowed']:
+            from .compatibility import message
+            raise ValueError(message(result))
+        return result['order'], library
 
     def install_root(self, installation):
         suffix = '-installed' if self.mode(installation) == 'installed' else ''
@@ -186,7 +213,7 @@ class Service:
             for directory, _, _ in os.walk(location / 'files', topdown=False): public.sync_directory(directory)
             order, library = self.selected(installation)
             write(location / 'receipt.json', {'store': 'steam', 'source': str(source), 'files': before,
-                  'game_hashes': discovery.inspect(installation)['hashes'], 'mods': order,
+                  'game_hashes': self.inspect(installation)['hashes'], 'mods': order,
                   'packages': {name: {'version': library[name][0]['version'], 'files': library[name][0]['files']} for name in order},
                   'created_at': datetime.now(timezone.utc).isoformat(),
                   'policy': 'Manual Steam-only backup; never automatically restore over newer progress'})
@@ -225,10 +252,23 @@ class Service:
             runtime_receipt = load(self.bundle / 'runtime/receipt.json', {})
             if not runtime.is_file() or sha(runtime) != runtime_receipt.get('sha256'):
                 raise ValueError('Loader runtime is missing or changed; rebuild the distribution')
+            inspection = self.inspect(installation)
+            if not inspection.get('profile'): raise ValueError('Unknown game build; update the loader adapter')
+            from .compatibility import receipt_digest, message
+            assessment = self.compatibility(installation, library=library, inspection=inspection)
+            if not assessment['allowed']: raise ValueError(message(assessment))
+            if assessment['runtime_receipt_digest'] != receipt_digest(runtime_receipt):
+                raise ValueError('Loader runtime changed during preparation; refresh compatibility')
+            previous = getattr(self, '_last_compatibility', None)
+            if previous and previous['profile'] != assessment['profile']:
+                raise ValueError('Game profile changed during preparation; refresh compatibility')
+            native_abis = runtime_receipt.get('native_package_abis')
+            if native_abis is not None:
+                native_abis = [f'MoonLab_ModStart/v{n}' if type(n) is int else n for n in native_abis]
             for name in order:
                 packages.require_available(library[name][0], self.available_runtimes(installation),
                                            runtime_receipt.get('runtime_api_abi', 0), runtime_receipt.get('runtime_readiness_abi', 0),
-                                           runtime_receipt.get('host_capabilities') or {})
+                                           runtime_receipt.get('host_capabilities') or {}, native_package_abis=native_abis)
             if any(library[name][0].get('shared_claims') for name in order) and runtime_receipt.get('shared_update_abi') != 1:
                 raise ValueError('Selected mods require the shared Update runtime; rebuild the distribution')
             if any(library[name][0].get('vehicle_hook') for name in order) and runtime_receipt.get('vehicle_dispatch_abi') != 1:
@@ -273,13 +313,14 @@ class Service:
             # All original assets are verified, not just the three executable pins.
             for name, expected in baseline['files'].items():
                 if sha(contained(game, name)) != expected: raise ValueError('Private original file changed: ' + name)
-            for name, expected in discovery.PIN.items():
+            for name, expected in inspection['hashes'].items():
                 if sha(source / name) != expected: raise ValueError('Installed game changed; reselect a supported installation')
             self.recover(root)
             files = {'version.dll': runtime.read_bytes()}
             if runtime_receipt.get('runtime_api_abi') == 1:
                 from moon_mod_api.runtime_plan import encode, PATH
-                files[PATH] = encode({name: library[name][0] for name in order}, order)
+                files[PATH] = encode({name: library[name][0] for name in order}, order,
+                                     game_profile=inspection['profile'] if runtime_receipt.get('game_adapter') else None)
             if installation.store == 'steam':
                 # Valve documents this public ID file for a directly started
                 # executable. It prevents RestartAppIfNecessary from replacing
@@ -299,7 +340,10 @@ class Service:
                 for member in manifest['files']:
                     target = 'MoonLab/mods/' + name + '/' + ('mod.dll' if member == manifest['entry'] else member)
                     if target in files: raise ValueError('Package entry alias collision')
-                    files[target] = contained(folder, member).read_bytes()
+                    data = contained(folder, member).read_bytes()
+                    if hashlib.sha256(data).hexdigest() != manifest['files'][member]:
+                        raise ValueError('Package changed during preparation: ' + name)
+                    files[target] = data
             if managed_selected:
                 managed.preflight(game, files)
                 # Keep the executable-input allowlist inside the same deployment

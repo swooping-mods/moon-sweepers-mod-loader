@@ -240,8 +240,12 @@ class LoaderChecks(unittest.TestCase):
         for name in discovery.PIN: (source/name).write_bytes(('original '+name).encode())
         pins={name:hashlib.sha256((source/name).read_bytes()).hexdigest() for name in discovery.PIN}
         patched=patch.object(discovery,'PIN',pins);patched.start();self.addCleanup(patched.stop)
+        from moonloader import game_profiles
+        catalog = copy.deepcopy(game_profiles.load()); catalog['profiles'][0]['hashes'] = pins
+        catalog_patch = patch.object(game_profiles, 'load', return_value=catalog)
+        catalog_patch.start(); self.addCleanup(catalog_patch.stop)
         bundle=self.root/'bundle';runtime=bundle/'runtime/windows-x64/version.dll';runtime.parent.mkdir(parents=True);runtime.write_bytes(b'new runtime')
-        write(bundle/'runtime/receipt.json',{'sha256':hashlib.sha256(runtime.read_bytes()).hexdigest()})
+        write(bundle/'runtime/receipt.json',{'sha256':hashlib.sha256(runtime.read_bytes()).hexdigest(), 'game_pins': pins})
         pkg=self.root/'mod.msmod';manifest=package(pkg);manifest['game']['hashes']=pins
         with zipfile.ZipFile(pkg,'w') as archive:
             archive.writestr('manifest.json',json.dumps(manifest));archive.writestr('mod.dll',b'MZ fixture');archive.writestr('icon.png',PNG)
@@ -267,7 +271,8 @@ class LoaderChecks(unittest.TestCase):
 
     def test_late_update_requires_runtime_before_copy(self):
         service,installation=self.prepared_fixture();order,library=service.selected(installation)
-        library['test-mod'][0].update(abi='MoonLab_ModStart/v4',late_update_hook='observer')
+        library['test-mod'][0].update(abi='MoonLab_ModStart/v4',late_update_hook='observer',shared_claims=['MoonWalker.LateUpdate'])
+        path = service.bundle/'runtime/receipt.json'; write(path, {**load(path), 'shared_update_abi': 1})
         with patch.object(service,'selected',return_value=(order,library)):
             with self.assertRaisesRegex(ValueError,'shared LateUpdate runtime'):service.prepare(installation)
         self.assertFalse(service.install_root(installation).exists())

@@ -9,7 +9,7 @@ from PySide6.QtCore import QUrl
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QFrame, QLabel, QPushButton,
     QLineEdit, QComboBox, QHBoxLayout, QVBoxLayout, QListWidget, QListWidgetItem, QAbstractItemView,
     QStyledItemDelegate, QStyle, QStyleOptionButton, QScrollArea, QFileDialog, QMessageBox, QDialog, QPlainTextEdit)
-from . import discovery, launch, packages, steam_options, diagnostics
+from . import discovery, launch, packages, steam_options, diagnostics, compatibility
 from .catalog import CATEGORIES, description as catalog_description, matches
 from .theme import STYLE, COLORS
 from .storage import load
@@ -142,6 +142,7 @@ class Window(QMainWindow):
         self.diagnostics = diagnostics.start(service.root)
         QImageReader.setAllocationLimit(32)
         self.view = service.state.get('view', 'grid'); self.mods = {}; self.installations = []; self.inspection = None
+        self.compatibility_report = None
         self.job = None; self.process = None; self._busy = False; self._validation = ''
         self.setWindowTitle('Moon Sweepers · Mod Loader'); self.resize(1190, 760); self.setMinimumSize(700, 540)
         self.setAcceptDrops(True)
@@ -164,6 +165,7 @@ class Window(QMainWindow):
         mode_row = QHBoxLayout(); mode_row.addWidget(label('Installation'))
         self.deployment_mode = QComboBox(); self.deployment_mode.addItem('Existing Steam game', 'installed'); self.deployment_mode.addItem('Private game copy', 'private')
         self.deployment_mode.currentIndexChanged.connect(self.mode_changed); mode_row.addWidget(self.deployment_mode, 1)
+        self.compatibility_button = QPushButton('Compatibility…'); self.compatibility_button.clicked.connect(self.show_compatibility); mode_row.addWidget(self.compatibility_button)
         self.disable_button = QPushButton('Disable mods'); self.disable_button.clicked.connect(lambda:self.toggle_installed(False)); mode_row.addWidget(self.disable_button)
         self.enable_button = QPushButton('Enable mods'); self.enable_button.clicked.connect(lambda:self.toggle_installed(True)); mode_row.addWidget(self.enable_button)
         self.uninstall_button = QPushButton('Uninstall loader'); self.uninstall_button.clicked.connect(self.uninstall_loader); mode_row.addWidget(self.uninstall_button)
@@ -255,7 +257,7 @@ class Window(QMainWindow):
             self.deployment_mode.blockSignals(True); self.deployment_mode.setCurrentIndex(0 if self.service.mode(installation) == 'installed' else 1); self.deployment_mode.blockSignals(False)
             self.service.state['installation'] = installation.path; self.service.save()
             try:
-                self.inspection = discovery.inspect(installation); self.game_status.setText(self.inspection['reason'])
+                self.inspection = self.service.inspect(installation); self.game_status.setText(self.inspection['reason'])
             except (ValueError, OSError) as error:
                 self.diagnostics.exception('inspection-error', error); self.game_status.setText(str(error))
         else: self.game_status.setText('Steam detection checks native and Flatpak libraries. Browse to its installation folder to add a game manually.')
@@ -408,7 +410,16 @@ class Window(QMainWindow):
         self.detail_name.setText(mod['name']); self.detail_meta.setText('v'+mod['version']+' · '+mod['author']+(' · Companion tool' if mod['kind']=='companion' else ''))
         self.detail_catalog.setText(catalog_description(mod)); self.detail_catalog.setVisible(bool(catalog_description(mod)))
         self.detail_text.setText(mod['summary']+'\n\n'+ ('Runs separately with Python. Open its folder for the application and README.' if mod['kind']=='companion' else 'Game: '+mod['game'].get('version','Pinned build')))
-        self.detail_verification.setText('Compatibility\n'+'\n'.join(key.replace('_',' ').title()+': '+str(value) for key,value in mod.get('verification',{}).items()))
+        text = 'Compatibility\nChoose a game to check this mod and its required frameworks.'
+        installation = self.current_installation()
+        if installation and packages.game_mod(mod):
+            try:
+                result = self.service.mod_compatibility(installation, mod['id'], library=self.mods, inspection=self.inspection)
+                text = compatibility.describe(result, {name: pair[0]['name'] for name, pair in self.mods.items()})
+            except (ValueError, OSError) as error: text = 'Compatibility could not be checked: ' + str(error)
+        if not packages.game_mod(mod): text = 'Companion tool · runs separately from the game.'
+        notes = '\n'.join(key.replace('_', ' ').title() + ': ' + str(value) for key, value in mod.get('verification', {}).items())
+        self.detail_verification.setText(text + ('\n\nPackage author notes\n' + notes if notes else ''))
 
     def details_dialog(self, mod):
         if not mod: return
@@ -437,17 +448,19 @@ class Window(QMainWindow):
     def update_actions(self):
         selected = self.service.state['selected']; self.count.setText(f'{len(selected)} selected · {len(self.mods)} installed')
         installation = self.current_installation(); installed = bool(installation and self.service.mode(installation) == 'installed')
-        ready = bool(installation and self.inspection and self.inspection['compatible'] and (selected or installed))
         reason = ''
-        if ready and selected:
+        self.compatibility_report = None
+        if installation:
             try:
-                from .packages import resolve
-                runtime = load(self.service.bundle / 'runtime/receipt.json', {})
-                resolve({name:pair[0] for name,pair in self.mods.items()}, selected, self.inspection['hashes'],
-                        available_runtimes=self.service.available_runtimes(installation), runtime_api_abi=self.service.runtime_api_abi(),
-                        runtime_readiness_abi=runtime.get('runtime_readiness_abi', 0), host_capabilities=runtime.get('host_capabilities') or {})
-            except ValueError as error: ready=False; reason=str(error)
+                self.compatibility_report = self.service.compatibility(installation, library=self.mods, inspection=self.inspection)
+                if not self.compatibility_report['allowed']: reason = compatibility.message(self.compatibility_report)
+                summary = self.compatibility_report['game']['description']
+                status = compatibility.LABELS[self.compatibility_report['status']]
+                self.game_status.setText(summary if summary.casefold().startswith(status.casefold()) else summary + ' · ' + status)
+            except (ValueError, OSError) as error: reason = str(error)
+        ready = bool(self.compatibility_report and self.compatibility_report['allowed'] and (selected or installed))
         active = self._busy or self.process is not None
+        self.compatibility_button.setEnabled(bool(installation) and not active)
         native = {name for name,(mod,_) in self.mods.items() if packages.game_mod(mod)}
         self.select_all_button.setEnabled(not active and bool(native - set(selected)))
         self.deselect_all_button.setEnabled(not active and bool(selected))
@@ -463,6 +476,14 @@ class Window(QMainWindow):
         for widget in [self.game,self.browse,self.rescan,self.import_button,self.import_folder_button,self.list,self.remove_button,self.deployment_mode]: widget.setEnabled(not active)
         if reason or self._validation and self.message.text() == self._validation: self.notice(reason)
         self._validation = reason
+
+    def show_compatibility(self):
+        installation = self.current_installation()
+        if not installation: return
+        try:
+            result = self.service.compatibility(installation)
+            self.text_dialog('Mod compatibility · no game started', compatibility.describe(result, {name: pair[0]['name'] for name, pair in self.mods.items()}))
+        except (ValueError, OSError) as error: self.report_error(error)
 
     def show_plan(self):
         try:

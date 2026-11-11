@@ -57,6 +57,7 @@ def plan(service, installation, platform=None, check_client=True):
     """Deterministic preflight with no runtime initialization or directory writes."""
     platform = platform or sys.platform
     order, library = service.selected(installation)
+    assessment = getattr(service, '_last_compatibility', None)
     native_order = [name for name in order if library[name][0]['kind'] == 'native']
     managed_selected = any(library[name][0]['kind'] == packages.MANAGED_KIND for name in order)
     external_mods = {name: library[name][0]['external']['adapter'] for name in order
@@ -74,6 +75,7 @@ def plan(service, installation, platform=None, check_client=True):
         else:
             command = ['steam', '-applaunch', APP_ID]
         return {'mode': 'installed', 'platform': platform, 'command': command, 'env': {}, 'managed': managed_selected,
+                'compatibility': assessment,
                 'deployment': preview(service, installation, order, library),
                 'cwd': installation.path, 'run': str(root / 'runs' / uuid.uuid4().hex),
                 'store': 'steam', 'profile': 'Normal Steam saves (not isolated)', 'order': order,
@@ -98,7 +100,7 @@ def plan(service, installation, platform=None, check_client=True):
         environment.update(settings_environment(root, order, platform))
         if installation.store == 'steam': environment.update(SteamAppId=APP_ID, SteamGameId=APP_ID)
         command = [str(game / 'MoonSweepers.exe'), '-logFile', str(run / 'Player.log')]
-        return {'platform': platform, 'command': command, 'env': environment, 'cwd': str(game), 'run': str(run),
+        return {'platform': platform, 'command': command, 'env': environment, 'cwd': str(game), 'run': str(run), 'compatibility': assessment,
                 'store': installation.store, 'profile': str(profile), 'order': order, 'external_mods': external_mods, 'runtime': 'Windows native',
                 'limits': ['Native Windows game replay pending', 'Process-local known-folder isolation requires rendered qualification']}
     if platform != 'linux': raise ValueError('Supported hosts are Linux and Windows')
@@ -131,7 +133,7 @@ def plan(service, installation, platform=None, check_client=True):
         if check_client: host_pid(steam)
         command = [sys.executable, str(proton / 'proton'), 'run']
     command += [str(game / 'MoonSweepers.exe'), '-logFile', windows(run / 'Player.log')]
-    return {'platform': platform, 'command': command, 'env': environment, 'cwd': str(game), 'run': str(run),
+    return {'platform': platform, 'command': command, 'env': environment, 'cwd': str(game), 'run': str(run), 'compatibility': assessment,
             'store': installation.store, 'profile': str(profile), 'order': order, 'external_mods': external_mods, 'runtime': 'Steam / Proton Experimental',
             'installed_proton': str(installed), 'private_proton': str(proton),
             'limits': ['Packaged loader replay pending', 'Native Steam host adapter is unqualified; existing evidence uses Flatpak Steam']}
@@ -195,6 +197,10 @@ def _start_locked(service, installation, lease):
     if record.get('mode') == 'installed' and record['order']:
         steam_options.require_ready(installation, record['platform'], record.get('managed', False))
     service.prepare(installation, _session_owner=True)
+    previous, current = record.get('compatibility'), getattr(service, '_last_compatibility', None)
+    if previous is not None and current is not None and any(previous.get(k) != current.get(k)
+            for k in ('profile', 'selection_digest', 'runtime_receipt_digest')):
+        raise ValueError('Compatibility changed during launch preparation; review the refreshed report before launching')
     if record.get('mode') == 'installed':
         diagnostics.prepare_installed(service, installation, record)
         run = Path(record['run']); run.mkdir(parents=True, exist_ok=True)

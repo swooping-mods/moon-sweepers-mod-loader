@@ -114,11 +114,15 @@ def manual(path, store='manual'):
     return Installation(str(game), store)
 
 
-def inspect(installation):
+def inspect(installation, catalog=None):
+    from . import game_profiles
     game = Path(installation.path)
     if not (game / 'MoonSweepers.exe').is_file(): return {'compatible': False, 'reason': 'Game executable is missing', 'hashes': {}}
     if (game / 'MoonSweepers_Data/Managed/Assembly-CSharp.dll').is_file():
-        return {'compatible': False, 'reason': 'Older Mono build. These packages require Steam IL2CPP 1.0.5.', 'hashes': {}}
+        return {'compatible': False, 'reason': 'Mono backend is not supported by this game adapter; use an IL2CPP build with a reviewed profile.', 'hashes': {}, 'profile': None}
     hashes = {name: sha(game / name) for name in PIN if (game / name).is_file()}
-    ok = hashes == PIN
-    return {'compatible': ok, 'reason': 'Steam 1.0.5 · IL2CPP · x64' if ok else 'Unqualified game build; update the adapter before loading mods.', 'hashes': hashes}
+    profile = game_profiles.identify(hashes, catalog)
+    return {'compatible': profile is not None,
+            'reason': ('Moon Sweepers ' + profile['version'] + ' · IL2CPP · x64'
+                       if profile else 'Unknown game build; no reviewed adapter profile matches its executable hashes.'),
+            'hashes': hashes, 'profile': profile}

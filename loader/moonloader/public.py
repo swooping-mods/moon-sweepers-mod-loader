@@ -88,14 +88,17 @@ def assert_stopped():
     finally: kernel.CloseHandle(handle)
 
 
-def validate_game(installation, root=None):
+def validate_game(installation, root=None, game_profile=None):
     if installation.store != 'steam': raise ValueError('Installed-game mode requires a Steam installation')
     game = Path(installation.path)
     competitors = competing_loaders(game, root)
     if competitors: raise ValueError('Unqualified loader coexistence: ' + ', '.join(competitors))
     if not str(game).isascii() or len(str(game)) > 170:
         raise ValueError('This native mod ABI requires a short ASCII game installation path')
-    for name, expected in discovery.PIN.items():
+    if game_profile is None:
+        game_profile = discovery.inspect(installation).get('profile')
+    if game_profile is None: raise ValueError('Installed game changed; no reviewed adapter profile matches it')
+    for name, expected in game_profile['hashes'].items():
         if current_hash(game, name) != expected:
             raise ValueError('Installed game changed; update the adapter before applying mods')
     # A mounted/staged Steam update is not coordinated by our operation lock.
@@ -254,7 +257,7 @@ def cleanup_stage(stage):
     except OSError: pass
 
 
-def transact(root, installation, files, order, generation, enabled, native_order=None, managed_selected=False):
+def transact(root, installation, files, order, generation, enabled, native_order=None, managed_selected=False, game_profile=None):
     """Recheck external writes at each mutation, then publish selection last."""
     # Renaming a package entry to mod.dll can introduce aliases absent from the
     # package itself. Check directory spellings too, before staging any payload.
@@ -269,6 +272,11 @@ def transact(root, installation, files, order, generation, enabled, native_order
     after = {**empty(installation), 'files': {n: digest(b) for n, b in files.items()},
              'order': order, 'generation': generation, 'enabled': enabled,
              'native_order': list(order if native_order is None else native_order), 'managed': managed_selected}
+    after['game_pins'] = game_profile['hashes'] if game_profile else before.get('game_pins', dict(discovery.PIN))
+    if game_profile:
+        after['game_profile'] = {k: game_profile[k] for k in ('id', 'digest')}
+    elif 'game_profile' in before:
+        after['game_profile'] = before['game_profile']
     for name, expected in before['files'].items():
         if current_hash(game, name) != expected: raise ValueError('Owned installed file changed or missing: ' + name)
     for name in files:
@@ -289,8 +297,8 @@ def transact(root, installation, files, order, generation, enabled, native_order
     write(pending, {'before': before, 'after': after, 'stage': stage_name}); sync_directory(root)
     try:
         assert_stopped()
-        if enabled: validate_game(installation, root)
-        baseline = {n: (game / n).stat() for n in discovery.PIN} if enabled else {}
+        if enabled: validate_game(installation, root, game_profile)
+        baseline = {n: (game / n).stat() for n in after['game_pins']} if enabled else {}
         def unchanged_inputs():
             for name, previous in baseline.items():
                 current = target(game, name).stat()
@@ -313,7 +321,7 @@ def transact(root, installation, files, order, generation, enabled, native_order
             sync_directory(path.parent)
         if CONFIG in files:
             assert_stopped()
-            if enabled: validate_game(installation, root)
+            if enabled: validate_game(installation, root, game_profile)
             if current_hash(game, CONFIG) is not None: raise ValueError('Configuration changed')
             assert_stopped()
             os.replace(contained(stage, 'new/' + CONFIG), target(game, CONFIG)); sync_directory(game / 'MoonLab')
@@ -340,7 +348,16 @@ def prepare(service, installation, order, library, runtime):
     # Reject bootstrap collisions before publishing any ownership metadata.
     if not (root / 'deployment.json').exists() and not (root / 'pending-installed.json').exists() and current_hash(game, 'version.dll') is not None:
         raise ValueError('Unowned deployment file: version.dll (another loader may be installed)')
-    validate_game(installation, root)
+    inspection = service.inspect(installation)
+    profile = inspection.get('profile')
+    if profile is None: raise ValueError('Installed game changed; no reviewed adapter profile matches it')
+    from .compatibility import message
+    assessment = service.compatibility(installation, library=library, inspection=inspection)
+    if not assessment['allowed']: raise ValueError(message(assessment))
+    previous = getattr(service, '_last_compatibility', None)
+    if previous and previous['profile'] != assessment['profile']:
+        raise ValueError('Game profile changed during preparation; refresh compatibility')
+    validate_game(installation, root, profile)
     managed_payloads = {name:managed.plugin_files(library[name][0], library[name][1])
                         for name in order if library[name][0]['kind'] == packages.MANAGED_KIND}
     with operation(root, game):
@@ -348,6 +365,9 @@ def prepare(service, installation, order, library, runtime):
         generation = uuid.uuid4().hex
         files = {'version.dll': runtime.read_bytes()}
         runtime_receipt = load(service.bundle / 'runtime/receipt.json', {})
+        from .compatibility import receipt_digest
+        if receipt_digest(runtime_receipt) != assessment['runtime_receipt_digest']:
+            raise ValueError('Loader runtime changed during preparation; refresh compatibility')
         if digest(files['version.dll']) != runtime_receipt.get('sha256'): raise ValueError('Runtime changed during preparation')
         native_order = [name for name in order if library[name][0]['kind'] == 'native']
         managed_selected = any(library[name][0]['kind'] == packages.MANAGED_KIND for name in order)
@@ -357,7 +377,8 @@ def prepare(service, installation, order, library, runtime):
             files['doorstop_config.ini'] = managed.doorstop_enabled(files['doorstop_config.ini'], True)
         if runtime_receipt.get('runtime_api_abi') == 1 and order:
             from moon_mod_api.runtime_plan import encode, PATH
-            files[PATH] = encode({name: library[name][0] for name in native_order}, native_order)
+            files[PATH] = encode({name: library[name][0] for name in native_order}, native_order,
+                                 game_profile=profile if runtime_receipt.get('game_adapter') else None)
         for name in order:
             manifest, folder = library[name]
             if manifest['kind'] == packages.MANAGED_KIND:
@@ -388,7 +409,7 @@ def prepare(service, installation, order, library, runtime):
         from .settings import seed
         seed(game / 'MoonLab', order, library)
         contained(game, 'MoonLab/logs').mkdir(exist_ok=True)
-        transact(root, installation, files, order, generation, bool(order), native_order, managed_selected)
+        transact(root, installation, files, order, generation, bool(order), native_order, managed_selected, profile)
     return root
 
 
@@ -435,10 +456,22 @@ def set_enabled(service, installation, enabled):
         recover(root, installation); old = receipt(root, installation)
         if CONFIG not in old['files']: raise ValueError('Prepare this installation first')
         files = {n: target(game, n).read_bytes() for n in old['files']}
+        profile = None
+        if enabled:
+            profile = service.inspect(installation).get('profile')
+            if profile is None or profile['hashes'] != old.get('game_pins'):
+                raise ValueError('Installed game changed; prepare the selected mods again before enabling')
+            expected_profile = {k: profile[k] for k in ('id', 'digest')}
+            if 'game_profile' not in old:
+                from .game_profiles import CURRENT_PROFILE_ID
+                if profile['id'] != CURRENT_PROFILE_ID:
+                    raise ValueError('Prepared legacy deployment has no adapter profile; prepare the selected mods again')
+            if old.get('game_profile', expected_profile) != expected_profile:
+                raise ValueError('Reviewed adapter profile changed; prepare the selected mods again before enabling')
         native_order = old.get('native_order', old['order']); managed_selected = old.get('managed', False)
         files[CONFIG] = config(installation, old['generation'], native_order, bool(enabled and old['order']), managed_selected)
         if managed_selected: files['doorstop_config.ini'] = managed.doorstop_enabled(files['doorstop_config.ini'], enabled)
-        transact(root, installation, files, old['order'], old['generation'], bool(enabled and old['order']), native_order, managed_selected)
+        transact(root, installation, files, old['order'], old['generation'], bool(enabled and old['order']), native_order, managed_selected, profile)
 
 
 def uninstall(service, installation):

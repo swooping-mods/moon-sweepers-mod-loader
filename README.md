@@ -130,6 +130,23 @@ remain available.
 
 ## Compatibility and saves
 
+**Compatibility…** checks your installed game against reviewed executable
+hashes and explains which game APIs and framework providers each selected mod
+needs. You can inspect an unknown game build even when launching is blocked.
+Per-mod details can check a mod and its required frameworks without selecting
+them. “Requirements matched” means its declared contracts are available;
+gameplay, saves and co-op need separate verification. Package author notes are
+shown separately from the loader's assessment.
+
+New native v8 mods can use the shared game adapter so the same mod binary can
+work on another reviewed game profile with matching APIs. An adapter update is
+still needed for a changed game build. Existing mods containing game-specific
+addresses and the current BepInEx host retain their exact supported build;
+matching a version label does not bypass those checks.
+
+For a report without importing/preparing/starting mods, use
+`--compatibility --game PATH` (with your usual `--data`/`--bundle` if needed).
+
 The adapter targets the pinned Steam Windows x64 IL2CPP **1.0.5** build
 (app **5335510**). Exact executable hashes determine compatibility; the version
 label alone is insufficient. Other builds require a matching adapter.

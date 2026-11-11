@@ -306,11 +306,11 @@ class InstalledChecks(unittest.TestCase):
     def test_first_install_failure_before_payload_writes_cleans_journal(self):
         service, installation = self.fixture(); root = service.install_root(installation)
         validate = public.validate_game; calls = 0
-        def fail_after_staging(item, root=None):
+        def fail_after_staging(item, root=None, game_profile=None):
             nonlocal calls
             calls += 1
             if calls == 2: raise ValueError('Game changed after staging')
-            return validate(item, root)
+            return validate(item, root, game_profile)
         with patch('moonloader.public.validate_game', side_effect=fail_after_staging):
             with self.assertRaisesRegex(ValueError, 'after staging'): service.prepare(installation)
         self.assertFalse((root/'pending-installed.json').exists())
@@ -325,11 +325,11 @@ class InstalledChecks(unittest.TestCase):
     def test_mid_apply_steam_change_aborts_without_overwriting_it(self):
         service, installation = self.fixture(); service.prepare(installation); game = Path(installation.path)
         original = public.validate_game; calls = 0
-        def updating(item, root=None):
+        def updating(item, root=None, game_profile=None):
             nonlocal calls
             calls += 1
             if calls == 3: (game/'GameAssembly.dll').write_bytes(b'updated concurrently')
-            return original(item, root)
+            return original(item, root, game_profile)
         with patch('moonloader.public.validate_game', side_effect=updating):
             with self.assertRaisesRegex(ValueError, 'changed'): service.prepare(installation)
         self.assertEqual((game/'GameAssembly.dll').read_bytes(), b'updated concurrently')
