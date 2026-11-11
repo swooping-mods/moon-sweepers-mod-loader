@@ -235,7 +235,7 @@ def payload(inputs, dotnet, work):
                'host_compatibility': 'be791-modern-detours/v3',
                'adapter_sha256': digest(binary.read_bytes()), 'builder_sha256': digest(Path(__file__).read_bytes()),
                'files': {name: digest(data) for name, data in sorted(files.items())},
-               'limits': ['Managed runtime supports the pinned Moon Sweepers Steam profile in Private game copy mode',
+               'limits': ['Managed runtime supports the pinned Moon Sweepers Steam profile with checked installed/private deployment',
                           'No game/plugin execution by the offline builder; Windows gameplay and co-op require separate qualification']}
     output = {'loader/runtime/bepinex/files/' + name: data for name, data in files.items()}
     output['loader/runtime/bepinex/receipt.json'] = (json.dumps(receipt, indent=2) + '\n').encode()

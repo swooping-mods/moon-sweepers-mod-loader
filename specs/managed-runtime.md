@@ -2,15 +2,21 @@
 
 Normal source, Windows and Linux distributions include the checked original
 adapter and BepInEx host for the `bepinex-il2cpp` /
-`BepInEx.IL2CPP/6-be791` backend in **Private game copy** mode. This applies to
-prereleases and full releases alike. Installed-game mode continues to refuse
-managed selections. Including the host does not select, acquire or execute a
+`BepInEx.IL2CPP/6-be791` backend in **Existing Steam game** and **Private game
+copy** modes. This applies to prereleases and full releases alike. Installed
+hosting requires runtime `installed_managed_abi: 1` and the checked native
+`MoonLab_InstalledManagedState_v1` export. Including the host does not select, acquire or execute a
 managed mod; the nine native starter packages retain unchecked defaults.
 
 [Downloaded mod imports](download-imports.md) recognize the complete reviewed
 MarsSweepers 0.6.1 folder/ZIP and retain its external metadata and exact hashes.
-The import result explains the private-copy prerequisite; convenience importing
-does not change installed-mode refusal.
+The import result explains supported deployment and startup requirements.
+Installed mode adds owned host/plugin files to the existing Steam installation
+without creating a second game copy; Steam uses its normal runtime and saves.
+Linux setup requires both `version=n,b` and `winhttp=n,b` overrides. See
+[installed deployment](public-deployment.md) for ownership, generation admission,
+enable/disable, rollback and removal. The adapter waits for validated native
+installed readiness before plugin startup and preserves fatal admission reports.
 
 `loader/moonloader/managed.py` is the canonical deployment implementation. The
 workshop consumes an exact hash-pinned copy through its explicit
@@ -31,7 +37,7 @@ An attachment contains `receipt.json` and `files/`, using
 and a complete SHA-256 file table. Required startup files include Doorstop,
 CoreCLR, upstream IL2CPP host, original adapter and disabled-download config.
 Preparation checks all actual bytes, rejects extra/missing/aliased files and
-validates config before making a private game copy. Declared capability may be
+validates config before changing either deployment target. Declared capability may be
 shown in the UI before that full integrity check; preparation repeats it.
 
 `vendored/managed-runtime.lock.json` pins upstream BepInEx, exact upstream source
@@ -58,6 +64,8 @@ input allowlist together. A failed commit restores both. Plugins deploy under
 `bepinex.data_root` namespace. Mutable config/cache/evidence stays in that
 private game tree. Unknown executable inputs or enabled automatic download/
 generation settings stop preparation; they are not silently removed/reset.
+Installed mode uses its separate owned-file transaction and keeps the generation's
+native and managed evidence attributable without redirecting normal Steam saves.
 
 Launch passes only native IDs to ModStart and enables the separate managed
 host with its own evidence path and `winhttp` override on Proton. Managed-only
