@@ -155,6 +155,23 @@ class CompatibilityPlayerChecks(unittest.TestCase):
         (service.bundle/'runtime/windows-x64/version.dll').write_bytes(b'tampered')
         self.assertIn('runtime-integrity', [r['code'] for r in service.compatibility(installation)['reasons']])
 
+    def test_loader_failures_invalidate_per_mod_admission_but_keep_requirements(self):
+        service, installation = self.fixture()
+        (service.bundle/'runtime/windows-x64/version.dll').write_bytes(b'tampered')
+        result = service.compatibility(installation); mod = result['mods']['portable-feature']
+        self.assertFalse(result['allowed']); self.assertFalse(mod['allowed'])
+        self.assertEqual(mod['status'], 'incompatible')
+        self.assertTrue(any(r.get('api') == 'unity.clock' for r in mod['requirements']))
+        self.assertTrue(any(r['code'] == 'runtime-integrity' and r.get('context') == 'loader-admission' for r in mod['reasons']))
+        (service.bundle/'runtime/windows-x64/version.dll').write_bytes(b'new runtime')
+        service.state['selected'] = ['test-mod']
+        path = service.bundle/'runtime/receipt.json'; receipt = load(path)
+        receipt.pop('game_adapter'); receipt.pop('game_pins'); write(path, receipt)
+        result = service.compatibility(installation); mod = result['mods']['test-mod']
+        self.assertFalse(result['allowed']); self.assertFalse(mod['allowed'])
+        self.assertEqual(mod['status'], 'incompatible')
+        self.assertTrue(any(r['code'] == 'runtime-profile-unavailable' for r in mod['reasons']))
+
     def test_individual_mod_assessment_adds_required_frameworks_without_selecting(self):
         service, installation = self.fixture()
         self.add_mod(service, 'some-framework', requires_game={}, provides={'some-framework.demo': {'abi': 3, 'size': 24}})
@@ -178,6 +195,8 @@ class CompatibilityPlayerChecks(unittest.TestCase):
                 patch('subprocess.Popen') as spawn, redirect_stdout(io.StringIO()) as output:
             self.assertEqual(module.main(), 0)
         result = json.loads(output.getvalue()); self.assertEqual(result['status'], 'unknown'); self.assertFalse(result['allowed'])
+        self.assertEqual(result['mods']['portable-feature']['status'], 'unknown')
+        self.assertFalse(result['mods']['portable-feature']['allowed'])
         spawn.assert_not_called(); self.assertEqual((service.root/'state.json').read_bytes(), before)
         self.assertEqual(sorted(service.state['library']), library); self.assertFalse((Path(installation.path)/'MoonLab').exists())
 

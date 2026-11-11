@@ -23,6 +23,14 @@ def _blocked(result, item):
     if item['code'] != 'unknown-game-profile' or result['status'] != 'incompatible':
         result['status'] = 'unknown' if item['code'] == 'unknown-game-profile' else 'incompatible'
     result.setdefault('reasons', []).append(item)
+    # The SDK evaluated declared contracts. A later loader/target integrity
+    # failure invalidates admission for the entire proposed selection too.
+    for mod in result.get('mods', {}).values():
+        mod['allowed'] = False
+        mod['status'] = 'incompatible' if mod.get('status') == 'incompatible' or result['status'] == 'incompatible' else result['status']
+        if not any(why.get('code') == item['code'] and why.get('message') == item['message']
+                   for why in mod.setdefault('reasons', [])):
+            mod['reasons'].append({**item, 'context': 'loader-admission'})
 
 
 def runtime_adapter(receipt, profile):
