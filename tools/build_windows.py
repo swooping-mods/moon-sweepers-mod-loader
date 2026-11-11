@@ -53,7 +53,7 @@ def main():
     # Retain the source layout for SDK resolution and user-replaceable LGPL libraries.
     with zipfile.ZipFile(out / f'moon-sweepers-mod-loader-{build.VERSION}-source.zip') as z:
         for n in z.namelist():
-            if n.startswith(('loader/', 'vendored/')) and not n.startswith('vendored/appimage/'):
+            if n.startswith(('loader/', 'vendored/')) and not n.startswith(('vendored/appimage/', 'vendored/managed-build-inputs/')):
                 put(dest, n, z.read(n))
     shutil.copy2(work / 'Mod Loader.exe', dest / 'Mod Loader.exe')
     for item in lock['files']:

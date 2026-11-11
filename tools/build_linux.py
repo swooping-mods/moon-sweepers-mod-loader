@@ -36,7 +36,8 @@ def main(argv=None):
         raise ValueError('Source archive has no qualified maintained managed runtime')
     with zipfile.ZipFile(source) as archive:
         files={name:archive.read(name) for name in archive.namelist()
-               if name.startswith(('loader/','vendored/')) and name!='vendored/appimage/runtime-x86_64'}
+               if name.startswith(('loader/','vendored/')) and name!='vendored/appimage/runtime-x86_64'
+               and not name.startswith('vendored/managed-build-inputs/')}
     files['Moon Sweepers Mod Loader']=LAUNCHER
     files.update(runtime_payload(args.inputs.resolve()))
     files['LICENSES/README.md']=(build.ROOT/'vendored/LINUX-LICENSES.md').read_bytes()

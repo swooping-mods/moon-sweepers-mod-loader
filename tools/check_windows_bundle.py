@@ -36,6 +36,7 @@ def main():
     from managed_bundle import verify_bundle
     managed_receipt = verify_bundle(folder/'loader')
     with zipfile.ZipFile(archive) as z:
+        assert not any(name.startswith('vendored/managed-build-inputs/') for name in z.namelist()), 'Upstream build input leaked into desktop bundle'
         for name in required:
             assert z.read(name) == (folder / name).read_bytes(), name
         assert {name for name in z.namelist() if name.startswith('loader/packages/')} == set(bundled)

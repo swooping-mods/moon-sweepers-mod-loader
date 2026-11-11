@@ -36,6 +36,8 @@ def check(out, gui=False):
                 target.write_bytes(data);target.chmod(entry.mode)
         if seen!=set(receipt['files']):
             raise ValueError('Linux archive inventory mismatch')
+        if any(name.startswith('vendored/managed-build-inputs/') for name in seen):
+            raise ValueError('Upstream build input leaked into desktop bundle')
         required={'Moon Sweepers Mod Loader','loader/main.py','loader/runtime/receipt.json',
                   'loader/runtime/windows-x64/version.dll','vendored/api/snapshot.json','README.md'}
         linux_lock=json.loads((root/'vendored/linux-runtime.lock.json').read_text())

@@ -10,6 +10,29 @@ import fetch_windows_inputs
 
 
 class WindowsInputChecks(unittest.TestCase):
+    def test_vendored_input_stages_offline_and_tampering_refuses(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root/'vendored').mkdir()
+            source = root/'vendored/input.zip'
+            source.write_bytes(b'reviewed')
+            lock = root/'vendored/windows-runtime.lock.json'
+            lock.write_text(json.dumps({'files': [{
+                'name': 'input.zip', 'url': 'https://publisher.invalid/input.zip',
+                'local_path': 'vendored/input.zip',
+                'sha256': hashlib.sha256(b'reviewed').hexdigest()}]}))
+            output = root/'staged'
+            with patch.object(fetch_windows_inputs, 'ROOT', root), \
+                    patch('sys.argv', ['fetch', '--output', str(output)]), \
+                    patch.object(fetch_windows_inputs.urllib.request, 'urlopen') as request:
+                fetch_windows_inputs.main()
+                self.assertEqual((output/'input.zip').read_bytes(), b'reviewed')
+                (output/'input.zip').unlink()
+                source.write_bytes(b'changed')
+                with self.assertRaisesRegex(ValueError, 'Vendored runtime identity'):
+                    fetch_windows_inputs.main()
+                request.assert_not_called()
+
     def test_transient_download_retries_but_changed_bytes_do_not(self):
         with tempfile.TemporaryDirectory() as temporary:
             target = Path(temporary) / 'input.download'
