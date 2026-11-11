@@ -34,7 +34,7 @@ def check(out):
             if name.endswith('.AppImage'):
                 command.append('--appimage-extract-and-run')
             for option in ('--help', '--smoke-test'):
-                subprocess.run(command+[option], env=env, check=True, capture_output=True, timeout=120)
+                subprocess.run(command+[option], env=env, check=True,  timeout=120)
             results[name] = {'sha256': sha, 'actual_cli_passed': True, 'bundled_gui_smoke_passed': True}
     result = {'success': True, 'version': build.VERSION, 'files': results,
               'game_started': False, 'fuse_required_for_check': False}

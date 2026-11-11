@@ -47,13 +47,13 @@ def check(out, gui=False):
              'XDG_DATA_HOME':str(root/'temporary-user-data'),'QT_QPA_PLATFORM':'offscreen'}
         env.pop('MOON_LOADER_PYTHON', None)
         command=[str(root/'Moon Sweepers Mod Loader')]
-        subprocess.run(command+['--help'],env=env,check=True,capture_output=True,timeout=30)
+        subprocess.run(command+['--help'],env=env,check=True,timeout=30)
         desktop_env={**env,'QT_QPA_PLATFORM':'xcb'}
         subprocess.run([str(root/'.runtime/python/bin/python3.13'),'-I','-c',
             'import sys; sys.path.insert(0, sys.argv[1]); from moonloader.linux_desktop import prepare; prepare()',
-            str(root/'loader')],env=desktop_env,check=True,capture_output=True,timeout=30)
+            str(root/'loader')],env=desktop_env,check=True,timeout=30)
         if gui:
-            subprocess.run(command+['--smoke-test'],env=env,check=True,capture_output=True,timeout=30)
+            subprocess.run(command+['--smoke-test'],env=env,check=True,timeout=30)
     result={'success':True,'version':build.VERSION,'sha256':digest,
             'bundled_mods_checked':len(bundled),
             'files_checked':len(seen),'actual_launcher_cli_passed':True,

@@ -28,7 +28,8 @@ hashes and the exact source archive identity in linux-build-receipt.json.
 members and inconsistent inventories/digests. It materializes files in a private
 temporary directory with spaces, runs the actual launcher with --help and isolates
 XDG data. `--gui` additionally runs the same Qt/SVG/no-launch smoke check used on
-Windows, with installed PySide6 and temporary data. No game starts.
+Windows, with bundled PySide6 and temporary data. Child-process output remains visible in
+CI so runtime or host-library failures can be diagnosed. No game starts.
 
 The root launcher is the only application entry point in the extracted folder.
 Runtime files stay under `.runtime/`. Small XCB/XKB helper libraries are taken
