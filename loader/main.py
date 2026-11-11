@@ -9,7 +9,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from moonloader import __version__
 from moonloader.service import Service
-from moonloader import discovery, launch
+from moonloader import discovery, launch, steam_options
 
 
 def main():
@@ -18,6 +18,8 @@ def main():
     parser.add_argument('--bundle', type=Path, default=Path(__file__).resolve().parent)
     parser.add_argument('--discover', action='store_true')
     parser.add_argument('--plan', action='store_true')
+    parser.add_argument('--steam-setup', action='store_true', help='Preview Steam launch options without changing them')
+    parser.add_argument('--apply-steam-setup', action='store_true', help='Explicitly apply the previewed Proton override; quit Steam first')
     parser.add_argument('--prepare', action='store_true', help='Apply files for the selected mode; never starts a game')
     parser.add_argument('--mode', choices=('installed', 'private'), help='Existing Steam game or separate private copy; legacy data keeps private mode')
     parser.add_argument('--disable', action='store_true', help='Disable installed mods on next launch')
@@ -44,9 +46,16 @@ def main():
     installations, errors = service.installations()
     if args.discover:
         print(json.dumps({'installations':[x.record() for x in installations], 'errors':errors}, indent=2)); return 0
-    if args.plan or args.prepare or args.mode or args.disable or args.enable or args.uninstall_loader or args.backup_steam_saves or args.normal_saves:
+    if args.steam_setup or args.apply_steam_setup or args.plan or args.prepare or args.mode or args.disable or args.enable or args.uninstall_loader or args.backup_steam_saves or args.normal_saves:
         selected = next((x for x in installations if x.path == service.state['installation']), installations[0] if len(installations) == 1 else None)
         if not selected: raise ValueError('Choose an installation with --game PATH')
+        if args.steam_setup or args.apply_steam_setup:
+            preview = steam_options.inspect(selected)
+            print(json.dumps(preview, indent=2))
+            if args.apply_steam_setup:
+                if preview['status'] not in ('required', 'ready'): raise ValueError(preview['message'])
+                print(json.dumps(steam_options.apply(selected, service.root, preview), indent=2))
+            return 0
         if args.mode: service.set_mode(selected, args.mode)
         if args.backup_steam_saves: print('Steam save backup: ' + str(service.backup_saves(selected, args.backup_steam_saves)))
         if args.normal_saves: service.accept_normal_saves(selected, args.normal_saves)

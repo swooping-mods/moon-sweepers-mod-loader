@@ -9,7 +9,7 @@ from PySide6.QtCore import QUrl
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QFrame, QLabel, QPushButton,
     QLineEdit, QComboBox, QHBoxLayout, QVBoxLayout, QListWidget, QListWidgetItem, QAbstractItemView,
     QStyledItemDelegate, QStyle, QStyleOptionButton, QScrollArea, QFileDialog, QMessageBox, QDialog, QPlainTextEdit)
-from . import discovery, launch, packages
+from . import discovery, launch, packages, steam_options
 from .catalog import CATEGORIES, description as catalog_description, matches
 from .theme import STYLE, COLORS
 from .storage import load
@@ -164,8 +164,10 @@ class Window(QMainWindow):
         self.enable_button = QPushButton('Enable mods'); self.enable_button.clicked.connect(lambda:self.toggle_installed(True)); mode_row.addWidget(self.enable_button)
         self.uninstall_button = QPushButton('Uninstall loader'); self.uninstall_button.clicked.connect(self.uninstall_loader); mode_row.addWidget(self.uninstall_button)
         setup_layout.addLayout(mode_row)
-        self.proton_hint = label('Steam launch options: WINEDLLOVERRIDES="version=n,b" %command%\nMerge the version override with your existing options; keep other wrappers and arguments.', 'muted')
-        self.proton_hint.setWordWrap(True); self.proton_hint.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse); setup_layout.addWidget(self.proton_hint)
+        setup_row = QHBoxLayout()
+        self.steam_setup_button = QPushButton('Steam setup…'); self.steam_setup_button.clicked.connect(self.steam_setup); setup_row.addWidget(self.steam_setup_button)
+        self.proton_hint = label('', 'muted'); setup_row.addWidget(self.proton_hint, 1); setup_layout.addLayout(setup_row)
+        self.proton_hint.setWordWrap(True); self.proton_hint.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         toolbar, bar = frame('toolbar', True, (16, 8, 16, 8))
         self.search = QLineEdit(); self.search.setPlaceholderText('Search mods, categories or tags'); self.search.setAccessibleName('Search installed mods, categories or tags'); self.search.setClearButtonEnabled(True); self.search.textChanged.connect(self.render); bar.addWidget(self.search, 1)
         self.search.setAcceptDrops(False)
@@ -430,6 +432,8 @@ class Window(QMainWindow):
         self.launch_button.setToolTip('Game starts are disabled in this UI inspection session.' if self.no_launch else reason or ('Apply mods to the installed game and request Steam launch.' if installed else 'Prepare a private game copy and launch the checked mods.'))
         self.save_info.setText('Normal Steam saves · back up before save-affecting mods' if installed else 'Fresh private saves')
         self.proton_hint.setVisible(installed and sys.platform == 'linux')
+        self.steam_setup_button.setVisible(installed and sys.platform == 'linux'); self.steam_setup_button.setEnabled(not active)
+        if installed and sys.platform == 'linux': self.proton_hint.setText(steam_options.inspect(installation)['message'])
         for widget in [self.disable_button, self.enable_button, self.uninstall_button]: widget.setVisible(installed); widget.setEnabled(not active)
         for widget in [self.game,self.browse,self.rescan,self.import_button,self.import_folder_button,self.list,self.remove_button,self.deployment_mode]: widget.setEnabled(not active)
         if reason or self._validation and self.message.text() == self._validation: self.notice(reason)
@@ -453,9 +457,29 @@ class Window(QMainWindow):
         installed = self.service.mode(installation) == 'installed'
         self.work('Applying selected mods…' if installed else 'Preparing private game files… This may take a few minutes.', lambda:self.service.prepare(installation), lambda root:self.notice('Installed mods ready. Normal Steam saves are in use.' if installed else 'Files ready. Private saves: '+str(root / 'profile/AppData/LocalLow/DragDropGames/MoonSweepers')))
 
+    def steam_setup(self):
+        installation = self.current_installation()
+        if not installation: return
+        preview = steam_options.inspect(installation)
+        dialog = QDialog(self); dialog.setWindowTitle('Steam launch setup'); dialog.resize(680, 420); layout = QVBoxLayout(dialog)
+        info = label(preview['message'] + '\n\nQuit Steam completely before applying; reopen it afterwards. Existing options are preserved and the original config is backed up.'); info.setWordWrap(True); layout.addWidget(info)
+        edit = QPlainTextEdit(); edit.setReadOnly(True); edit.setPlainText('Current launch options\n' + preview.get('current', '(unavailable)') + '\n\nProposed launch options\n' + preview.get('proposed', '(manual setup required)')); layout.addWidget(edit)
+        row = QHBoxLayout(); apply = QPushButton('Apply required launch options'); apply.setEnabled(preview['status'] == 'required'); row.addWidget(apply)
+        close = QPushButton('Close'); close.clicked.connect(dialog.accept); row.addWidget(close); layout.addLayout(row)
+        def apply_options():
+            try:
+                result = steam_options.apply(installation, self.service.root, preview)
+                self.notice(result.get('message', 'Steam options are already ready.')); dialog.accept(); self.update_actions()
+            except (ValueError, OSError) as error: info.setText(str(error))
+        apply.clicked.connect(apply_options); dialog.exec()
+
     def start_game(self):
         if self.no_launch: return
         installation=self.current_installation()
+        if self.service.mode(installation) == 'installed' and self.service.state['selected']:
+            status = steam_options.inspect(installation)
+            if status['status'] not in ('ready', 'not-required'):
+                self.steam_setup(); return
         if not self.confirm_save_policy(installation): return
         self.work('Preparing selected mods and starting the game…', lambda:launch.start(self.service,installation), self.started)
 

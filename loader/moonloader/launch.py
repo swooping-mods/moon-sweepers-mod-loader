@@ -6,7 +6,7 @@ import shutil
 import subprocess
 import sys
 import uuid
-from . import packages
+from . import packages, steam_options
 from .discovery import APP_ID, library_roots
 from .storage import contained, load, write, sha, locked, assert_inactive, process_birth
 from .settings import environment as settings_environment
@@ -79,8 +79,9 @@ def plan(service, installation, platform=None, check_client=True):
                 'store': 'steam', 'profile': 'Normal Steam saves (not isolated)', 'order': order,
                 'runtime': 'Steam selected compatibility runtime' if platform == 'linux' else 'Steam / Windows',
                 'launch_options': 'WINEDLLOVERRIDES="version=n,b" %command%' if platform == 'linux' else '',
+                'steam_setup': steam_options.inspect(installation, platform),
                 'limits': ['Steam launch request is not game-process ownership or startup confirmation',
-                           'Keep existing Steam launch options; merge the version override manually on Proton',
+                           'Proton requires verified launch options; use Steam setup before launching mods',
                            'Back up saves before save-affecting mods; binary uninstall does not restore saves',
                            'Native Windows gameplay, Cloud and two-account co-op require separate qualification']}
     game = root / 'game'
@@ -185,6 +186,8 @@ def start(service, installation):
 
 def _start_locked(service, installation, lease):
     record = plan(service, installation)
+    if record.get('mode') == 'installed' and record['order']:
+        steam_options.require_ready(installation, record['platform'])
     service.prepare(installation, _session_owner=True)
     if record.get('mode') == 'installed':
         run = Path(record['run']); run.mkdir(parents=True, exist_ok=True)

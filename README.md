@@ -61,8 +61,9 @@ PySide6. GitHub's automatic source-code archives require a [native build](#devel
    it was not detected.
 2. Choose **Existing Steam game** to use your installed game and normal Steam
    saves. Confirm that your saves are backed up, or use a fresh Steam profile.
-3. On Linux, set the game's Steam launch options as described under
-   [Proton setup](#proton-setup).
+3. On Linux, open **Steam setup…** to check the required launch options. If a
+   change is needed, quit Steam completely, review and apply the proposed change,
+   then reopen Steam. See [Proton setup](#proton-setup) for manual setup.
 4. Check the mods you want and their required frameworks. **Select all** selects
    the whole library, including mods hidden by search or filters.
 5. Click **Prepare files**, resolve any reported dependency or compatibility
@@ -129,8 +130,14 @@ for path requirements, conflicts and recovery.
 
 ### Proton setup
 
-For **Existing Steam game** on Linux, open the game's **Properties → General →
-Launch Options** in Steam. With no existing options, use:
+For **Existing Steam game** on Linux, **Steam setup…** shows the current and
+proposed launch options for your most recent Steam account. To apply a repair,
+quit Steam completely, click **Apply required launch options**, then reopen Steam.
+The loader preserves other options and keeps a backup in its data folder. It
+checks setup before launching selected mods. Windows needs no Proton option.
+
+For manual setup, open the game's **Properties → General → Launch Options** in
+Steam. With no existing options, use:
 
 ```sh
 WINEDLLOVERRIDES="version=n,b" %command%
