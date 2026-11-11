@@ -4,12 +4,22 @@ The managed host contains upstream BepInEx components and an original Moon
 Sweepers adapter. Component terms apply independently. This file adds no license
 to the loader, adapter, game or third-party mods.
 
-The adjacent `components.json` in a packaged host records every upstream
-non-CoreCLR runtime DLL, its SHA-256 identity, observed version, owner, license
+The adjacent `components.json` in a packaged host records the original be.791
+non-CoreCLR runtime DLLs, their SHA-256 identity, observed version, owner, license
 and corresponding notice. The source repository keeps the same manifest at
 `vendored/bepinex-notices/manifest.json`. Versions were read from the actual
 be.791 DLL resources and upstream project pins, rather than inferred from a
 current repository default branch.
+
+The production host replaces the original Harmony/MonoMod/Cecil dependency
+assemblies with the versions and exact hashes in
+`modern-detours/components.json`; their retained notices take precedence for
+those runtime files. The original inventory remains useful provenance for
+the archived upstream corresponding source. The original BepInEx modules are
+adapted by the accompanying `managed-host-compat/PatchLegacyHost.cs` tool;
+the complete attachment receipt records their final modified hashes. Its
+compatibility modifications retain BepInEx's LGPL terms. The independent host
+compatibility helper and its source are also included.
 
 | Component | Bundled version | Terms | Retained notice/source |
 |---|---|---|---|
@@ -30,7 +40,7 @@ current repository default branch.
 | MonoMod.Backports and ILHelpers | Backports 1.1.2, a1b82852b | MIT | `MonoMod-Backports-LICENSE` |
 | SemanticVersioning | 2.0.2, c52c9d4 | MIT | `SemanticVersioning-LICENSE` |
 
-The Windows CoreCLR runtime has its own Microsoft .NET license and third-party
+The Windows CoreCLR runtime has its own Microsoft NuGet MIT license and third-party
 notices in the pinned runtime payload. Its selected version and archive identity
 are recorded by the managed bundle builder. This inventory does not authorize
 shipping the older development-only CoreCLR 6.0.7 closure.

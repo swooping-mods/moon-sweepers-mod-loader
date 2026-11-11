@@ -42,4 +42,14 @@ original first-party Mars compatibility companion, wrapper artwork and metadata.
 The upstream MarsSweepers DLL, voices and source are not bundled; users supply
 their own exact supported download. Import grants no redistribution rights.
 
+Normal desktop and source distributions also include BepInEx 6.0.0-be.791,
+Il2CppInterop 1.5.3, Unity Doorstop and their component libraries, with the original
+Moon Sweepers adapter. [Managed component notices](bepinex-runtime-notices.md)
+describe their terms. Exact LGPL corresponding sources and component license
+texts travel under `loader/runtime/bepinex/files/BepInEx/third-party-sources/`.
+The maintained Windows CoreCLR runtime is the MIT-licensed Microsoft NuGet
+runtime pack pinned by `managed-runtime.lock.json`; its complete original
+`LICENSE.TXT`, `THIRD-PARTY-NOTICES.TXT` and package metadata remain in the
+host's `dotnet/` folder. No generated proprietary game bindings are included.
+
 No project license is assigned.

@@ -1,0 +1,84 @@
+{
+  "schema": "moon-loader-managed-application-notices/v1",
+  "components": [
+    {
+      "id": "Microsoft.Extensions.Logging.Abstractions",
+      "version": "6.0.0",
+      "archive": "microsoft.extensions.logging.abstractions.6.0.0.nupkg",
+      "url": "https://api.nuget.org/v3-flatcontainer/microsoft.extensions.logging.abstractions/6.0.0/microsoft.extensions.logging.abstractions.6.0.0.nupkg",
+      "sha256": "40da9c437c7e30e2bb9576d6902cd23966bfd90c9835b74cfce1046d6375e52c",
+      "matching_members": [
+        "lib/net6.0/Microsoft.Extensions.Logging.Abstractions.dll"
+      ],
+      "dll_sha256": "d575c9d1543ca726ce14dbdffd103e93ea527cd46bb28316da1f4122dbc55d56"
+    },
+    {
+      "id": "Microsoft.Extensions.Logging",
+      "version": "6.0.0",
+      "archive": "microsoft.extensions.logging.6.0.0.nupkg",
+      "url": "https://api.nuget.org/v3-flatcontainer/microsoft.extensions.logging/6.0.0/microsoft.extensions.logging.6.0.0.nupkg",
+      "sha256": "f16b1929119f5d6e4cb1790c98d55feac96b930f9c474d3973390e3f6294a939",
+      "matching_members": [
+        "lib/netstandard2.1/Microsoft.Extensions.Logging.dll"
+      ],
+      "dll_sha256": "183650081b551dfad967a7cbf79946a229cb79458b8d04a12db7c44b03bb9ab7"
+    },
+    {
+      "id": "Microsoft.Extensions.Options",
+      "version": "6.0.0",
+      "archive": "microsoft.extensions.options.6.0.0.nupkg",
+      "url": "https://api.nuget.org/v3-flatcontainer/microsoft.extensions.options/6.0.0/microsoft.extensions.options.6.0.0.nupkg",
+      "sha256": "0f19c48068825e992bc459315ed397ab06a202da088c0f1549258272c5b41701",
+      "matching_members": [
+        "lib/netstandard2.1/Microsoft.Extensions.Options.dll"
+      ],
+      "dll_sha256": "786112cb2f6646ef1170219a8c0bb813c9f14a6781e67c6266414f55a679565d"
+    },
+    {
+      "id": "Microsoft.Extensions.Primitives",
+      "version": "6.0.0",
+      "archive": "microsoft.extensions.primitives.6.0.0.nupkg",
+      "url": "https://api.nuget.org/v3-flatcontainer/microsoft.extensions.primitives/6.0.0/microsoft.extensions.primitives.6.0.0.nupkg",
+      "sha256": "020bf2b2cce9435d40893049164bd2cbc267c085938f5e4f7de93b4fb4e151ce",
+      "matching_members": [
+        "lib/net6.0/Microsoft.Extensions.Primitives.dll"
+      ],
+      "dll_sha256": "8ce9a85927ec7507b11ffe90080e7a811d51304a9e8b1da20c350159ba403902"
+    },
+    {
+      "id": "Microsoft.Extensions.DependencyInjection",
+      "version": "6.0.0",
+      "archive": "microsoft.extensions.dependencyinjection.6.0.0.nupkg",
+      "url": "https://api.nuget.org/v3-flatcontainer/microsoft.extensions.dependencyinjection/6.0.0/microsoft.extensions.dependencyinjection.6.0.0.nupkg",
+      "sha256": "819b8c6ae9cc255cafbdea6eccda1d18f45ce9ea8a1fffdb92cdfde7b75890f2",
+      "matching_members": [
+        "lib/net6.0/Microsoft.Extensions.DependencyInjection.dll"
+      ],
+      "dll_sha256": "2aa8182b5356a8cc5c35fc3641a87e814857d8d9be399ac78f260343754d09e0"
+    },
+    {
+      "id": "Microsoft.Extensions.DependencyInjection.Abstractions",
+      "version": "6.0.0",
+      "archive": "microsoft.extensions.dependencyinjection.abstractions.6.0.0.nupkg",
+      "url": "https://api.nuget.org/v3-flatcontainer/microsoft.extensions.dependencyinjection.abstractions/6.0.0/microsoft.extensions.dependencyinjection.abstractions.6.0.0.nupkg",
+      "sha256": "49991ed2334a22a26fbee91db5af8c808946b2b3f611d3e4912f257cb83b26ee",
+      "matching_members": [
+        "lib/net6.0/Microsoft.Extensions.DependencyInjection.Abstractions.dll"
+      ],
+      "dll_sha256": "9ccd830351aa28bc683d4f8d1cefd9e724161f972d25bfb64eee5bf55c48c5e3"
+    },
+    {
+      "id": "Microsoft.Bcl.AsyncInterfaces",
+      "version": "6.0.0",
+      "archive": "microsoft.bcl.asyncinterfaces.6.0.0.nupkg",
+      "url": "https://api.nuget.org/v3-flatcontainer/microsoft.bcl.asyncinterfaces/6.0.0/microsoft.bcl.asyncinterfaces.6.0.0.nupkg",
+      "sha256": "e3df87fe2170a7e01f0880af59caa8f6eb380b3c40a4f282dfb43912aaf0f895",
+      "matching_members": [
+        "lib/netstandard2.1/Microsoft.Bcl.AsyncInterfaces.dll"
+      ],
+      "dll_sha256": "5705d245072d3eb78400547b32147dbb6e2c8b02ba8bda76729798f5efdeaecb"
+    }
+  ],
+  "scope": "Exact BepInEx application dependencies, not CoreCLR platform/runtime binaries",
+  "license": "MIT, original license/third-party notices and NuGet metadata retained"
+}

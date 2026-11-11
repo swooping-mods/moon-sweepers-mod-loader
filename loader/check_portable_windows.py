@@ -15,7 +15,13 @@ def main():
     from PySide6.QtCore import QTimer
     from moonloader.service import Service
     from moonloader.ui import Window
+    from moonloader.managed import artifact_files, available
     bundle = Path(__file__).resolve().parent
+    runtime_receipt = json.loads((bundle/'runtime/receipt.json').read_text())
+    managed_receipt, _ = artifact_files(bundle/'runtime/bepinex')
+    managed_lock = json.loads((bundle.parent/'vendored/managed-runtime.lock.json').read_text())
+    assert managed_receipt.get('coreclr_version') == managed_lock['coreclr_version']
+    assert available(bundle, runtime_receipt)
     app = QApplication([])
     with tempfile.TemporaryDirectory(prefix='MoonLoader-portable-check-') as temporary:
         service = Service(Path(temporary), bundle)

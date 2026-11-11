@@ -53,20 +53,23 @@ def main(argv=None):
     parser.add_argument('--output', type=Path, default=ROOT/'artifacts')
     parser.add_argument('--with-bepinex', type=Path, metavar='ATTACHMENT',
                         help='Explicit checked runtime attachment containing receipt.json and files/; private mode only')
+    parser.add_argument('--managed-inputs', type=Path, default=ROOT/'local/managed-inputs',
+                        help='Reviewed hash-locked BepInEx/CoreCLR inputs; required for normal distributions')
+    parser.add_argument('--dotnet', type=Path, help='Existing .NET SDK executable for the original adapter build')
     args = parser.parse_args(argv)
     from check_native_sdk import check as check_native_sdk
     check_native_sdk()
     from check_managed_sources import check as check_managed_sources
     check_managed_sources()
     sources = source_payload()
-    managed_payload = {}
+    managed_payload = {}; managed_receipt = None
     if args.with_bepinex:
         from moonloader.managed import artifact_files
         host_receipt, host_files = artifact_files(args.with_bepinex)
         # Keep portable provenance and original notices/source archives without
         # disclosing the author's intake or build directories in a distribution.
         public_receipt = {key: value for key, value in host_receipt.items() if key in
-                          ('schema', 'version', 'files', 'inputs', 'adapter_sha256', 'builder_sha256', 'limits')}
+                          ('schema', 'version', 'files', 'inputs', 'adapter_sha256', 'builder_sha256', 'limits', 'coreclr_version')}
         managed_payload = {'loader/runtime/bepinex/files/' + name: data for name, data in host_files.items()}
         managed_payload['loader/runtime/bepinex/receipt.json'] = (json.dumps(public_receipt, indent=2) + '\n').encode()
     tools = find_tools()
@@ -75,6 +78,9 @@ def main(argv=None):
         raise ValueError('Build outputs belong under this project artifacts/')
     work = out / "build"
     work.mkdir(parents=True, exist_ok=True)
+    if not args.with_bepinex:
+        from managed_bundle import payload
+        managed_payload, managed_receipt = payload(args.managed_inputs, args.dotnet, work/'managed')
     runtime = ROOT / "runtime/loader"
     for name in ("kernel32", "ole32", "shell32", "bcrypt"):
         subprocess.run([tools["llvm-dlltool"], "-m", "i386:x86-64", "-d", str(runtime / (name + ".def")), "-l", str(work / (name + ".lib"))], check=True)
@@ -107,7 +113,7 @@ def main(argv=None):
     files["loader/runtime/windows-x64/version.dll"] = (work / "version.dll").read_bytes()
     files["loader/runtime/windows-x64/MoonLab.LoaderCheck.exe"] = (work / "MoonLab.LoaderCheck.exe").read_bytes()
     files["loader/runtime/receipt.json"] = (json.dumps(receipt, indent=2) + "\n").encode()
-    suffix = '-managed-private' if managed_payload else ''
+    suffix = '-managed-private' if args.with_bepinex else ''
     archive = out / f"moon-sweepers-mod-loader-{VERSION}{suffix}-source.zip"
     with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as target:
         for name, data in sorted(files.items()):
@@ -115,11 +121,12 @@ def main(argv=None):
             info.compress_type = zipfile.ZIP_DEFLATED
             info.external_attr = (0o100755 if name.endswith(".sh") else 0o100644) << 16
             target.writestr(info, data)
-    checksums = 'SHA256SUMS-managed-private' if managed_payload else 'SHA256SUMS'
+    checksums = 'SHA256SUMS-managed-private' if args.with_bepinex else 'SHA256SUMS'
     (out / checksums).write_text(hashlib.sha256(archive.read_bytes()).hexdigest() + "  " + archive.name + "\n")
     (out / ("build" + suffix + "-receipt.json")).write_text(json.dumps({"version": VERSION, "runtime": receipt, "pe_exports_valid": True,
         "source_files": {name: hashlib.sha256(data).hexdigest() for name, data in sources.items()},
         "managed_attachment": bool(managed_payload),
+        "managed_coreclr_version": managed_receipt.get('coreclr_version') if managed_receipt else public_receipt.get('coreclr_version'),
         "archive": archive.name, "sha256": hashlib.sha256(archive.read_bytes()).hexdigest(),
         "limits": ["Host Python/PySide6 required", "No game, Wine or native Windows execution"]}, indent=2) + "\n")
     print(archive)

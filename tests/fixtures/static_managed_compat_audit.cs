@@ -13,6 +13,9 @@ internal static class StaticManagedCompatAudit
         "MonoMod.ILHelpers", "Mono.Cecil", "0Harmony", "MoonLab.ManagedHostCompat",
         "MoonLab.LegacyMonoMod.Utils"
     };
+    private static readonly HashSet<string> GeneratedGameAssemblies = new(StringComparer.OrdinalIgnoreCase) {
+        "Il2Cppmscorlib", "Unity.InputSystem", "UnityEngine.CoreModule", "UnityEngine.InputLegacyModule"
+    };
     private static IEnumerable<TypeDefinition> Types(IEnumerable<TypeDefinition> types) =>
         types.SelectMany(type => new[] { type }.Concat(Types(type.NestedTypes)));
     private static string Scope(TypeReference type)
@@ -24,8 +27,15 @@ internal static class StaticManagedCompatAudit
     private static TypeDefinition Find(TypeReference type)
     {
         type = type.GetElementType();
-        if (!Assemblies.TryGetValue(Scope(type), out var assembly)) return null;
-        return Types(assembly.MainModule.Types).FirstOrDefault(candidate => candidate.FullName == type.FullName);
+        return FindForwarded(Scope(type), type.FullName, new HashSet<string>());
+    }
+    private static TypeDefinition FindForwarded(string scope, string name, HashSet<string> seen)
+    {
+        if (!seen.Add(scope + ":" + name) || !Assemblies.TryGetValue(scope, out var assembly)) return null;
+        var found = Types(assembly.MainModule.Types).FirstOrDefault(candidate => candidate.FullName == name);
+        if (found != null) return found;
+        var forwarded = assembly.MainModule.ExportedTypes.FirstOrDefault(candidate => candidate.FullName == name);
+        return forwarded?.Scope is AssemblyNameReference target ? FindForwarded(target.Name, name, seen) : null;
     }
     private static string Normal(TypeReference type, GenericInstanceType declaring = null)
     {
@@ -35,14 +45,22 @@ internal static class StaticManagedCompatAudit
             return (parameter.Type == GenericParameterType.Method ? "!!" : "!") + parameter.Position;
         }
         if (type is GenericInstanceType generic)
-            return generic.ElementType.FullName + "<" + string.Join(",", generic.GenericArguments.Select(argument => Normal(argument, declaring))) + ">";
+            return Identity(generic.ElementType) + "<" + string.Join(",", generic.GenericArguments.Select(argument => Normal(argument, declaring))) + ">";
+        if (type is FunctionPointerType pointerSignature)
+            return "fnptr:" + pointerSignature.CallingConvention + ":" + pointerSignature.HasThis + ":" +
+                Normal(pointerSignature.ReturnType, declaring) + "(" +
+                string.Join(",", pointerSignature.Parameters.Select(parameter => Normal(parameter.ParameterType, declaring))) + ")";
         if (type is ByReferenceType reference) return Normal(reference.ElementType, declaring) + "&";
         if (type is PointerType pointer) return Normal(pointer.ElementType, declaring) + "*";
         if (type is ArrayType array) return Normal(array.ElementType, declaring) + "[" + new string(',', array.Rank - 1) + "]";
         if (type is OptionalModifierType optional) return Normal(optional.ElementType, declaring);
         if (type is RequiredModifierType required) return Normal(required.ElementType, declaring);
-        return type.FullName;
+        return Identity(type);
     }
+    // Equal names in modern and isolated legacy Utils are distinct CLR types.
+    // Framework forwards remain name-normalized; detour dependency scopes do not.
+    private static string Identity(TypeReference type) =>
+        (Targets.Contains(Scope(type)) ? Scope(type) + "::" : "") + type.FullName;
     private static IEnumerable<TypeDefinition> Hierarchy(TypeDefinition type)
     {
         var seen = new HashSet<string>();
@@ -51,21 +69,34 @@ internal static class StaticManagedCompatAudit
             type = type.BaseType == null ? null : Find(type.BaseType);
         }
     }
-    private static IEnumerable<TypeDefinition> Interfaces(TypeDefinition type, HashSet<string> seen)
+    private static TypeReference Substitute(TypeReference type, GenericInstanceType context)
+    {
+        if (context != null && type is GenericParameter parameter && parameter.Type == GenericParameterType.Type)
+            return context.GenericArguments[parameter.Position];
+        if (type is GenericInstanceType generic) {
+            var result = new GenericInstanceType(generic.ElementType);
+            foreach (var argument in generic.GenericArguments) result.GenericArguments.Add(Substitute(argument, context));
+            return result;
+        }
+        return type;
+    }
+    private static IEnumerable<(TypeDefinition Type, GenericInstanceType Context)> Interfaces(TypeDefinition type, HashSet<string> seen, GenericInstanceType context = null)
     {
         foreach (var current in Hierarchy(type))
         foreach (var implemented in current.Interfaces) {
-            var contract = Find(implemented.InterfaceType);
-            if (contract == null || !seen.Add(contract.FullName)) continue;
-            yield return contract;
-            foreach (var parent in Interfaces(contract, seen)) yield return parent;
+            var reference = Substitute(implemented.InterfaceType, context);
+            var contract = Find(reference);
+            if (contract == null || !seen.Add(Scope(reference) + ":" + reference.FullName)) continue;
+            var bound = reference as GenericInstanceType;
+            yield return (contract, bound);
+            foreach (var parent in Interfaces(contract, seen, bound)) yield return parent;
         }
     }
-    private static bool MethodMatches(MethodReference reference, MethodDefinition candidate)
+    private static bool MethodMatches(MethodReference reference, MethodDefinition candidate, GenericInstanceType context = null, bool explicitName = false)
     {
         reference = reference.GetElementMethod();
-        var declaring = reference.DeclaringType as GenericInstanceType;
-        return candidate.Name == reference.Name && candidate.HasThis == reference.HasThis &&
+        var declaring = context ?? reference.DeclaringType as GenericInstanceType;
+        return (explicitName || candidate.Name == reference.Name) && candidate.HasThis == reference.HasThis &&
             candidate.GenericParameters.Count == reference.GenericParameters.Count &&
             candidate.Parameters.Count == reference.Parameters.Count &&
             Normal(candidate.ReturnType, declaring) == Normal(reference.ReturnType, declaring) &&
@@ -90,6 +121,9 @@ internal static class StaticManagedCompatAudit
             var path = input.path;
             var assembly = input.assembly;
             var missingTypes = new HashSet<string>();
+            var missingAssemblies = input.assembly.MainModule.AssemblyReferences
+                .Where(reference => !Assemblies.ContainsKey(reference.Name) && !GeneratedGameAssemblies.Contains(reference.Name))
+                .Select(reference => reference.FullName).ToArray();
             var missingMembers = new HashSet<string>();
             var signatures = new List<object>();
             var missingImplementations = new List<string>();
@@ -117,17 +151,19 @@ internal static class StaticManagedCompatAudit
             }
             foreach (var type in Types(assembly.MainModule.Types).Where(type => !type.IsInterface && !type.IsAbstract))
             foreach (var contract in Interfaces(type, new HashSet<string>()))
-            foreach (var requirement in contract.Methods.Where(method => method.IsAbstract)) {
-                if (!Targets.Contains(contract.Module.Assembly.Name.Name)) continue;
+            foreach (var requirement in contract.Type.Methods.Where(method => method.IsAbstract)) {
+                if (!Targets.Contains(contract.Type.Module.Assembly.Name.Name)) continue;
                 var methods = Hierarchy(type).SelectMany(current => current.Methods).ToList();
-                if (methods.Any(candidate => MethodMatches(requirement, candidate) ||
-                    candidate.Overrides.Any(overridden => overridden.FullName == requirement.FullName))) continue;
+                if (methods.Any(candidate => MethodMatches(requirement, candidate, contract.Context) ||
+                    candidate.Overrides.Any(overridden => overridden.Name == requirement.Name &&
+                        overridden.DeclaringType.GetElementType().FullName == contract.Type.FullName &&
+                        MethodMatches(overridden, candidate, contract.Context, true)))) continue;
                 missingImplementations.Add(type.FullName + " does not implement " + requirement.FullName);
             }
-            failures += missingTypes.Count + missingMembers.Count + signatures.Count + missingImplementations.Count;
+            failures += missingAssemblies.Length + missingTypes.Count + missingMembers.Count + signatures.Count + missingImplementations.Count;
             results.Add(new { assembly = assembly.Name.Name, path = Path.GetFullPath(path), checkedTypes, checkedMembers,
                 missingTypes = missingTypes.OrderBy(value => value).ToArray(), missingMembers = missingMembers.OrderBy(value => value).ToArray(),
-                signatureMismatches = signatures, missingImplementations });
+                signatureMismatches = signatures, missingImplementations, missingAssemblies });
         }
         var json = JsonSerializer.Serialize(results, new JsonSerializerOptions { WriteIndented = true });
         File.WriteAllText(arguments[1], json + Environment.NewLine);

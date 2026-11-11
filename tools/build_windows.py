@@ -24,6 +24,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--inputs', type=Path, required=True, help='Reviewed inert download directory; no downloads occur')
     parser.add_argument('--output', type=Path, default=ROOT/'artifacts')
+    parser.add_argument('--managed-inputs', type=Path, default=ROOT/'local/managed-inputs')
+    parser.add_argument('--dotnet', type=Path, help='Existing SDK executable; no download occurs')
     args = parser.parse_args()
     lock = json.loads((ROOT / 'vendored/windows-runtime.lock.json').read_text())
     for item in lock['files']:
@@ -33,7 +35,9 @@ def main():
     out = args.output.resolve()
     if not out.is_relative_to(ROOT/'artifacts'):
         raise ValueError('Build outputs belong under this project artifacts/')
-    build.main(['--output', str(out)])
+    build_args = ['--output', str(out), '--managed-inputs', str(args.managed_inputs)]
+    if args.dotnet: build_args += ['--dotnet', str(args.dotnet)]
+    build.main(build_args)
     work = out / 'build'
     tools = build.find_tools()
     cc, link, dlltool = (tools[name] for name in ('clang', 'lld-link', 'llvm-dlltool'))
@@ -86,7 +90,7 @@ def main():
     shutil.copy2(ROOT / 'vendored/THIRD_PARTY_NOTICES.md', dest / 'THIRD_PARTY_NOTICES.md')
     shutil.copy2(ROOT / 'vendored/windows-runtime.lock.json', dest / 'LICENSES/runtime-manifest.json')
     shutil.copy2(ROOT / 'vendored/WINDOWS-LICENSES.md', dest / 'LICENSES/README.md')
-    put(dest, 'README.txt', b'Moon Sweepers Mod Loader - Windows x64\r\n\r\nExtract the entire ZIP, then double-click Mod Loader.exe. No Python install needed.\r\nSquishy Plushie, Futuristic Courier, Power Poles, Debug Menu (F4), and their five\r\ndependencies are included in the library, initially unchecked. Select mods and their\r\nrequired frameworks, select your supported game, Prepare files, then Launch.\r\nUse Add mods... for files, Add folder... for extracted mods, or drop files/folders\r\nonto the window. MarsSweepers 0.6.1 needs the supported BepInEx runtime in\r\nPrivate game copy mode. The game is not included.\r\nApplication data uses LOCALAPPDATA/MoonLab/Loader.\r\nFor UI inspection: "Mod Loader.exe" --no-launch\r\n\r\nBundled Python, PySide6/Shiboken and Qt notices, licenses and source: LICENSES/.\r\nQt/PySide use LGPLv3. You may replace these libraries and debug their modifications.\r\nSee THIRD_PARTY_NOTICES.md and LICENSES/README.md.\r\n')
+    put(dest, 'README.txt', b'Moon Sweepers Mod Loader - Windows x64\r\n\r\nExtract the entire ZIP, then double-click Mod Loader.exe. No Python install needed.\r\nSquishy Plushie, Futuristic Courier, Power Poles, Debug Menu (F4), and their five\r\ndependencies are included in the library, initially unchecked. Select mods and their\r\nrequired frameworks, select your supported game, Prepare files, then Launch.\r\nUse Add mods... for files, Add folder... for extracted mods, or drop files/folders\r\nonto the window. The BepInEx adapter and maintained runtime are included.\r\nImport MarsSweepers separately; the loader shows supported deployment modes.\r\nThe game is not included.\r\nApplication data uses LOCALAPPDATA/MoonLab/Loader.\r\nFor UI inspection: "Mod Loader.exe" --no-launch\r\n\r\nBundled Python, PySide6/Shiboken and Qt notices, licenses and source: LICENSES/.\r\nQt/PySide use LGPLv3. You may replace these libraries and debug their modifications.\r\nSee THIRD_PARTY_NOTICES.md and LICENSES/README.md.\r\n')
     archive = out / f'moon-sweepers-mod-loader-{build.VERSION}-windows-x64.zip'
     with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as z:
         for p in sorted(dest.rglob('*')):
@@ -95,7 +99,9 @@ def main():
                 info.compress_type = zipfile.ZIP_DEFLATED
                 info.external_attr = 0o100644 << 16
                 z.writestr(info, p.read_bytes())
-    receipt = {'version': build.VERSION, 'archive': archive.name, 'sha256': hashlib.sha256(archive.read_bytes()).hexdigest(), 'bytes': archive.stat().st_size, 'input_lock': lock, 'limits': ['Native Windows GUI/game execution not performed on Linux build host', 'Unsigned launcher; no signing certificate supplied']}
+    from managed_bundle import verify_bundle
+    managed_receipt = verify_bundle(dest/'loader')
+    receipt = {'version': build.VERSION, 'archive': archive.name, 'sha256': hashlib.sha256(archive.read_bytes()).hexdigest(), 'bytes': archive.stat().st_size, 'input_lock': lock, 'managed_coreclr_version': managed_receipt['coreclr_version'], 'limits': ['Native Windows GUI/game execution not performed on Linux build host', 'Unsigned launcher; no signing certificate supplied']}
     (out / 'windows-build-receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
     (out / 'SHA256SUMS').write_text(''.join(hashlib.sha256(p.read_bytes()).hexdigest() + '  ' + p.name + '\n' for p in [out / f'moon-sweepers-mod-loader-{build.VERSION}-source.zip', archive]))
     print(archive)

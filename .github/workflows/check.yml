@@ -32,7 +32,11 @@ jobs:
       - name: Focused host checks
         run: python3 tools/check.py --host-only
       - name: Stage exact reviewed runtime inputs
-        run: python3 tools/fetch_windows_inputs.py --output local/windows-inputs
+        run: |
+          python3 tools/fetch_windows_inputs.py --output local/windows-inputs
+          python3 tools/fetch_windows_inputs.py --lock vendored/managed-runtime.lock.json --output local/managed-inputs
+          python3 tools/fetch_windows_inputs.py --lock vendored/modern-harmony.lock.json --output local/managed-inputs
+          dotnet --list-sdks
       - name: Build portable Windows bundle offline
         run: python3 tools/build_windows.py --inputs local/windows-inputs
       - name: Check Windows package and licenses

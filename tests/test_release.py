@@ -11,6 +11,7 @@ class ReleaseChecks(unittest.TestCase):
     def candidate(self, root):
         sums = []
         identities={}
+        coreclr = json.loads((Path(__file__).resolve().parents[1]/'vendored/managed-runtime.lock.json').read_text())['coreclr_version']
         for kind, receipt in [('source', 'build-receipt.json'), ('windows-x64', 'windows-build-receipt.json'), ('linux-x64', 'linux-build-receipt.json')]:
             name = f'moon-sweepers-mod-loader-{VERSION}-{kind}'+('.tar.gz' if kind=='linux-x64' else '.zip')
             payload = ('candidate ' + kind).encode()
@@ -18,7 +19,7 @@ class ReleaseChecks(unittest.TestCase):
             digest = hashlib.sha256(payload).hexdigest()
             identities[kind]=digest
             sums.append(digest + '  ' + name + '\n')
-            (root / receipt).write_text(json.dumps({'version': VERSION, 'archive': name, 'sha256': digest, 'python_qt_bundled':True}))
+            (root / receipt).write_text(json.dumps({'version': VERSION, 'archive': name, 'sha256': digest, 'python_qt_bundled':True, 'managed_coreclr_version': coreclr}))
         formats={}
         for suffix in ('.run','.AppImage'):
             name=f'moon-sweepers-mod-loader-{VERSION}-linux-x64'+suffix
@@ -28,8 +29,8 @@ class ReleaseChecks(unittest.TestCase):
         (root/'linux-formats-checks.json').write_text(json.dumps({'success':True,'version':VERSION,'files':{n:{'sha256':sha,'actual_cli_passed':True,'bundled_gui_smoke_passed':True} for n,sha in formats.items()}}))
         (root / 'SHA256SUMS').write_text(''.join(sums))
         (root / 'checks.json').write_text(json.dumps({'success': True, 'tests_run': 40, 'failures': 0, 'errors': 0, 'skipped': [], 'excluded': ['test_loader.LoaderChecks.test_gui_checkboxes_views_filter_and_no_launch', 'test_loader.LoaderChecks.test_grid_wheel_travel_ignores_global_lines_and_preserves_precise_input', 'test_categories.CategoryChecks.test_ui_categories_tags_and_enabled_combine_in_every_view']}))
-        (root / 'windows-checks.json').write_text(json.dumps({'success': True, 'sha256': identities['windows-x64']}))
-        (root / 'linux-checks.json').write_text(json.dumps({'success': True, 'sha256': identities['linux-x64'], 'actual_launcher_cli_passed':True, 'gui_smoke_passed':True, 'portable_desktop_libraries_passed':True}))
+        (root / 'windows-checks.json').write_text(json.dumps({'success': True, 'sha256': identities['windows-x64'], 'managed_coreclr_version': coreclr}))
+        (root / 'linux-checks.json').write_text(json.dumps({'success': True, 'sha256': identities['linux-x64'], 'actual_launcher_cli_passed':True, 'gui_smoke_passed':True, 'portable_desktop_libraries_passed':True, 'managed_coreclr_version': coreclr}))
 
     def test_tag_must_match_package_version(self):
         validate_tag('v' + VERSION)
@@ -48,7 +49,7 @@ class ReleaseChecks(unittest.TestCase):
     def test_changed_payload_or_receipt_blocks_upload(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            for broken in ('zip', 'version', 'failed', 'excluded', 'extra', 'stale', 'linux-stale', 'linux-not-run', 'format-changed', 'format-not-run'):
+            for broken in ('zip', 'version', 'failed', 'excluded', 'extra', 'stale', 'linux-stale', 'linux-not-run', 'format-changed', 'format-not-run', 'managed-missing', 'managed-unverified'):
                 self.candidate(root)
                 if broken == 'zip':
                     (root / f'moon-sweepers-mod-loader-{VERSION}-windows-x64.zip').write_bytes(b'changed')
@@ -76,6 +77,9 @@ class ReleaseChecks(unittest.TestCase):
                 elif broken == 'format-not-run':
                     p=root/'linux-formats-checks.json';r=json.loads(p.read_text())
                     next(iter(r['files'].values()))['bundled_gui_smoke_passed']=False;p.write_text(json.dumps(r))
+                elif broken.startswith('managed-'):
+                    p=root/('build-receipt.json' if broken=='managed-missing' else 'windows-checks.json')
+                    r=json.loads(p.read_text());r.pop('managed_coreclr_version');p.write_text(json.dumps(r))
                 with self.subTest(broken=broken), self.assertRaises(ValueError):
                     verify_artifacts(root, 'v' + VERSION)
 

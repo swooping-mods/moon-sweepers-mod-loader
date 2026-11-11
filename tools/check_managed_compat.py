@@ -43,11 +43,15 @@ def negative_control(dotnet, cecil, output, image):
             subprocess.run(command+['/noconfig','@/output/'+name+'.rsp'],stdout=log,stderr=subprocess.STDOUT,check=True,timeout=90)
     rejected=check(dotnet,cecil,output/'new',[output/'Consumer.dll'],output/'rejected',image)
     accepted=check(dotnet,cecil,output/'old',[output/'Consumer.dll'],output/'accepted',image)
+    (output/'missing').mkdir()
+    absent=check(dotnet,cecil,output/'missing',[output/'Consumer.dll'],output/'absent',image)
     row=rejected['modules'][0]
     categories=('missingTypes','missingMembers','signatureMismatches','missingImplementations')
-    success=not rejected['success'] and accepted['success'] and all(len(row[name])==1 for name in categories)
+    missing_assembly = not absent['success'] and any('MonoMod.Utils' in name for name in absent['modules'][0]['missingAssemblies'])
+    success=not rejected['success'] and accepted['success'] and missing_assembly and all(len(row[name])==1 for name in categories)
     result={'success':success,'negative_counts':{name:len(row[name]) for name in categories},
-            'unchanged_contract_accepted':accepted['success'],'changed_contract_rejected':not rejected['success']}
+            'unchanged_contract_accepted':accepted['success'],'changed_contract_rejected':not rejected['success'],
+            'missing_assembly_rejected':missing_assembly}
     (output/'self-test.json').write_text(json.dumps(result,indent=2)+'\n')
     return result
 
@@ -74,7 +78,16 @@ def check(dotnet, cecil, dependencies, modules, output, image):
     args += ['/reference:/dotnet/'+path.relative_to(sdk).as_posix() for path in sorted(references.glob('*.dll'))]
     args += ['/output/Audit.cs']
     (output/'compile.rsp').write_text('\n'.join(args)+'\n')
-    dependencies = Path(dependencies).resolve()
+    supplied = Path(dependencies).resolve()
+    dependencies = output/'dependencies'; dependencies.mkdir()
+    for path in sorted(supplied.glob('*.dll')):
+        if path.is_symlink(): raise ValueError('Alias in metadata dependencies')
+        shutil.copyfile(path, dependencies/path.name)
+    # A complete AssemblyRef check also needs platform metadata. Prefer actual
+    # supplied runtime members, supplementing only absent platform names with
+    # the explicitly selected installed SDK's shared runtime.
+    for path in sorted((sdk/'shared/Microsoft.NETCore.App'/runtime).glob('*.dll')):
+        if not (dependencies/path.name).exists(): shutil.copyfile(path, dependencies/path.name)
     modules = [Path(path).resolve() for path in modules]
     command = ['podman','run','--rm','--pull','never','--network','none','--userns','keep-id',
         '--user',str(os.getuid())+':'+str(os.getgid()),'--cap-drop','ALL','--security-opt','no-new-privileges',

@@ -5,6 +5,10 @@ folder and ZIP under `artifacts/`. It requires the installed native build tools
 used by `tools/build.py`. Exact reviewed input names, SHA-256 hashes, publisher
 URLs and selected wheel members are pinned in `vendored/windows-runtime.lock.json`.
 The command never downloads, installs dependencies or executes Windows payloads.
+Normal builds additionally require staged `--managed-inputs PATH` and an installed
+SDK (`--dotnet PATH`, or `dotnet` on PATH) for the bundled original adapter.
+The checked BepInEx/maintained CoreCLR host and notices are included under
+`loader/runtime/bepinex/`; see [managed runtime](managed-runtime.md).
 The separate explicit `tools/fetch_windows_inputs.py` stages the already-reviewed
 lock inputs for CI; [CI](ci.md) defines the hosted-runner execution gates.
 New input bytes require the workstation external-intake review before use.

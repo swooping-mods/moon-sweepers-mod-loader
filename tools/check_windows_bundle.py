@@ -33,10 +33,16 @@ def main():
     required += list(bundled) + ['vendored/mod-bundle.json', 'vendored/mod-bundle/README.md']
     for name in required:
         assert (folder / name).is_file(), name
+    from managed_bundle import verify_bundle
+    managed_receipt = verify_bundle(folder/'loader')
     with zipfile.ZipFile(archive) as z:
         for name in required:
             assert z.read(name) == (folder / name).read_bytes(), name
         assert {name for name in z.namelist() if name.startswith('loader/packages/')} == set(bundled)
+        managed_prefix = 'loader/runtime/bepinex/files/'
+        assert {name[len(managed_prefix):] for name in z.namelist() if name.startswith(managed_prefix)} == set(managed_receipt['files'])
+        for name, expected in managed_receipt['files'].items():
+            assert hashlib.sha256(z.read(managed_prefix + name)).hexdigest() == expected, name
         for item in lock['files']:
             if item['role'] in ('source', 'license'):
                 data = z.read('LICENSES/' + item['name'])
@@ -63,6 +69,7 @@ def main():
     receipt = {'success': True, 'required_files': len(required), 'amd64_runtime_images': len(native),
                'bundled_mods_checked': len(bundled),
                'library_source_hashes_verified': True, 'runtime_import_closure': 'Windows system libraries plus bundled DLLs',
+               'managed_coreclr_version': managed_receipt['coreclr_version'],
                'sha256': hashlib.sha256(archive.read_bytes()).hexdigest(),
                'limits': ['Static package verification; Windows GUI and launcher execution not tested']}
     (out / 'windows-checks.json').write_text(json.dumps(receipt, indent=2) + '\n')

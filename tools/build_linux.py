@@ -32,6 +32,8 @@ def main(argv=None):
     source=out/receipt['archive']
     if receipt['version']!=build.VERSION or hashlib.sha256(source.read_bytes()).hexdigest()!=receipt['sha256']:
         raise ValueError('Source archive differs from the checked build')
+    if receipt.get('managed_coreclr_version') != json.loads((build.ROOT/'vendored/managed-runtime.lock.json').read_text())['coreclr_version']:
+        raise ValueError('Source archive has no qualified maintained managed runtime')
     with zipfile.ZipFile(source) as archive:
         files={name:archive.read(name) for name in archive.namelist()
                if name.startswith(('loader/','vendored/')) and name!='vendored/appimage/runtime-x86_64'}
@@ -54,7 +56,8 @@ dependencies are included in the library, initially unchecked. Select the mods
 and required frameworks, choose the supported Steam game, prepare files, then launch.
 Use Add mods... for files, Add folder... for extracted mods, or drop files/folders
 onto the window. Supports .msmod, packaged ZIPs and MarsSweepers 0.6.1 downloads.
-MarsSweepers needs the supported BepInEx runtime and Private game copy mode.
+The BepInEx adapter and maintained runtime are included. Import MarsSweepers separately;
+the loader shows supported deployment modes and startup requirements.
 Moon Sweepers uses Steam Proton; its native mod bootstrap is the included Windows DLL.
 Merge `WINEDLLOVERRIDES="version=n,b" %command%` into the Steam launch options.
 The desktop loader itself runs on Linux. See the repository README for save backups,
@@ -74,6 +77,7 @@ deployment recovery and compatibility.
     (out/'linux-build-receipt.json').write_text(json.dumps({
         'version':build.VERSION,'platform':'linux-x64','archive':name,'sha256':digest,
         'source_archive_sha256':receipt['sha256'],
+        'managed_coreclr_version':receipt['managed_coreclr_version'],
         'files':{name:hashlib.sha256(data).hexdigest() for name,data in files.items()},
         'requires':['Linux x64 desktop; glibc 2.38+','Steam Proton for the game'],
         'python_qt_bundled':True,'game_started':False},indent=2)+'\n')

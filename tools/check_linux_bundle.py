@@ -43,6 +43,8 @@ def check(out, gui=False):
         if not required<=seen:
             raise ValueError('Missing Linux loader files')
         bundled = bundled_payload(root / 'loader/packages')
+        from managed_bundle import verify_bundle
+        managed_receipt = verify_bundle(root/'loader')
         env={**os.environ,
              'XDG_DATA_HOME':str(root/'temporary-user-data'),'QT_QPA_PLATFORM':'offscreen'}
         env.pop('MOON_LOADER_PYTHON', None)
@@ -56,6 +58,7 @@ def check(out, gui=False):
             subprocess.run(command+['--smoke-test'],env=env,check=True,timeout=30)
     result={'success':True,'version':build.VERSION,'sha256':digest,
             'bundled_mods_checked':len(bundled),
+            'managed_coreclr_version':managed_receipt['coreclr_version'],
             'files_checked':len(seen),'actual_launcher_cli_passed':True,
             'portable_desktop_libraries_passed':True,
             'gui_smoke_passed':gui,'game_started':False,

@@ -1,14 +1,16 @@
-# Optional managed runtime adapter
+# Bundled managed runtime adapter
 
-The default distribution hosts native mods. A checked BepInEx runtime attachment
-adds the existing `bepinex-il2cpp` / `BepInEx.IL2CPP/6-be791` backend in **Private
-game copy** mode. Installed-game mode continues to refuse managed selections.
-Importing a package never downloads, attaches or executes a host.
+Normal source, Windows and Linux distributions include the checked original
+adapter and BepInEx host for the `bepinex-il2cpp` /
+`BepInEx.IL2CPP/6-be791` backend in **Private game copy** mode. This applies to
+prereleases and full releases alike. Installed-game mode continues to refuse
+managed selections. Including the host does not select, acquire or execute a
+managed mod; the nine native starter packages retain unchecked defaults.
 
 [Downloaded mod imports](download-imports.md) recognize the complete reviewed
 MarsSweepers 0.6.1 folder/ZIP and retain its external metadata and exact hashes.
-The import result explains the host/private-copy prerequisites; this convenience
-does not change host availability or installed-mode refusal.
+The import result explains the private-copy prerequisite; convenience importing
+does not change installed-mode refusal.
 
 `loader/moonloader/managed.py` is the canonical deployment implementation. The
 workshop consumes an exact hash-pinned copy through its explicit
@@ -32,13 +34,23 @@ Preparation checks all actual bytes, rejects extra/missing/aliased files and
 validates config before making a private game copy. Declared capability may be
 shown in the UI before that full integrity check; preparation repeats it.
 
-`tools/build.py --with-bepinex ATTACHMENT` explicitly packages the attachment
-in a separate `*-managed-private-source.zip`. It never executes or downloads
-the input. Default builds exclude an attached managed folder unless the flag
-is supplied. Its separate `SHA256SUMS-managed-private` preserves the default
-source/Windows checksum manifest. Portable receipts retain file/source hashes and bounded limits,
-omitting local intake/build directories. The normal Windows portable build
-remains native-only unless a separate managed packaging path is requested.
+`vendored/managed-runtime.lock.json` pins upstream BepInEx, exact upstream source
+archives and maintained Windows CoreCLR input bytes. Explicit staging uses
+`tools/fetch_windows_inputs.py --lock vendored/managed-runtime.lock.json --output
+local/managed-inputs`; offline builders never fetch or install dependencies.
+`tools/managed_bundle.py` compiles only this repository's original adapter using
+an installed SDK, replaces the entire retired upstream `dotnet/` closure,
+retains exact runtime licenses and component sources/notices, and seals a complete
+receipt. No plugin, proprietary game binary or generated game binding is shipped.
+`tools/build.py --managed-inputs PATH --dotnet PATH` uses this host by default;
+Windows packaging forwards those options and Linux consumes the sealed source
+archive. Host absence or tampering blocks the build. Package/release gates require
+the maintained runtime version and actual member hashes. Receipts omit local
+intake/compiler directories. The six existing release assets remain unchanged.
+
+`--with-bepinex ATTACHMENT` remains an explicit development attachment override
+producing a separate `*-managed-private-source.zip` and
+`SHA256SUMS-managed-private`. Those outputs are not normal release assets.
 
 Private deployment journals immutable host/plugin files and their executable
 input allowlist together. A failed commit restores both. Plugins deploy under
@@ -55,8 +67,31 @@ native entries; total selection capacity remains the package contract's bound.
 External provenance is generic metadata and never a native DLL fallback.
 
 The qualified adapter profile is Moon Sweepers Steam 1.0.5 / Unity 6000.6 /
-IL2CPP 108. Its upstream .NET 6.0.7 closure is development-only; attaching it
-does not qualify a public runtime release or arbitrary game/Unity profiles.
+IL2CPP 108. Production packaging replaces upstream CoreCLR 6.0.7 with
+maintained CoreCLR 10.0.15. The offline compiler still uses the reviewed upstream
+.NET 6 reference assemblies for compatible adapter assembly signatures; the
+retired runtime is never copied into normal packages. New runtime execution
+requires its own private startup qualification; older retained world receipts
+below qualify only their original runtime. Arbitrary game/Unity profiles remain
+unsupported.
+
+Modern HarmonyX 2.16.1 / MonoMod RuntimeDetour 25.3.6 provides .NET 10-aware
+managed hooks; its complete dependency/member hash and MIT notice closure is
+separately pinned in `modern-harmony.lock.json`. The old backend crashes during
+Harmony initialization on .NET 10 and cannot be carried into the maintained
+host unchanged. A deterministic offline Cecil transformation preserves the
+be.791 host's native-detour interface and MethodBase trampoline proxy in the
+isolated original `MoonLab.ManagedHostCompat` assembly. It renames the reviewed
+old utilities assembly to `MoonLab.LegacyMonoMod.Utils` and retargets only the
+four legacy BepInEx modules to it, preserving their Platform/Reflection/DynDll
+APIs. Il2CppInterop/Harmony and modern MonoMod retain modern utility type
+identity, including `MonoMod.Cil.ILContext`; the retired native detour backend
+is not loaded. Original upstream corresponding sources, the exact patch tool
+and helper sources travel in the host. No user plugin is rewritten. Compiler
+version/hash and every modified assembly hash are recorded. Real executable
+trampoline tests cover zero/eight arguments, by-reference/void, value types,
+legacy instance-signature semantics and forced GC; static scope-aware member
+and interface checks remain distinct from actual engine qualification.
 Managed plugin lifecycle follows BepInEx metadata. Mixed package dependency
 ordering establishes package closure, not a native/managed startup rendezvous.
 SDK 0.5 managed consumers may declare native `requires_apis` with

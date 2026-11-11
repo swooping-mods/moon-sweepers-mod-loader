@@ -12,6 +12,11 @@ package verifiers. Wheels are copied as selected files, never installed. Build-o
 SquashFS packages are extracted without maintainer scripts. No package resolver,
 Python installer or system package install runs.
 `vendored/runtime-intake.md` records dependency review and scan limits.
+The same staging step verifies `vendored/managed-runtime.lock.json`; the offline
+build compiles the original managed adapter with the runner's installed SDK and
+includes its checked BepInEx/CoreCLR host in all normal artifacts. Package smoke
+checks confirm managed backend availability without starting a game/plugin.
+Publication rejects missing managed-runtime build/check receipts.
 `tools/fetch_windows_inputs.py` stages the reviewed lock; changed bytes fail.
 Matching LGPL source archives remain inert distribution payloads.
 The reviewed Microsoft license DOCX inputs are vendored at unchanged hashes
