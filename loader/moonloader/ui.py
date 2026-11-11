@@ -465,7 +465,15 @@ class Window(QMainWindow):
         info = label(preview['message'] + '\n\nQuit Steam completely before applying; reopen it afterwards. Existing options are preserved and the original config is backed up.'); info.setWordWrap(True); layout.addWidget(info)
         edit = QPlainTextEdit(); edit.setReadOnly(True); edit.setPlainText('Current launch options\n' + preview.get('current', '(unavailable)') + '\n\nProposed launch options\n' + preview.get('proposed', '(manual setup required)')); layout.addWidget(edit)
         row = QHBoxLayout(); apply = QPushButton('Apply required launch options'); apply.setEnabled(preview['status'] == 'required'); row.addWidget(apply)
+        refresh = QPushButton('Refresh preview'); row.addWidget(refresh)
         close = QPushButton('Close'); close.clicked.connect(dialog.accept); row.addWidget(close); layout.addLayout(row)
+        def refresh_preview():
+            nonlocal preview
+            preview = steam_options.inspect(installation)
+            info.setText(preview['message'] + '\n\nQuit Steam completely before applying; reopen it afterwards. Existing options are preserved and the original config is backed up.')
+            edit.setPlainText('Current launch options\n' + preview.get('current', '(unavailable)') + '\n\nProposed launch options\n' + preview.get('proposed', '(manual setup required)'))
+            apply.setEnabled(preview['status'] == 'required')
+        refresh.clicked.connect(refresh_preview)
         def apply_options():
             try:
                 result = steam_options.apply(installation, self.service.root, preview)
