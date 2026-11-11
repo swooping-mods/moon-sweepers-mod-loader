@@ -10,6 +10,23 @@ import fetch_windows_inputs
 
 
 class WindowsInputChecks(unittest.TestCase):
+    def test_transient_download_retries_but_changed_bytes_do_not(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            target = Path(temporary) / 'input.download'
+            item = {'name': 'input.zip', 'url': 'https://publisher.invalid/input.zip',
+                    'sha256': hashlib.sha256(b'reviewed').hexdigest()}
+            with patch.object(fetch_windows_inputs.urllib.request, 'urlopen',
+                              side_effect=[OSError('connection reset'), io.BytesIO(b'reviewed')]) as request, \
+                    patch.object(fetch_windows_inputs.time, 'sleep'):
+                fetch_windows_inputs.download(item, target)
+                self.assertEqual(request.call_count, 2)
+                self.assertEqual(target.read_bytes(), b'reviewed')
+            with patch.object(fetch_windows_inputs.urllib.request, 'urlopen',
+                              return_value=io.BytesIO(b'changed')) as request:
+                with self.assertRaisesRegex(ValueError, 'intake review required'):
+                    fetch_windows_inputs.download(item, target)
+                self.assertEqual(request.call_count, 1)
+
     def test_mismatch_preserves_prior_file_and_removes_partial_download(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

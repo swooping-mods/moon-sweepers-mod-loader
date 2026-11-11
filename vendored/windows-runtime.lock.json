@@ -14,7 +14,8 @@
       "name": "Visual-Studio-2022-Community-License.docx",
       "role": "license",
       "sha256": "41a207b10c8ab91d0d2f10a854715f73dca54509581692d2fe179aa3ffcb8540",
-      "url": "https://visualstudio.microsoft.com/wp-content/uploads/2021/11/Visual-Studio-2022-Community-License-EN.docx"
+      "url": "https://visualstudio.microsoft.com/wp-content/uploads/2021/11/Visual-Studio-2022-Community-License-EN.docx",
+      "local_path": "vendored/windows-license-inputs/Visual-Studio-2022-Community-License.docx"
     },
     {
       "name": "qtbase-everywhere-src-6.8.3.tar.xz",
@@ -51,7 +52,8 @@
       "name": "Visual-C-Runtime-2015-2022-License-1.docx",
       "role": "license",
       "sha256": "f1e3d56ceb2ad68aae0711b910375009e651ac5530fa0760f0dea6e81e54fae1",
-      "url": "https://visualstudio.microsoft.com/wp-content/uploads/2021/09/Visual-C-Runtime-2015-2022-License-1.docx"
+      "url": "https://visualstudio.microsoft.com/wp-content/uploads/2021/09/Visual-C-Runtime-2015-2022-License-1.docx",
+      "local_path": "vendored/windows-license-inputs/Visual-C-Runtime-2015-2022-License-1.docx"
     }
   ],
   "wheel_members": [

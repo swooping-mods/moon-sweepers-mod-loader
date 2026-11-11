@@ -14,6 +14,9 @@ Python installer or system package install runs.
 `vendored/runtime-intake.md` records dependency review and scan limits.
 `tools/fetch_windows_inputs.py` stages the reviewed lock; changed bytes fail.
 Matching LGPL source archives remain inert distribution payloads.
+The reviewed Microsoft license DOCX inputs are vendored at unchanged hashes
+because their publisher intermittently denies CI requests. Other downloads retry
+transport errors up to three attempts; permission errors and changed hashes fail.
 
 Host-only checks explicitly exclude the three Linux Qt interaction cases; the local
 full suite covers those. A downstream Windows Server 2022 job checks the Windows

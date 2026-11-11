@@ -39,3 +39,9 @@ receive no repository credentials. GitHub's maintained runner supplies LLVM/Pyth
 build tools; existing pinned checkout/upload actions are retained without updates.
 CI downloads need no package installer and no dependency resolution. Raw local
 scan logs remain private; the repository preserves this sanitized disposition.
+
+The exact reviewed Microsoft DOCX license texts are retained under
+`vendored/windows-license-inputs/` and checked against their existing lock hashes.
+This avoids an intermittent HTTP 403 from the publisher website during CI.
+Original publisher URLs and unchanged byte identities remain in the lock. These
+are inert notices already included by the portable Windows license payload.
