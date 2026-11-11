@@ -46,9 +46,9 @@ PTR CreateFileW(const WCHAR *path,DWORD access,DWORD share,PTR security,DWORD mo
     if(strstr(name,"active.txt"))file_data=configuration;
     else if(strstr(name,"files.txt"))file_data=inventory;
     else {
-        const char *names[]={"GameAssembly.dll","MoonSweepers.exe","UnityPlayer.dll","mod.dll","runtime-plan.bin"};
-        hashing_file=5;for(unsigned int j=0;j<5;j++)if(strstr(name,names[j]))hashing_file=j;
-        if(hashing_file==5)return (PTR)(U64)-1;
+        const char *names[]={"GameAssembly.dll","MoonSweepers.exe","UnityPlayer.dll","mod.dll","runtime-plan.bin","winhttp.dll","doorstop_config.ini","allowed-inputs.json","MoonLab.BepInExAdapter.dll"};
+        hashing_file=9;for(unsigned int j=0;j<9;j++)if(strstr(name,names[j]))hashing_file=j;
+        if(hashing_file==9)return (PTR)(U64)-1;
         file_data="synthetic file";
     }
     return (PTR)(uintptr_t)(hashing_file+1);
@@ -106,6 +106,14 @@ int main(void){
     reset("1","test-mod;test-mod");assert(!public_startup());assert(hashes==0);
     reset("1","test-mod");configuration[0]='X';assert(!public_startup());assert(hashes==0);
     reset("1","test-mod");strcat(configuration,"unexpected=1\n");assert(!public_startup());assert(hashes==0);
+    reset("1","");strcat(configuration,"managed=1\n");
+    snprintf(inventory,sizeof(inventory),"%s MoonLab/runtime-plan.bin\n%s winhttp.dll\n%s doorstop_config.ini\n%s BepInEx/MoonLab/allowed-inputs.json\n%s BepInEx/patchers/MoonLab.Adapter/MoonLab.BepInExAdapter.dll\n",mod_hash,mod_hash,mod_hash,mod_hash,mod_hash);
+    assert(public_startup());assert(public_managed);assert(hashes==8);public_release_inputs();
+    reset("1","");strcat(configuration,"managed=1\n");
+    snprintf(inventory,sizeof(inventory),"%s MoonLab/runtime-plan.bin\n",mod_hash);
+    assert(!public_startup());assert(environments==0);public_release_inputs();
+    reset("1","test-mod");strcat(configuration,"managed=0\n");
+    assert(!public_startup());assert(hashes==0);public_release_inputs();
     reset("1","test-mod");wrong_hash=1;assert(!public_startup());assert(hashes==1);assert(environments==0);public_release_inputs();
     reset("1","missing-mod");assert(!public_startup());assert(environments==0);public_release_inputs();
     reset("1","test-mod");strcpy(inventory+65,"MoonLab/mods/../escape.dll\n");assert(!public_startup());assert(environments==0);public_release_inputs();

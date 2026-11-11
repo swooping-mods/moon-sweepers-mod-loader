@@ -109,9 +109,10 @@ class Service:
 
     def available_runtimes(self, installation=None):
         result = {('native', abi) for abi in packages.NATIVE_ABIS}
-        if installation is not None and self.mode(installation) == 'private':
+        if installation is not None:
             from . import managed
-            if managed.available(self.bundle, load(self.bundle / 'runtime/receipt.json', {})):
+            receipt = load(self.bundle / 'runtime/receipt.json', {})
+            if managed.available(self.bundle, receipt) and (self.mode(installation) == 'private' or receipt.get('installed_managed_abi') == 1):
                 result.add((packages.MANAGED_KIND, packages.MANAGED_ABI))
         return result
 
@@ -255,7 +256,7 @@ class Service:
             if not baseline_file.exists():
                 if game.exists(): raise ValueError('Unowned private game folder; move it aside before preparing')
                 if any((source / name).exists() for name in ('version.dll', 'MoonLab', 'winhttp.dll', 'BepInEx', 'doorstop_config.ini')):
-                    raise ValueError('Source already has a loader. If installed by this app, choose Existing Steam game → Uninstall loader, then switch back to Private game copy. Otherwise choose a clean game installation.')
+                    raise ValueError('Source has a loader or retained loader data; use Existing Steam game (native and BepInEx supported) or choose a clean installation for a new private copy. Existing private copies are preserved.')
                 before = tree(source)
                 stage = contained(root, 'copy-' + uuid.uuid4().hex)
                 stage.mkdir()

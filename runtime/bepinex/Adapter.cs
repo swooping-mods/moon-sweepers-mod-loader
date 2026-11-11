@@ -2,6 +2,8 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Runtime.InteropServices;
+using System.Threading;
 using BepInEx;
 using BepInEx.Preloader.Core.Patching;
 
@@ -10,11 +12,21 @@ namespace MoonLab.BepInExAdapter;
 [PatcherPluginInfo("moonlab.il2cpp.adapter", "MoonLab IL2CPP Adapter", "0.1.0")]
 public sealed class Adapter : BasePatcher
 {
+    [DllImport("version.dll", EntryPoint="MoonLab_InstalledManagedState_v1", CallingConvention=CallingConvention.Cdecl)]
+    private static extern uint InstalledManagedState();
     public override void Initialize()
     {
         string? output = null;
         try
         {
+            // Installed mode relies on the resident bootstrap's exact enabled
+            // generation/inventory validation. Private mode retains its existing
+            // synchronous save guard and independent allowlist validation.
+            string gameRoot = Path.GetDirectoryName(Paths.ExecutablePath)!;
+            if (File.Exists(Path.Combine(gameRoot,"MoonLab","owner.json")))
+            {
+                InstalledSelection.RequireReady(InstalledManagedState, () => Thread.Sleep(25));
+            }
             var measurements = Environment.GetEnvironmentVariable("MOONLAB_ADAPTER_PROFILE") == "1"
                 ? new StartupMeasurements() : null;
             output = Environment.GetEnvironmentVariable("MOONLAB_BEPINEX_EVIDENCE")
@@ -96,5 +108,21 @@ internal static class AdapterFailure
         try { log(error); } catch { }
         try { if (output != null) File.WriteAllText(Path.Combine(output,"adapter-failure.txt"),error.ToString()); } catch { }
         Environment.Exit(23);
+    }
+}
+
+
+internal static class InstalledSelection
+{
+    internal static void RequireReady(Func<uint> read, Action pause, int attempts=1200)
+    {
+        for (int attempt=0; attempt<attempts; attempt++)
+        {
+            uint state = read();
+            if (state == 1) return;
+            if (state != 0) throw new InvalidDataException("Installed managed selection was rejected by the native bootstrap");
+            pause();
+        }
+        throw new InvalidDataException("Installed managed selection did not become ready before the timeout");
     }
 }

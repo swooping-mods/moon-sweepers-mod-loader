@@ -76,7 +76,8 @@ def runtime_files(bundle):
     _, result = artifact_files(Path(bundle) / 'runtime/bepinex')
     # BepInEx rewrites configuration. It is seeded separately, then checked
     # before every launch instead of pretending that it is immutable.
-    return {name: data for name, data in result.items() if not name.startswith('BepInEx/config/')}
+    return {name: data for name, data in result.items()
+            if not name.startswith(('BepInEx/config/', 'BepInEx/third-party-sources/')) and name != 'changelog.txt'}
 
 
 def plugin_files(manifest, folder):
@@ -86,13 +87,16 @@ def plugin_files(manifest, folder):
             target = 'BepInEx/' + manifest['bepinex']['data_root'] + '/' + member[5:]
         else:
             target = 'BepInEx/plugins/' + manifest['id'] + '/' + member
-        result[target] = contained(folder, member).read_bytes()
+        data = contained(folder, member).read_bytes()
+        if hashlib.sha256(data).hexdigest() != manifest['files'][member]:
+            raise ValueError('Managed package changed during preparation: ' + member)
+        result[target] = data
     return result
 
 
-def preflight(game, files):
+def preflight(game, files, previous=None):
     """Unknown executable inputs are never picked up by upstream discovery."""
-    previous = load(Path(game).parent / 'deployment.json', {'files': {}})['files']
+    previous = previous if previous is not None else load(Path(game).parent / 'deployment.json', {'files': {}})['files']
     allowed = set(files) | set(previous)
     for name in ('BepInEx/core', 'BepInEx/patchers', 'BepInEx/plugins', 'dotnet'):
         root = contained(game, name)
@@ -141,3 +145,23 @@ def write_allowlist(game, files):
     # Compatibility for existing private workshop callers; new deployments
     # journal allowlist(files) together with their immutable payloads.
     write(contained(game, 'BepInEx/MoonLab/allowed-inputs.json'), allowed_inputs(files))
+
+
+def doorstop_enabled(data, enabled):
+    """Change the pinned Doorstop switch without altering its runtime paths."""
+    text = data.decode('utf-8-sig')
+    cfg = configparser.ConfigParser(interpolation=None)
+    cfg.read_string(text)
+    if 'General' not in cfg or 'enabled' not in cfg['General']:
+        raise ValueError('Managed runtime lacks the Doorstop enabled switch')
+    import re
+    lines = text.splitlines(keepends=True)
+    section = ''; found = 0
+    for index, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith('[') and stripped.endswith(']'): section = stripped[1:-1].casefold()
+        if section == 'general' and re.match(r'^\s*enabled\s*=', line, re.I):
+            newline = '\r\n' if line.endswith('\r\n') else '\n' if line.endswith('\n') else ''
+            lines[index] = 'enabled = ' + ('true' if enabled else 'false') + newline; found += 1
+    if found != 1: raise ValueError('Ambiguous Doorstop enabled switch')
+    return (('\ufeff' if data.startswith(b'\xef\xbb\xbf') else '') + ''.join(lines)).encode('utf-8')

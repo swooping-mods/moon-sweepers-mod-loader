@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 import re
 import uuid
-from . import discovery
+from . import discovery, packages, managed
 from .storage import contained, is_alias, load, locked, relative, sha, write
 
 CONFIG = 'MoonLab/active.txt'
@@ -88,10 +88,10 @@ def assert_stopped():
     finally: kernel.CloseHandle(handle)
 
 
-def validate_game(installation):
+def validate_game(installation, root=None):
     if installation.store != 'steam': raise ValueError('Installed-game mode requires a Steam installation')
     game = Path(installation.path)
-    competitors = competing_loaders(game)
+    competitors = competing_loaders(game, root)
     if competitors: raise ValueError('Unqualified loader coexistence: ' + ', '.join(competitors))
     if not str(game).isascii() or len(str(game)) > 170:
         raise ValueError('This native mod ABI requires a short ASCII game installation path')
@@ -106,9 +106,28 @@ def validate_game(installation):
             if app.get('StateFlags') != '4': raise ValueError('Steam is updating or has not finished installing this game')
 
 
-def competing_loaders(game):
+def competing_loaders(game, root=None):
     names = {'winhttp.dll', 'winmm.dll', 'doorstop_config.ini', 'bepinex', 'melonloader'}
-    return sorted(path.name for path in Path(game).iterdir() if path.name.casefold() in names)
+    owner = load(contained(game, 'MoonLab/owner.json'), {})
+    marker = load(contained(game, 'MoonLab/managed-owned.json'), {})
+    allowed = set()
+    if root is not None and owner == {'schema':SCHEMA, 'data':str(root)} and marker == {'schema':'moon-loader-managed-owner/v1', 'data':str(root)}:
+        allowed.add('bepinex')
+        previous = load(contained(root, 'deployment.json'), {})
+        if previous.get('schema') == SCHEMA and previous.get('installation', {}).get('path') == str(game):
+            allowed.update(name.casefold() for name in ('winhttp.dll', 'doorstop_config.ini') if name in previous.get('files', {}))
+        pending = load(contained(root, 'pending-installed.json'), {})
+        candidate = pending.get('after', {})
+        if candidate.get('schema') == SCHEMA and candidate.get('installation', {}).get('path') == str(game):
+            allowed.update(name.casefold() for name in ('winhttp.dll', 'doorstop_config.ini')
+                           if name in candidate.get('files', {}) and current_hash(game, name) == candidate['files'][name])
+    return sorted(path.name for path in Path(game).iterdir() if path.name.casefold() in names - allowed)
+
+
+def owned_path(name):
+    relative(name)
+    return (name in ('version.dll', CONFIG, 'MoonLab/runtime-plan.bin', 'winhttp.dll', 'doorstop_config.ini', '.doorstop_version', 'changelog.txt')
+            or bool(re.fullmatch(r'MoonLab/deployments/[a-f0-9]{32}/files.txt|MoonLab/mods/.+|BepInEx/.+|dotnet/.+', name)))
 
 
 @contextmanager
@@ -149,19 +168,18 @@ def receipt(root, installation):
     if result.get('schema') != SCHEMA or result.get('installation') != installation.record():
         raise ValueError('Foreign installed-game receipt')
     for name, value in result['files'].items():
-        if (name not in ('version.dll', CONFIG, 'MoonLab/runtime-plan.bin') and
-                not re.fullmatch(r'MoonLab/deployments/[a-f0-9]{32}/files.txt|MoonLab/mods/.+', name)):
+        if not owned_path(name):
             raise ValueError('Invalid owned payload path')
         if not re.fullmatch('[a-f0-9]{64}', value): raise ValueError('Invalid owned payload hash')
     return result
 
 
-def config(installation, generation, order, enabled):
+def config(installation, generation, order, enabled, managed_selected=False):
     if not re.fullmatch('[a-f0-9]{32}', generation): raise ValueError('Invalid deployment generation')
     from .storage import key
     for name in order: key(name)
     return (f'MOONLAB-PUBLIC-1\ninstallation={installation.identity}\ngeneration={generation}\n'
-            f'enabled={int(enabled)}\nmods={";".join(order)}\n').encode('ascii')
+            f'enabled={int(enabled)}\nmods={";".join(order)}\n' + ('managed=1\n' if managed_selected else '')).encode('ascii')
 
 
 def recover(root, installation):
@@ -176,7 +194,7 @@ def recover(root, installation):
     # Validate the path allowlist with the same receipt parser before using journal paths.
     for state in (before, after):
         for name in state['files']:
-            if name not in ('version.dll', CONFIG, 'MoonLab/runtime-plan.bin') and not re.fullmatch(r'MoonLab/deployments/[a-f0-9]{32}/files.txt|MoonLab/mods/.+', name):
+            if not owned_path(name):
                 raise ValueError('Invalid journal payload path')
     stage_name = journal['stage']
     if not re.fullmatch(r'\.moonlab-stage-[a-f0-9]{32}', stage_name): raise ValueError('Invalid transaction stage')
@@ -236,7 +254,7 @@ def cleanup_stage(stage):
     except OSError: pass
 
 
-def transact(root, installation, files, order, generation, enabled):
+def transact(root, installation, files, order, generation, enabled, native_order=None, managed_selected=False):
     """Recheck external writes at each mutation, then publish selection last."""
     # Renaming a package entry to mod.dll can introduce aliases absent from the
     # package itself. Check directory spellings too, before staging any payload.
@@ -249,7 +267,8 @@ def transact(root, installation, files, order, generation, enabled):
                 raise ValueError('Deployment path alias collision: ' + prefix)
     game = Path(installation.path); before = receipt(root, installation)
     after = {**empty(installation), 'files': {n: digest(b) for n, b in files.items()},
-             'order': order, 'generation': generation, 'enabled': enabled}
+             'order': order, 'generation': generation, 'enabled': enabled,
+             'native_order': list(order if native_order is None else native_order), 'managed': managed_selected}
     for name, expected in before['files'].items():
         if current_hash(game, name) != expected: raise ValueError('Owned installed file changed or missing: ' + name)
     for name in files:
@@ -270,7 +289,7 @@ def transact(root, installation, files, order, generation, enabled):
     write(pending, {'before': before, 'after': after, 'stage': stage_name}); sync_directory(root)
     try:
         assert_stopped()
-        if enabled: validate_game(installation)
+        if enabled: validate_game(installation, root)
         baseline = {n: (game / n).stat() for n in discovery.PIN} if enabled else {}
         def unchanged_inputs():
             for name, previous in baseline.items():
@@ -294,7 +313,7 @@ def transact(root, installation, files, order, generation, enabled):
             sync_directory(path.parent)
         if CONFIG in files:
             assert_stopped()
-            if enabled: validate_game(installation)
+            if enabled: validate_game(installation, root)
             if current_hash(game, CONFIG) is not None: raise ValueError('Configuration changed')
             assert_stopped()
             os.replace(contained(stage, 'new/' + CONFIG), target(game, CONFIG)); sync_directory(game / 'MoonLab')
@@ -316,29 +335,48 @@ def prepare(service, installation, order, library, runtime):
     root = service.install_root(installation); game = Path(installation.path)
     if order and not service.save_policy_ready(installation, order, library):
         raise ValueError('Installed mods use normal Steam saves. Back up saves or explicitly confirm a fresh Steam profile first.')
-    competitors = competing_loaders(game)
+    competitors = competing_loaders(game, root)
     if competitors: raise ValueError('Unqualified loader coexistence: ' + ', '.join(competitors))
     # Reject bootstrap collisions before publishing any ownership metadata.
     if not (root / 'deployment.json').exists() and not (root / 'pending-installed.json').exists() and current_hash(game, 'version.dll') is not None:
         raise ValueError('Unowned deployment file: version.dll (another loader may be installed)')
-    validate_game(installation)
+    validate_game(installation, root)
+    managed_payloads = {name:managed.plugin_files(library[name][0], library[name][1])
+                        for name in order if library[name][0]['kind'] == packages.MANAGED_KIND}
     with operation(root, game):
         recover(root, installation)
         generation = uuid.uuid4().hex
         files = {'version.dll': runtime.read_bytes()}
         runtime_receipt = load(service.bundle / 'runtime/receipt.json', {})
         if digest(files['version.dll']) != runtime_receipt.get('sha256'): raise ValueError('Runtime changed during preparation')
+        native_order = [name for name in order if library[name][0]['kind'] == 'native']
+        managed_selected = any(library[name][0]['kind'] == packages.MANAGED_KIND for name in order)
+        if managed_selected:
+            if runtime_receipt.get('installed_managed_abi') != 1: raise ValueError('Rebuild the loader for installed managed support')
+            files.update(managed.runtime_files(service.bundle))
+            files['doorstop_config.ini'] = managed.doorstop_enabled(files['doorstop_config.ini'], True)
         if runtime_receipt.get('runtime_api_abi') == 1 and order:
             from moon_mod_api.runtime_plan import encode, PATH
-            files[PATH] = encode({name: library[name][0] for name in order}, order)
+            files[PATH] = encode({name: library[name][0] for name in native_order}, native_order)
         for name in order:
             manifest, folder = library[name]
+            if manifest['kind'] == packages.MANAGED_KIND:
+                files.update(managed_payloads[name]); continue
             for member in manifest['files']:
                 destination = f'MoonLab/mods/{name}/' + ('mod.dll' if member == manifest['entry'] else member)
                 if destination in files: raise ValueError('Package entry alias collision')
                 data = contained(folder, member).read_bytes()
                 if digest(data) != manifest['files'][member]: raise ValueError('Package changed during preparation: ' + name)
                 files[destination] = data
+        if managed_selected:
+            managed.preflight(game, files, receipt(root, installation)['files'])
+            files['BepInEx/MoonLab/allowed-inputs.json'] = managed.allowlist(files)
+            marker = target(game, 'MoonLab/managed-owned.json')
+            value = {'schema':'moon-loader-managed-owner/v1', 'data':str(root)}
+            if marker.exists():
+                if load(marker) != value: raise ValueError('Foreign managed runtime owner')
+            else: file_bytes(marker, (json.dumps(value)+'\n').encode())
+            managed.prepare_cache(game, service.bundle)
         for destination in files:
             if not destination.isascii() or len(str(game / destination)) > 240:
                 raise ValueError('Selected package needs a shorter ASCII installed payload path: ' + destination)
@@ -346,11 +384,11 @@ def prepare(service, installation, order, library, runtime):
         inventory = ''.join(f'{digest(data)} {name}\n' for name, data in sorted(files.items()) if name != 'version.dll')
         if len(inventory) > 1048576: raise ValueError('Selected payload inventory exceeds this bootstrap capacity')
         files[f'MoonLab/deployments/{generation}/files.txt'] = inventory.encode('ascii')
-        files[CONFIG] = config(installation, generation, order, bool(order))
+        files[CONFIG] = config(installation, generation, native_order, bool(order), managed_selected)
         from .settings import seed
         seed(game / 'MoonLab', order, library)
         contained(game, 'MoonLab/logs').mkdir(exist_ok=True)
-        transact(root, installation, files, order, generation, bool(order))
+        transact(root, installation, files, order, generation, bool(order), native_order, managed_selected)
     return root
 
 
@@ -361,12 +399,18 @@ def preview(service, installation, order, library):
     destinations = {'version.dll', CONFIG}
     if load(service.bundle / 'runtime/receipt.json', {}).get('runtime_api_abi') == 1 and order:
         destinations.add('MoonLab/runtime-plan.bin')
+    managed_selected = any(library[name][0]['kind'] == packages.MANAGED_KIND for name in order)
+    if managed_selected:
+        destinations.update(managed.runtime_files(service.bundle))
+        destinations.add('BepInEx/MoonLab/allowed-inputs.json')
     for name in order:
-        manifest, _ = library[name]
+        manifest, folder = library[name]
+        if manifest['kind'] == packages.MANAGED_KIND:
+            destinations.update(managed.plugin_files(manifest, folder)); continue
         for member in manifest['files']:
             destinations.add(f'MoonLab/mods/{name}/' + ('mod.dll' if member == manifest['entry'] else member))
     conflicts = []
-    conflicts.extend('Unqualified loader coexistence: ' + name for name in competing_loaders(game))
+    conflicts.extend('Unqualified loader coexistence: ' + name for name in competing_loaders(game, root))
     for name in sorted(set(old['files']) | destinations):
         actual = current_hash(game, name)
         if name in old['files'] and actual != old['files'][name]: conflicts.append('Changed/missing owned file: ' + name)
@@ -391,8 +435,10 @@ def set_enabled(service, installation, enabled):
         recover(root, installation); old = receipt(root, installation)
         if CONFIG not in old['files']: raise ValueError('Prepare this installation first')
         files = {n: target(game, n).read_bytes() for n in old['files']}
-        files[CONFIG] = config(installation, old['generation'], old['order'], bool(enabled and old['order']))
-        transact(root, installation, files, old['order'], old['generation'], bool(enabled and old['order']))
+        native_order = old.get('native_order', old['order']); managed_selected = old.get('managed', False)
+        files[CONFIG] = config(installation, old['generation'], native_order, bool(enabled and old['order']), managed_selected)
+        if managed_selected: files['doorstop_config.ini'] = managed.doorstop_enabled(files['doorstop_config.ini'], enabled)
+        transact(root, installation, files, old['order'], old['generation'], bool(enabled and old['order']), native_order, managed_selected)
 
 
 def uninstall(service, installation):

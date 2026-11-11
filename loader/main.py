@@ -58,7 +58,8 @@ def main():
         selected = next((x for x in installations if x.path == service.state['installation']), installations[0] if len(installations) == 1 else None)
         if not selected: raise ValueError('Choose an installation with --game PATH')
         if args.steam_setup or args.apply_steam_setup:
-            preview = steam_options.inspect(selected)
+            library, _ = service.library()
+            preview = steam_options.inspect(selected, managed=any(library[name][0]['kind'] == 'bepinex-il2cpp' for name in service.state['selected'] if name in library))
             print(json.dumps(preview, indent=2))
             if args.apply_steam_setup:
                 if preview['status'] not in ('required', 'ready'): raise ValueError(preview['message'])

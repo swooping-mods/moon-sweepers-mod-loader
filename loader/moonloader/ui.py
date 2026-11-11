@@ -458,7 +458,7 @@ class Window(QMainWindow):
         self.save_info.setText('Normal Steam saves · back up before save-affecting mods' if installed else 'Fresh private saves')
         self.proton_hint.setVisible(installed and sys.platform == 'linux')
         self.steam_setup_button.setVisible(installed and sys.platform == 'linux'); self.steam_setup_button.setEnabled(not active)
-        if installed and sys.platform == 'linux': self.proton_hint.setText(steam_options.inspect(installation)['message'])
+        if installed and sys.platform == 'linux': self.proton_hint.setText(steam_options.inspect(installation, managed=any(self.mods[name][0]['kind'] == packages.MANAGED_KIND for name in self.service.state['selected'] if name in self.mods))['message'])
         for widget in [self.disable_button, self.enable_button, self.uninstall_button]: widget.setVisible(installed); widget.setEnabled(not active)
         for widget in [self.game,self.browse,self.rescan,self.import_button,self.import_folder_button,self.list,self.remove_button,self.deployment_mode]: widget.setEnabled(not active)
         if reason or self._validation and self.message.text() == self._validation: self.notice(reason)
@@ -486,7 +486,7 @@ class Window(QMainWindow):
     def steam_setup(self):
         installation = self.current_installation()
         if not installation: return
-        preview = steam_options.inspect(installation)
+        preview = steam_options.inspect(installation, managed=any(self.mods[name][0]['kind'] == packages.MANAGED_KIND for name in self.service.state['selected'] if name in self.mods))
         dialog = QDialog(self); dialog.setWindowTitle('Steam launch setup'); dialog.resize(680, 420); layout = QVBoxLayout(dialog)
         info = label(preview['message'] + '\n\nQuit Steam completely before applying; reopen it afterwards. Existing options are preserved and the original config is backed up.'); info.setWordWrap(True); layout.addWidget(info)
         edit = QPlainTextEdit(); edit.setReadOnly(True); edit.setPlainText('Current launch options\n' + preview.get('current', '(unavailable)') + '\n\nProposed launch options\n' + preview.get('proposed', '(manual setup required)')); layout.addWidget(edit)
@@ -495,7 +495,7 @@ class Window(QMainWindow):
         close = QPushButton('Close'); close.clicked.connect(dialog.accept); row.addWidget(close); layout.addLayout(row)
         def refresh_preview():
             nonlocal preview
-            preview = steam_options.inspect(installation)
+            preview = steam_options.inspect(installation, managed=any(self.mods[name][0]['kind'] == packages.MANAGED_KIND for name in self.service.state['selected'] if name in self.mods))
             info.setText(preview['message'] + '\n\nQuit Steam completely before applying; reopen it afterwards. Existing options are preserved and the original config is backed up.')
             edit.setPlainText('Current launch options\n' + preview.get('current', '(unavailable)') + '\n\nProposed launch options\n' + preview.get('proposed', '(manual setup required)'))
             apply.setEnabled(preview['status'] == 'required')
@@ -512,7 +512,7 @@ class Window(QMainWindow):
         if self.no_launch: return
         installation=self.current_installation()
         if self.service.mode(installation) == 'installed' and self.service.state['selected']:
-            status = steam_options.inspect(installation)
+            status = steam_options.inspect(installation, managed=any(self.mods[name][0]['kind'] == packages.MANAGED_KIND for name in self.service.state['selected'] if name in self.mods))
             if status['status'] not in ('ready', 'not-required'):
                 self.steam_setup(); return
         if not self.confirm_save_policy(installation): return

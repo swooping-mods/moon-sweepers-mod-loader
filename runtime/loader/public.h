@@ -14,6 +14,7 @@ __declspec(dllimport) int __stdcall BCryptFinishHash(PTR,void *,DWORD,DWORD);
 __declspec(dllimport) int __stdcall BCryptDestroyHash(PTR);
 __declspec(dllimport) int __stdcall BCryptCloseAlgorithmProvider(PTR,DWORD);
 static int public_mode;
+static int public_managed;
 static WCHAR public_base[1000], public_generation[33], public_ids[MOONLAB_MAX_NATIVE_MODS*65+1];
 static char public_installation[17];
 static DWORD public_base_length;
@@ -85,6 +86,8 @@ static int public_parse(char *text){
     char *magic=public_field(&cursor,""),*installation=public_field(&cursor,"installation="),
          *generation=public_field(&cursor,"generation="),*enabled=public_field(&cursor,"enabled="),
          *mods=public_field(&cursor,"mods=");
+    public_managed=0;
+    if(*cursor){char *managed=public_field(&cursor,"managed=");if(!managed||!equal(managed,"1"))return 0;public_managed=1;}
     if(!magic||!installation||!generation||!enabled||!mods||*cursor||
        !equal(magic,"MOONLAB-PUBLIC-1")||!equal(enabled,"1"))return 0;
     DWORD n=0;while(installation[n])n++;
@@ -94,7 +97,7 @@ static int public_parse(char *text){
     if(n!=32||!public_hex(generation,32))return 0;
     for(DWORD i=0;i<33;i++)public_generation[i]=(WCHAR)generation[i];
     n=0;while(mods[n]){if(n>=MOONLAB_MAX_NATIVE_MODS*65)return 0;public_ids[n]=(unsigned char)mods[n];n++;}
-    public_ids[n]=0;if(!n)return 0;
+    public_ids[n]=0;if(!n)return public_managed;
     DWORD count=0;WCHAR *id=public_ids;
     for(WCHAR *p=id;;p++)if(*p==';'||!*p){
         int last=!*p;WCHAR saved=*p;*p=0;
@@ -152,19 +155,31 @@ static int public_payload(void){
     char inventory[100];append(append(inventory,prefix),"files.txt");DWORD size;
     if(!public_read(inventory,public_inventory,sizeof(public_inventory),&size)||!size)return 0;
     for(DWORD i=0;i<size;i++)if(!public_inventory[i])return 0;
-    char *line=public_inventory;unsigned int entries=0,plans=0;
+    char *line=public_inventory;unsigned int entries=0,plans=0,managed_mask=0;
     while(*line){
         char *end=line;while(*end&&*end!='\n')end++;
         if(*end!='\n'||end-line<67)return 0;
         *end=0;if(line[64]!=' '||!public_hex(line,64))return 0;
         char *name=line+65,*p=name;const char *q="MoonLab/mods/";
         if(equal(name,"MoonLab/runtime-plan.bin"))plans++;
-        else while(*q)if(*p++!=*q++)return 0;
+        else {
+            int native=1;while(*q)if(*p++!=*q++){native=0;break;}
+            if(!native){
+                if(!public_managed)return 0;
+                const char *prefixes[]={"BepInEx/","dotnet/"};int allowed=0;
+                for(unsigned int i=0;i<2;i++){char *a=name;const char *b=prefixes[i];while(*b&&*a==*b){a++;b++;}if(!*b)allowed=1;}
+                if(!allowed&&!equal(name,"winhttp.dll")&&!equal(name,"doorstop_config.ini")&&!equal(name,".doorstop_version"))return 0;
+            }
+        }
+        if(equal(name,"winhttp.dll"))managed_mask|=1;
+        if(equal(name,"doorstop_config.ini"))managed_mask|=2;
+        if(equal(name,"BepInEx/MoonLab/allowed-inputs.json"))managed_mask|=4;
+        if(equal(name,"BepInEx/patchers/MoonLab.Adapter/MoonLab.BepInExAdapter.dll"))managed_mask|=8;
         if(!public_relative(name)||!public_hash(name,line,0))return 0;
         entries++;line=end+1;
     }
     /* Every selected DLL must occur in the checked inventory. */
-    for(WCHAR *id=public_ids;;){
+    for(WCHAR *id=public_ids;*id;){
         char required[180],*out=append(required,"MoonLab/mods/");
         while(*id&&*id!=';')*out++=(char)*id++;
         append(out,"/mod.dll");int found=0;
@@ -177,7 +192,7 @@ static int public_payload(void){
     }
     /* The worker consumes this plan even for legacy native packages. An
      * omitted inventory row must not authorize unchecked startup contracts. */
-    return entries>0&&plans==1;
+    return entries>0&&plans==1&&(!public_managed||managed_mask==15);
 }
 static int public_startup(void){
     DWORD n=GetModuleFileNameW(self_module,public_base,950);
@@ -208,6 +223,9 @@ static int public_startup(void){
     if(!public_path(path,1500,run)||!CreateDirectoryW(path,0))return 0;
     if(!SetEnvironmentVariableW(L"MOONLAB_EVIDENCE",path)||!SetEnvironmentVariableW(L"MOONLAB_MODS",public_ids)||
        !SetEnvironmentVariableW(L"MOONLAB_RUN_ID",run_id))return 0;
+    if(!SetEnvironmentVariableW(L"MOONLAB_BEPINEX",public_managed?L"1":0)||
+       !SetEnvironmentVariableW(L"MOONLAB_BEPINEX_EVIDENCE",public_managed?path:0)||
+       !SetEnvironmentVariableW(L"MOONLAB_PROFILE_ROOT",0))return 0;
     const WCHAR *clear[]={L"MOONLAB_TEST_TOOLS",L"MOONLAB_SLIME_TEST_TOOLS",L"MOONLAB_STATS_TEST",L"MOONLAB_UNIT_INSPECT"};
     for(unsigned int i=0;i<sizeof(clear)/sizeof(clear[0]);i++)if(!SetEnvironmentVariableW(clear[i],0))return 0;
     const char *settings[][2]={

@@ -21,6 +21,16 @@ internal static unsafe class AdapterChecks
         throw new InvalidOperationException("Expected " + typeof(T).Name);
     }
 
+    private static void InstalledStartup()
+    {
+        int reads=0, pauses=0;
+        InstalledSelection.RequireReady(() => ++reads<3 ? 0u : 1u, () => pauses++, 4);
+        Require(reads==3 && pauses==2,"Installed adapter waits for validated native providers");
+        Reject<InvalidDataException>(() => InstalledSelection.RequireReady(() => 2u, () => throw new Exception("must not wait"), 2));
+        Reject<InvalidDataException>(() => InstalledSelection.RequireReady(() => 9u, () => {}, 2));
+        Reject<InvalidDataException>(() => InstalledSelection.RequireReady(() => 0u, () => {}, 2));
+    }
+
     private static void ProjectionOwnership()
     {
         using var fixture = new NativeAllocationArena();
@@ -278,6 +288,7 @@ internal static unsafe class AdapterChecks
                 var names=assembly.MainModule.Types.Select(p=>p.FullName).ToArray();
                 Require(!names.Any(p=>p.Contains("MarsCompatibility") || p.EndsWith("ApiCheck") || p.EndsWith("GenerateCommand") || p.EndsWith("AssemblyResolutionScope")),"Host contains an optional plugin or diagnostic");
             },
+            ["installed-managed-bootstrap-admission"]=InstalledStartup,
             ["projection-owner-cache-and-lazy-initialization"]=ProjectionOwnership,
             ["injection-identity-and-publication"]=InjectionPublication,
             ["publication-overflow-and-duplicate-safety"]=PublicationFailureSafety,

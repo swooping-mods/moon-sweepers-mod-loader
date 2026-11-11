@@ -61,7 +61,7 @@ def _walk(tree, *keys):
     return tree
 
 
-def merge(current):
+def _merge_one(current, dll):
     """Change only the required assignment; preserve other command bytes verbatim."""
     if any(c in current for c in '\r\n\0'):
         raise ValueError('Multiline Steam options need manual setup')
@@ -90,9 +90,9 @@ def merge(current):
     if len(commands) > 1 or any('%command%' in value and value != '%command%' for value, _, _ in tokens):
         raise ValueError('Steam options need exactly one standalone %command%; merge the override manually')
     if not commands:
-        if not tokens: return 'WINEDLLOVERRIDES="version=n,b" %command%'
+        if not tokens: return 'WINEDLLOVERRIDES="'+dll+'=n,b" %command%'
         if not tokens[0][0].startswith('-'): raise ValueError('Wrapper options without %command% need manual setup')
-        return 'WINEDLLOVERRIDES="version=n,b" %command% ' + current
+        return 'WINEDLLOVERRIDES="'+dll+'=n,b" %command% ' + current
     command = commands[0]
     prefix_values = [value for value, _, _ in tokens[:command]]
     # A leading assignment cannot survive an environment-clearing wrapper.
@@ -105,7 +105,7 @@ def merge(current):
             raise ValueError('env options need manual Steam setup; preserve the required override inside its environment')
     assignments = [(i, value, start, end) for i, (value, start, end) in enumerate(tokens) if value.startswith('WINEDLLOVERRIDES=')]
     if len(assignments) > 1: raise ValueError('Multiple WINEDLLOVERRIDES assignments need manual setup')
-    if not assignments: return 'WINEDLLOVERRIDES="version=n,b" ' + current
+    if not assignments: return 'WINEDLLOVERRIDES="'+dll+'=n,b" ' + current
     index, assignment, start, end = assignments[0]
     if not current[start:end].startswith('WINEDLLOVERRIDES='):
         raise ValueError('Quoted assignment names need manual Steam setup')
@@ -123,18 +123,25 @@ def merge(current):
         names = names.split(',')
         if not all(re.fullmatch(r'[A-Za-z0-9_.-]+', name) for name in names) or not re.fullmatch(r'[nb,]*', modes):
             raise ValueError('Unsupported DLL override syntax; merge version=n,b manually')
-        remaining = [name for name in names if name.casefold() != 'version']
+        remaining = [name for name in names if name.casefold() != dll]
         count = len(names) - len(remaining); found += count
         if count and modes == 'n,b' and len(names) == 1:
             clauses.append(clause)
         else:
             if remaining: clauses.append(','.join(remaining) + '=' + modes)
-            if count: clauses.append('version=n,b')
+            if count: clauses.append(dll+'=n,b')
     if found > 1: raise ValueError('Conflicting repeated version overrides need manual setup')
-    if not found: clauses.append('version=n,b')
+    if not found: clauses.append(dll+'=n,b')
     proposed = ';'.join(clauses)
     if proposed == value: return current
     return current[:start] + 'WINEDLLOVERRIDES=' + _quoted(proposed) + current[end:]
+
+
+def merge(current, dlls=('version',)):
+    if tuple(dlls) not in (('version',), ('version', 'winhttp')):
+        raise ValueError('Unsupported required Steam override set')
+    for dll in dlls: current = _merge_one(current, dll)
+    return current
 
 
 def _read(path, root):
@@ -156,7 +163,7 @@ def _read(path, root):
     return data, [*signature(info), hashlib.sha256(data).hexdigest()]
 
 
-def _snapshot(installation):
+def _snapshot(installation, dlls=('version',)):
     if installation.store != 'steam' or not installation.steam_root: raise ValueError('Choose a Steam-discovered installation')
     root = Path(installation.steam_root).resolve()
     login = root / 'config/loginusers.vdf'
@@ -185,27 +192,28 @@ def _snapshot(installation):
     options = node['children'].get('launchoptions')
     if options and 'value' not in options: raise ValueError('Invalid Steam launch options')
     current = options['value'] if options else ''
-    proposed = merge(current)
+    proposed = merge(current, dlls)
     if options: modified = text[:options['start']] + _quoted(proposed) + text[options['end']:]
     else:
         newline = '\r\n' if '\r\n' in text else '\n'
         modified = text[:node['close']] + newline + '\t\t\t\t\t"LaunchOptions"\t\t' + _quoted(proposed) + newline + '\t\t\t\t' + text[node['close']:]
     if data.startswith(b'\xef\xbb\xbf'): modified = '\ufeff' + modified
     return {'path': str(path), 'account': account, 'current': current, 'proposed': proposed,
-            'signature': signature, 'login_signature': login_signature}, data, modified.encode('utf-8')
+            'signature': signature, 'login_signature': login_signature, 'required_dlls': list(dlls)}, data, modified.encode('utf-8')
 
 
-def inspect(installation, platform=None):
+def inspect(installation, platform=None, managed=False):
     platform = platform or sys.platform
     if platform == 'win32': return {'status': 'not-required', 'message': 'Windows loads the installed bootstrap directly; no Proton launch options are needed.'}
     if platform != 'linux': return {'status': 'unsupported', 'message': 'Steam setup is supported on Windows and Linux.'}
     try:
-        result, _, _ = _snapshot(installation)
+        result, _, _ = _snapshot(installation, ('version', 'winhttp') if managed else ('version',))
         ready = result['current'] == result['proposed']
-        result.update(status='ready' if ready else 'required', message='Steam Proton launch options are ready.' if ready else 'Steam setup required: apply the version DLL override before launching mods.')
+        result.update(status='ready' if ready else 'required', message='Steam Proton launch options are ready.' if ready else 'Steam setup required: apply the version and winhttp DLL overrides before launching managed mods.' if managed else 'Steam setup required: apply the version DLL override before launching mods.')
         return result
     except (OSError, ValueError, UnicodeError) as error:
-        return {'status': 'unsupported', 'message': str(error) + '. Set WINEDLLOVERRIDES="version=n,b" in Steam Properties → Launch Options, preserving existing options.'}
+        required = 'version=n,b;winhttp=n,b' if managed else 'version=n,b'
+        return {'status': 'unsupported', 'message': str(error) + '. Set WINEDLLOVERRIDES="'+required+'" in Steam Properties → Launch Options, preserving existing options.'}
 
 
 def assert_steam_stopped():
@@ -224,8 +232,9 @@ def apply(installation, data_root, preview):
     if sys.platform != 'linux': raise ValueError('Automatic Proton setup is only needed on Linux')
     with locked(data_root, 'steam-options.lock'):
         assert_steam_stopped()
-        current, before, after = _snapshot(installation)
-        for key in ('path', 'account', 'signature', 'login_signature', 'current', 'proposed'):
+        dlls = tuple(preview.get('required_dlls', ['version']))
+        current, before, after = _snapshot(installation, dlls)
+        for key in ('path', 'account', 'signature', 'login_signature', 'current', 'proposed', 'required_dlls'):
             if current.get(key) != preview.get(key): raise ValueError('Steam settings changed; refresh the setup preview before applying')
         if before == after or current['current'] == current['proposed']: return {'changed': False}
         backup = contained(Path(data_root), 'steam-options-backups/' + uuid.uuid4().hex)
@@ -239,7 +248,7 @@ def apply(installation, data_root, preview):
                 stream.write(after); stream.flush(); os.fsync(stream.fileno())
             os.chmod(temporary, stat.S_IMODE(path.stat().st_mode))
             assert_steam_stopped()
-            checked, _, _ = _snapshot(installation)
+            checked, _, _ = _snapshot(installation, dlls)
             if checked != current: raise ValueError('Steam settings changed during setup; nothing was replaced')
             os.replace(temporary, path); temporary = None
             verified, _ = _read(path, Path(installation.steam_root).resolve())
@@ -249,7 +258,7 @@ def apply(installation, data_root, preview):
         return {'changed': True, 'backup': str(backup), 'message': 'Steam launch options applied and verified. Reopen Steam, then launch the game.'}
 
 
-def require_ready(installation, platform=None):
-    result = inspect(installation, platform)
+def require_ready(installation, platform=None, managed=False):
+    result = inspect(installation, platform, managed)
     if result['status'] not in ('ready', 'not-required'): raise ValueError(result['message'] + ' Open Steam setup in the loader.')
     return result

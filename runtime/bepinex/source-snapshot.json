@@ -1,7 +1,7 @@
 {
   "schema": "moon-managed-adapter-source/v1",
   "files": {
-    "runtime/bepinex/Adapter.cs": "a7553e73094211a8b4ebd5fa979a79c5fd7aeaa883944585b419fda56bb329b8",
+    "runtime/bepinex/Adapter.cs": "ac3a78cc357945463fa40d50c0490885780553666b31ae8fd97bd2f4f8a1f267",
     "runtime/bepinex/ApiCheck.cs": "0348cde52842099b78c46b82f76fa0c652a9fd2aece39a692ac274e0d6122b40",
     "runtime/bepinex/BindingRepairs.cs": "15c26ff8a747291de30393c3990be828e14d65aae78f3e2da57ac967bdc4d9f9",
     "runtime/bepinex/FileIntegrity.cs": "af616b2d259e86b4021b15baac74aa0f27acbfc9fad4ce7d0728cc89ea8dfa67",
@@ -24,7 +24,7 @@
     "runtime/bepinex/repairs/UnityCoreRepairs.cs": "7fb6d1b499d56a8c2d6a698c4dad4cf356bc49e08c463853f735cc07ffd62ab4",
     "runtime/bepinex/repairs/UnityPhysicsRepairs.cs": "9057eb40b09b7cac3717152451166f6cb3e74a199478470b3e365863e6c49c84",
     "runtime/bepinex/tests/AdapterBenchmark.cs": "d4273a4379e0220556930768c4f819fbfd3a60c6805aab148e71c37885e2eee7",
-    "runtime/bepinex/tests/AdapterChecks.cs": "4da8d9dbaee0a45f2c918cdd7686e1fb712ac7867ea32ab28a4221e4cc1c1767",
+    "runtime/bepinex/tests/AdapterChecks.cs": "552712a91b33f4fb26860e2791350adf969225bc4b151c4a404b2929404a7d19",
     "runtime/bepinex/tests/CompatibilityBenchmark.cs": "a1bc292100526dbea659cbf4ef421e28ab21515b4da73c38f52505b303386a79",
     "runtime/bepinex/tests/DeclarationBenchmark.cs": "7bef910d7f6b8013332cbe86defbe0071d2bf1cfc19d82cccaf0ddaa61a5f307",
     "runtime/bepinex/tests/PhysicsProbe.cs": "2d3eabd5072a24382ce8a9a60c6258277cf4749af8b6968810ba8976ac8dc570",

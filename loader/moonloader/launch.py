@@ -73,13 +73,13 @@ def plan(service, installation, platform=None, check_client=True):
             command = ['flatpak', 'run', 'com.valvesoftware.Steam', '-applaunch', APP_ID]
         else:
             command = ['steam', '-applaunch', APP_ID]
-        return {'mode': 'installed', 'platform': platform, 'command': command, 'env': {},
+        return {'mode': 'installed', 'platform': platform, 'command': command, 'env': {}, 'managed': managed_selected,
                 'deployment': preview(service, installation, order, library),
                 'cwd': installation.path, 'run': str(root / 'runs' / uuid.uuid4().hex),
                 'store': 'steam', 'profile': 'Normal Steam saves (not isolated)', 'order': order,
                 'runtime': 'Steam selected compatibility runtime' if platform == 'linux' else 'Steam / Windows',
-                'launch_options': 'WINEDLLOVERRIDES="version=n,b" %command%' if platform == 'linux' else '',
-                'steam_setup': steam_options.inspect(installation, platform),
+                'launch_options': ('WINEDLLOVERRIDES="version=n,b;winhttp=n,b" %command%' if managed_selected else 'WINEDLLOVERRIDES="version=n,b" %command%') if platform == 'linux' else '',
+                'steam_setup': steam_options.inspect(installation, platform, managed_selected),
                 'limits': ['Steam launch request is not game-process ownership or startup confirmation',
                            'Proton requires verified launch options; use Steam setup before launching mods',
                            'Back up saves before save-affecting mods; binary uninstall does not restore saves',
@@ -193,7 +193,7 @@ def _start_locked(service, installation, lease):
     record = plan(service, installation)
     logger = diagnostics.start(service.root)
     if record.get('mode') == 'installed' and record['order']:
-        steam_options.require_ready(installation, record['platform'])
+        steam_options.require_ready(installation, record['platform'], record.get('managed', False))
     service.prepare(installation, _session_owner=True)
     if record.get('mode') == 'installed':
         diagnostics.prepare_installed(service, installation, record)

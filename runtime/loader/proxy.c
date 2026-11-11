@@ -67,6 +67,13 @@ static void read_service_plan(void){
     event("runtime-plan-ready",1);
 }
 #include "public.h"
+/* The managed patcher calls this before admitting any installed plug-in. */
+__declspec(dllexport) unsigned int MoonLab_InstalledManagedState_v1(void){
+    unsigned int state=MoonLab_RuntimeState_v1();
+    if(!public_mode)return MOON_RUNTIME_FAILED;
+    if(state==MOON_RUNTIME_PENDING)return state;
+    return public_managed?state:MOON_RUNTIME_FAILED;
+}
 static DWORD __stdcall worker(PTR unused){
     (void)unused;
     if(public_mode&&!public_startup()){
@@ -150,7 +157,7 @@ static DWORD __stdcall worker(PTR unused){
     n=GetEnvironmentVariableW(L"MOONLAB_MODS",ids,MOONLAB_MAX_NATIVE_MODS*65+1);
     if(!n){
         WCHAR managed[4];
-        if(public_mode||GetEnvironmentVariableW(L"MOONLAB_BEPINEX",managed,4)!=1||managed[0]!='1')fail("missing-mod-list");
+        if((public_mode&&!public_managed)||GetEnvironmentVariableW(L"MOONLAB_BEPINEX",managed,4)!=1||managed[0]!='1')fail("missing-mod-list");
         if(service_plan.count)fail("runtime-plan-mod-list");
         if(!runtime_finish_startup(seal_updates()))fail("shared-update-install-failed");
         event("managed-host-only",1);detach(thread);event("load-complete",1);CloseHandle(log_file);return 0;
