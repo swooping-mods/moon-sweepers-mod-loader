@@ -96,6 +96,15 @@ class ManagedRuntimeChecks(unittest.TestCase):
         self.assertTrue((root / 'game/BepInEx/plugins/other-managed/mod.dll').is_file())
         self.assertEqual(service.state['selected'], ['test-mod', 'other-managed'])
 
+    def test_proton_managed_preloader_errors_reach_the_owned_process_log(self):
+        service, installation, _, _ = self.fixture()
+        proton = Path(installation.steam_root)/'steamapps/common/Proton - Experimental/proton'
+        proton.parent.mkdir(parents=True); proton.write_bytes(b'inert plan-only runtime')
+        record = launch.plan(service, installation, platform='linux', check_client=False)
+        self.assertEqual(record['env']['WINEDEBUG'], '-all,err+eventlog')
+        self.assertIn('winhttp=n,b', record['env']['WINEDLLOVERRIDES'])
+        self.assertNotIn('WINEDEBUG', launch.plan(service, installation, platform='win32')['env'])
+
     def test_optional_host_unavailable_in_installed_mode_and_without_attachment(self):
         service, installation, _, _ = self.fixture()
         service.set_mode(installation, 'installed')

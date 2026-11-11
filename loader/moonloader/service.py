@@ -255,7 +255,7 @@ class Service:
             if not baseline_file.exists():
                 if game.exists(): raise ValueError('Unowned private game folder; move it aside before preparing')
                 if any((source / name).exists() for name in ('version.dll', 'MoonLab', 'winhttp.dll', 'BepInEx', 'doorstop_config.ini')):
-                    raise ValueError('Source already has a loader; choose a clean game installation')
+                    raise ValueError('Source already has a loader. If installed by this app, choose Existing Steam game → Uninstall loader, then switch back to Private game copy. Otherwise choose a clean game installation.')
                 before = tree(source)
                 stage = contained(root, 'copy-' + uuid.uuid4().hex)
                 stage.mkdir()

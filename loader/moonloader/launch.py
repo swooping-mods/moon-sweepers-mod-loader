@@ -112,7 +112,8 @@ def plan(service, installation, platform=None, check_client=True):
     windows = lambda p: 'Z:' + str(p).replace('/', '\\')
     environment = {'STEAM_COMPAT_CLIENT_INSTALL_PATH': str(steam), 'STEAM_COMPAT_DATA_PATH': str(prefix.parent),
                    'WINEPREFIX': str(prefix), 'SteamAppId': APP_ID, 'SteamGameId': APP_ID,
-                   'WINEDLLOVERRIDES': 'version=n,b;winhttp=n,b' if managed_selected else 'version=n,b', 'WINEDEBUG': '-all', 'PROTON_NO_NTSYNC': '1',
+                   'WINEDLLOVERRIDES': 'version=n,b;winhttp=n,b' if managed_selected else 'version=n,b',
+                   'WINEDEBUG': '-all,err+eventlog' if managed_selected else '-all', 'PROTON_NO_NTSYNC': '1',
                    'WINEFSYNC': '0', 'WINENTSYNC': '0', 'MOONLAB_MODS': ';'.join(native_order),
                    'MOONLAB_EVIDENCE': windows(run), 'MOONLAB_RUN_ID': run.name,
                    'MOONLAB_PROFILE_ROOT': 'M:\\profile'}

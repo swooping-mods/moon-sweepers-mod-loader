@@ -5,6 +5,9 @@
 - Check Steam Proton launch options before starting installed mods, preventing a successful Steam request from silently starting the game without its native mod bootstrap.
 - Add **Steam setup…** with current/proposed options and an explicit **Apply required launch options** action. Quit Steam before applying; existing DLL overrides, supported wrappers and game arguments are preserved, and the previous configuration is backed up and verified.
 - Missing, ambiguous or unsupported Steam settings provide manual setup guidance. Windows keeps its normal launch arguments without Proton environment syntax.
+- Save rotating informational/error logs, Python/worker/Qt tracebacks, available fatal-crash diagnostics and bounded launch log snapshots. **Open logs** refreshes attributable native bootstrap logs; Steam request completion remains distinct from game startup or crash confirmation.
+- Include the supported BepInEx adapter/runtime in release and prerelease downloads for **Private game copy** mode. MarsSweepers remains a separate user-supplied mod.
+- Harden the MarsSweepers compatibility companion with bounded packet/decompression handling, initial-state retries, receive recovery, host version/weather checks and username-safe diagnostic commands. The original Mars DLL and wire protocol remain unchanged; real co-op is not yet qualified.
 
 The AppImage startup failure was reproduced with the released nine-mod payload in an isolated Linux/Proton game copy: no mods initialized without the version DLL override; all nine initialized with it. The test uses a private Proton bridge instead of changing the user's Steam configuration or saves. Native Windows gameplay and loaded-world/co-op compatibility remain separately unqualified.
 

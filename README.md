@@ -109,10 +109,19 @@ existing versions and selections are preserved:
 | **Add folder…** | Choose an extracted folder containing `.msmod` files or unpacked packages with manifests. |
 
 The importer also recognizes the complete **MarsSweepers 0.6.1** download.
-Running it requires a separately attached supported BepInEx runtime and **Private
-game copy** mode. Standard loader downloads do not include that runtime, and
-importing does not attach it. Other raw third-party DLLs require a compatible mod
-package. See the [managed runtime contract](specs/managed-runtime.md).
+The supported BepInEx adapter/runtime is included in release and prerelease
+downloads. Select **Private game copy** to run Mars; installed-game mode supports
+native mods only. The first managed launch generates game bindings locally and
+can take longer. Mars itself is supplied separately and starts unchecked after
+import. Its compatibility companion adds bounded multiplayer messages, initial
+state retries and host setting checks; real co-op remains unqualified. Other raw
+third-party DLLs require a compatible mod package. See the
+[managed runtime contract](specs/managed-runtime.md).
+
+Creating the first private copy needs a clean game folder. If this loader has
+already applied native mods to **Existing Steam game**, use **Uninstall loader**
+in that mode before switching to **Private game copy**. This keeps saves and
+settings. An existing private copy remains available.
 
 ## Compatibility and saves
 
@@ -169,11 +178,19 @@ physical controllers require separate qualification.
 | Different buttons or an empty library | Check the version. v0.1.0 predates the starter bundle and new import controls; use v0.2.0 or a newer checked build. |
 | Linux loader does not open | Confirm executable permission and keep the complete extracted folder. Try the `.run` download or AppImage's `--appimage-extract-and-run` fallback. Remove an unintended `MOON_LOADER_PYTHON` override. |
 | Steam opens but mods do not load on Proton | Check the [Steam launch options](#proton-setup) and **View launch plan**. |
+| A launch or the loader fails | Click **Open logs** for saved informational messages, errors, tracebacks and available crash diagnostics. |
 
 Application data is stored in `%LOCALAPPDATA%/MoonLab/Loader` on Windows and
 `$XDG_DATA_HOME/moonlab-loader` (normally `~/.local/share/moonlab-loader`) on Linux.
 Use `--data PATH` to choose another location, or `--no-launch` to inspect the UI
 with launching disabled.
+
+Diagnostics are saved under the data folder's `logs/`, including rotating
+`loader.jsonl` files and Python fatal-crash logs. Individual launches retain
+their process output and available private game/BepInEx log tails. **Open logs**
+also refreshes fresh installed-bootstrap logs belonging to the prepared mod
+generation. A completed Steam request does not establish game startup, lifetime
+or a crash; unavailable evidence is reported as unconfirmed. Logs stay local.
 
 Report loader, installation and launch issues in
 [this repository's issue tracker](https://github.com/swooping-mods/moon-sweepers-mod-loader/issues).
