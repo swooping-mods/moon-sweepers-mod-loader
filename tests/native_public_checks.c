@@ -36,7 +36,7 @@ static void reset(const char *enabled,const char *mods){
     hashes=environments=0;wrong_hash=0;public_mode=1;
 }
 DWORD GetModuleFileNameW(PTR module,WCHAR *out,DWORD capacity){
-    const char *s=module?"C:\\game\\version.dll":"C:\\game\\MoonSweepers.exe";unsigned int i=0;
+    const char *s=module==(PTR)2?"C:\\game\\GameAssembly.dll":module==(PTR)3?"C:\\game\\UnityPlayer.dll":module==(PTR)4?"C:\\foreign\\GameAssembly.dll":module?"C:\\game\\version.dll":"C:\\game\\MoonSweepers.exe";unsigned int i=0;
     for(;s[i]&&i+1<capacity;i++)out[i]=s[i];out[i]=0;return i;
 }
 PTR CreateFileW(const WCHAR *path,DWORD access,DWORD share,PTR security,DWORD mode,DWORD flags,PTR template){
@@ -71,7 +71,7 @@ static unsigned char hex_digit(char c){return (unsigned char)(c<='9'?c-'0':c-'a'
 int BCryptFinishHash(PTR hash,void *bytes,DWORD size,DWORD flags){
     (void)hash;(void)flags;assert(size==32);const char *expected=hashing_file<3?pins[hashing_file]:mod_hash;
     for(int i=0;i<32;i++)((unsigned char *)bytes)[i]=(unsigned char)((hex_digit(expected[i*2])<<4)|hex_digit(expected[i*2+1]));
-    if(wrong_hash)((unsigned char *)bytes)[0]^=1;return 0;
+    if(wrong_hash==(int)hashing_file+1)((unsigned char *)bytes)[0]^=1;return 0;
 }
 int BCryptDestroyHash(PTR hash){(void)hash;return 0;}
 int BCryptCloseAlgorithmProvider(PTR alg,DWORD flags){(void)alg;(void)flags;return 0;}
@@ -82,6 +82,14 @@ int main(void){
     assert(public_same_path(L"C:\\Game\\MoonSweepers.exe",L"c:/game/moonsweepers.exe"));
     assert(!public_same_path(L"C:\\Game\\MoonSweepers.exe",L"C:\\Elsewhere\\MoonSweepers.exe"));
     self_module=(PTR)1;assert(public_installed_marker());assert(!public_game_module((PTR)1));
+    reset("1","test-mod");assert(private_startup_identity());assert(hashes==3);assert(!environments);public_release_inputs();
+    assert(public_game_module((PTR)2));assert(native_game_module((PTR)3,"UnityPlayer.dll"));assert(!public_game_module((PTR)4));
+    union {U64 align;unsigned char bytes[8192];} module={0};unsigned char *base=module.bytes;
+    *(unsigned short *)base=0x5a4d;*(DWORD *)(base+0x3c)=0x80;*(DWORD *)(base+0x80)=0x00004550;
+    *(unsigned short *)(base+0x84)=0x8664;*(unsigned short *)(base+0x80+24)=0x20b;
+    *(DWORD *)(base+0x80+24+56)=0x3000000;assert(native_profile_module_bounds(base));
+    *(DWORD *)(base+0x80+24+56)=0x2000000;assert(!native_profile_module_bounds(base));
+    *(DWORD *)(base+0x80+24+56)=0x3000000;*(unsigned short *)(base+0x84)=0x14c;assert(!native_profile_module_bounds(base));
     reset("1","test-mod");assert(public_startup());assert(hashes==5);assert(environments>2);public_release_inputs();
     reset("1","3d-tools");snprintf(inventory,sizeof(inventory),"%s MoonLab/mods/3d-tools/mod.dll\n%s MoonLab/runtime-plan.bin\n",mod_hash,mod_hash);
     assert(public_startup());assert(hashes==5);public_release_inputs();
@@ -114,7 +122,9 @@ int main(void){
     assert(!public_startup());assert(environments==0);public_release_inputs();
     reset("1","test-mod");strcat(configuration,"managed=0\n");
     assert(!public_startup());assert(hashes==0);public_release_inputs();
-    reset("1","test-mod");wrong_hash=1;assert(!public_startup());assert(hashes==1);assert(environments==0);public_release_inputs();
+    for(int changed=1;changed<=3;changed++){
+        reset("1","test-mod");wrong_hash=changed;assert(!public_startup());assert(hashes==3);assert(environments==0);public_release_inputs();
+    }
     reset("1","missing-mod");assert(!public_startup());assert(environments==0);public_release_inputs();
     reset("1","test-mod");strcpy(inventory+65,"MoonLab/mods/../escape.dll\n");assert(!public_startup());assert(environments==0);public_release_inputs();
     assert(!public_relative("/absolute"));assert(!public_relative("x//y"));assert(!public_relative("x/.."));

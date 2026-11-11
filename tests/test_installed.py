@@ -399,7 +399,10 @@ class InstalledChecks(unittest.TestCase):
         # admit unsupported native reads or silently drop editable settings.
         from moonloader.settings import ENVIRONMENT
         source = (test_loader.ROOT/'runtime/loader/public.h').read_text()
-        for value in discovery.PIN.values(): self.assertIn(value, source)
+        from game_profiles_native import check
+        check(test_loader.ROOT)
+        profiles = (test_loader.ROOT/'runtime/loader/game_profiles.generated.h').read_text()
+        for value in discovery.PIN.values(): self.assertIn(value, profiles)
         for name, variable in ENVIRONMENT.items(): self.assertIn('{"'+name+'","'+variable+'"}', source)
 
 

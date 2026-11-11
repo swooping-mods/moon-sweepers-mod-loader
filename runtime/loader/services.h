@@ -76,6 +76,21 @@ static unsigned int runtime_subscribe_frame(const MoonFrameSubscriptionV1 *spec)
 }
 static const MoonRuntimeApiV1 runtime_api={sizeof(MoonRuntimeApiV1),MOON_RUNTIME_SERVICES_ABI,
     runtime_publish,runtime_find,runtime_subscribe_frame,hook_unsubscribe};
+/* ABI8 binds through its declared dependency closure, then caches typed tables.
+ * Keep the older exported table's post-start lookup behavior unchanged. */
+static const void *runtime_find_v8(const char *provider,const char *service,unsigned int abi,unsigned int size){
+    if(!registration_thread_matches()||update_sealed||!registration_owner||!service_plan.active
+       ||service_plan.mods[registration_owner-1].package_abi!=8||!provider||!service||!size)return 0;
+    char name[161];int n=msp_full_name(provider,service,name);if(!n)return 0;
+    MspMod *mod=service_plan.mods+registration_owner-1;MspReader reader={mod->requires,service_plan.end,1};
+    for(unsigned int i=0;i<mod->requires_count;i++){
+        MspContract need;if(!msp_contract(&reader,&need))return 0;
+        if(msp_equal(need.name,need.length,name))return abi==need.abi&&size<=need.size?runtime_find(provider,service,abi,size):0;
+    }return 0;
+}
+static const MoonRuntimeApiV1 runtime_api_v8={sizeof(MoonRuntimeApiV1),MOON_RUNTIME_SERVICES_ABI,
+    runtime_publish,runtime_find_v8,runtime_subscribe_frame,hook_unsubscribe};
+static inline const MoonRuntimeApiV1 *runtime_context_api_v8(void){return &runtime_api_v8;}
 __declspec(dllexport) const MoonRuntimeApiV1 *MoonLab_GetRuntimeApi_v1(void){return &runtime_api;}
 static inline int begin_runtime_registration(unsigned int owner,const char *id){
     if(!runtime_id_valid(id,64)||!msp_identity(owner,id)||!begin_hook_registration(owner))return 0;

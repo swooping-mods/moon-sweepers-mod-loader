@@ -5,6 +5,11 @@ contracts and package tools remain in Moon Sweepers API. This loader also owns
 the source-only, game-specific native author adapter under `sdk/native/`.
 Framework implementations and domain SDKs stay in their individual mod repos.
 
+The source-pinned helpers below remain the legacy direct-game path. New ABI8
+modules can instead use the public SDK's broker-only startup context and typed
+game/framework tables; see [native game adapter](game-adapter.md). Existing
+compiled modules do not become forward-compatible by changing their labels.
+
 The adapter preserves `runtime/native/` and `runtime/sdk/` relative paths so
 existing independently exported mod sources compile without a workshop sibling.
 It includes IL2CPP binding, local actor/input/camera/interaction connectors,

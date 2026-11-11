@@ -9,6 +9,11 @@ __declspec(dllimport) PTR __stdcall AddVectoredExceptionHandler(DWORD,int (*)(Ex
 __declspec(dllimport) DWORD __stdcall RemoveVectoredExceptionHandler(PTR);
 #include "../native/hook_engine.h"
 #include "camera.h"
+#include "service_plan.h"
+#ifndef MOON_LOADER_GAME_FRAME_ENTER
+#define MOON_LOADER_GAME_FRAME_ENTER(hook) 0
+#define MOON_LOADER_GAME_FRAME_LEAVE(hook,entered) ((void)(hook),(void)(entered))
+#endif
 #ifndef MOON_LOADER_INPUT_PREFLIGHT
 #define MOON_LOADER_INPUT_PREFLIGHT(walker) ((void)0)
 #define MOON_LOADER_INTERACTION_SEAL() 1
@@ -59,6 +64,7 @@ static unsigned int subscribe_observer(const MoonHookSubscriptionV1 *spec,MoonFr
     if(!registration_thread_matches())return 0;
     if(update_sealed||!registration_owner||!spec||spec->size!=sizeof(*spec)
        ||subscription_count>=MOONLAB_MAX_SUBSCRIPTIONS||next_subscription==(unsigned int)-1)return 0;
+    if(service_plan.active&&service_plan.mods[registration_owner-1].package_abi==8&&!frame)return 0;
     PTR address=hook_address(spec->hook);
     if(!address||!instruction_length(address)||spec->phase>MOON_PHASE_LATE)return 0;
     int observer=spec->role==MOON_ROLE_OBSERVER;
@@ -108,6 +114,7 @@ static int dispatch_update(int id,Context *context){
 #ifdef MOON_LOADER_INPUT_HOOK
     if(id>=100&&id<=102)return MOON_LOADER_INPUT_HOOK(id,context);
 #endif
+    int game_frame_entered=MOON_LOADER_GAME_FRAME_ENTER((unsigned int)id);
     moon_camera_observe_thread();
     if(id==MOON_HOOK_UPDATE)MOON_LOADER_INPUT_PREFLIGHT((PTR)context->rcx);
     unsigned int hook=(unsigned int)id;int skip=0;
@@ -141,6 +148,7 @@ static int dispatch_update(int id,Context *context){
             skip=spec->vehicle_callback(spec->local_id,context,&input)!=0;
         }
     }
+    MOON_LOADER_GAME_FRAME_LEAVE((unsigned int)id,game_frame_entered);
     return skip;
 }
 static unsigned int legacy_subscribe(unsigned int hook,unsigned int role,int id,MoonHookCallback callback,MoonHookVehicleCallback vehicle_callback){

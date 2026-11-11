@@ -29,6 +29,10 @@ static int equal(const char *a,const char *b){while(*a&&*a==*b){a++;b++;}return 
 #include "forward.h"
 #include "profile.h"
 #include "input.h"
+static int moon_game_frame_enter(unsigned int);
+static void moon_game_frame_leave(unsigned int,int);
+#define MOON_LOADER_GAME_FRAME_ENTER(hook) moon_game_frame_enter(hook)
+#define MOON_LOADER_GAME_FRAME_LEAVE(hook,entered) moon_game_frame_leave(hook,entered)
 #include "dispatch.h"
 #include "interaction.h"
 int _fltused=0;
@@ -67,6 +71,8 @@ static void read_service_plan(void){
     event("runtime-plan-ready",1);
 }
 #include "public.h"
+#include "game_adapter.h"
+#include "mod_entry.h"
 /* The managed patcher calls this before admitting any installed plug-in. */
 __declspec(dllexport) unsigned int MoonLab_InstalledManagedState_v1(void){
     unsigned int state=MoonLab_RuntimeState_v1();
@@ -86,6 +92,15 @@ static DWORD __stdcall worker(PTR unused){
     const WCHAR *tail=L"\\loader.jsonl";while(*tail)evidence[n++]=*tail++;evidence[n]=0;
     log_file=CreateFileW(evidence,0x40000000,1,0,1,0x80,0);
     if(log_file==(PTR)(U64)-1){runtime_startup_failed();if(public_mode)return 0;ExitProcess(110);}
+    if(!public_mode&&!private_startup_identity())fail("game-profile-identity");
+    read_service_plan();
+    if(!moon_game_plan_valid())fail("game-profile-plan");
+    {
+        char text[300],*out=append(text,"{\"case\":\"game-profile\",\"id\":\"");out=append(out,native_profile->id);
+        out=append(out,"\",\"digest\":\"");out=append(out,native_profile->digest);append(out,"\",\"success\":true}\n");
+        DWORD written=0,size=0;while(text[size])size++;
+        if(!WriteFile(log_file,text,size,&written,0)||written!=size)fail("game-profile-log");FlushFileBuffers(log_file);
+    }
     event("loader-ready",1);event(public_mode?"installed-game":"private-profile",1);
     if(public_mode){
         char text[200],*out=append(text,"{\"case\":\"deployment\",\"installation\":\"");
@@ -97,12 +112,14 @@ static DWORD __stdcall worker(PTR unused){
     }
     PTR game=0;for(int i=0;i<1200&&!game;i++){game=GetModuleHandleW(L"GameAssembly.dll");if(!game)Sleep(25);}
     if(!game)fail("gameassembly-timeout");
-    if(public_mode&&!public_game_module(game)){runtime_startup_failed();event("gameassembly-path-mismatch",0);CloseHandle(log_file);public_release_inputs();return 0;}
+    if(!public_game_module(game)){runtime_startup_failed();event("gameassembly-path-mismatch",0);CloseHandle(log_file);public_release_inputs();return 0;}
+    PTR player=GetModuleHandleW(L"UnityPlayer.dll");if(!player||!native_game_module(player,"UnityPlayer.dll"))fail("unityplayer-path-mismatch");
+    if(!native_profile_module_bounds(game))fail("game-profile-module-bounds");
     if(!public_mode&&!protect_profile(game,0))fail("gameassembly-profile-guard");
     PTR domain=0;
     for(int i=0;i<1200;i++){
-        domain=*(PTR volatile *)((char *)game+0x24f3658);
-        if(domain&&*(PTR volatile *)((char *)domain+0x18))break;
+        domain=*(PTR volatile *)((char *)game+native_profile->domain_rva);
+        if(domain&&*(PTR volatile *)((char *)domain+native_profile->domain_ready_offset))break;
         domain=0;Sleep(25);
     }
     if(!domain)fail("domain-timeout");
@@ -137,21 +154,21 @@ static DWORD __stdcall worker(PTR unused){
         if(!name||!equal(name,"Assembly-CSharp.dll"))continue;
         PTR klass=get_class(image,"MoonCleaners","MoonWalker");
         PTR update=klass?get_method(klass,"Update",0):0;
-        if(!update||get_token(update)!=100671733)fail("dispatch-update-token");
+        if(!update||get_token(update)!=native_profile->update_token)fail("dispatch-update-token");
         update_address=*(PTR *)update;
         PTR late=get_method(klass,"LateUpdate",0);
-        if(!late||get_token(late)!=100671741)fail("dispatch-late-update-token");
+        if(!late||get_token(late)!=native_profile->late_update_token)fail("dispatch-late-update-token");
         late_update_address=*(PTR *)late;
-        if(late_update_address!=(char *)game+0x636410)fail("dispatch-late-update-address");
+        if(late_update_address!=(char *)game+native_profile->late_update_rva)fail("dispatch-late-update-address");
         klass=get_class(image,"MoonCleaners","MoonPrototypeVehicle");
         PTR fixed=klass?get_method(klass,"FixedUpdate",0):0;
-        if(!fixed||get_token(fixed)!=100669323)fail("dispatch-vehicle-token");
+        if(!fixed||get_token(fixed)!=native_profile->vehicle_fixed_token)fail("dispatch-vehicle-token");
         vehicle_address=*(PTR *)fixed;
-        if(vehicle_address!=(char *)game+0x4d0c80)fail("dispatch-vehicle-address");
+        if(vehicle_address!=(char *)game+native_profile->vehicle_fixed_rva)fail("dispatch-vehicle-address");
     }
-    if((U64)update_address<(U64)game+0x1000||(U64)update_address>=(U64)game+31917844)fail("dispatch-update-address");
+    if((U64)update_address<(U64)game+native_profile->image_min_rva||(U64)update_address>=(U64)game+native_profile->image_max_rva)fail("dispatch-update-address");
     if(!moon_interaction_bind(domain,game))fail("interaction-bind-failed");
-    read_service_plan();
+    if(!game_clock_bind(domain,game))fail("game-clock-binding");
     /* Include every maximum-length ID plus separators and termination. */
     static WCHAR ids[MOONLAB_MAX_NATIVE_MODS*65+1];
     n=GetEnvironmentVariableW(L"MOONLAB_MODS",ids,MOONLAB_MAX_NATIVE_MODS*65+1);
@@ -177,15 +194,15 @@ static DWORD __stdcall worker(PTR unused){
         part=L"mods\\";while(*part)path[length++]=*part++;
         for(WCHAR *q=id;*q;q++)path[length++]=*q;
         part=L"\\mod.dll";while(*part)path[length++]=*part++;path[length]=0;
-        PTR mod=LoadLibraryW(path);int (*start)(PTR,PTR)=mod?(int(*)(PTR,PTR))GetProcAddress(mod,"MoonLab_ModStart"):0;
+        int adapter_mod=service_plan.mods[loaded-1].package_abi==8;
+        PTR mod=LoadLibraryW(path);MoonNativeModEntry entry={0};
         if(!mod)fail("mod-library-load-failed");
-        if(!start)fail("mod-entry-missing");
-        if(service_plan.mods[loaded-1].package_abi>=6){
-            int (*abi)(void)=(int(*)(void))GetProcAddress(mod,"MoonLab_RuntimeServicesAbi");
-            if(!abi||abi()!=1)fail("runtime-api-marker");
-        }
+        unsigned int admitted=moon_mod_entry(mod,service_plan.mods[loaded-1].package_abi,&entry);
+        if(admitted==MOON_MOD_ENTRY_RUNTIME)fail("runtime-api-marker");
+        if(admitted!=MOON_MOD_ENTRY_OK)fail("mod-entry-missing");
         if(!begin_runtime_registration((unsigned int)loaded,active_mod))fail("runtime-registration-scope");
-        int started=start(domain,game);
+        MoonModContextV8 context={sizeof(context),MOON_MOD_CONTEXT_V8_ABI,moon_game_adapter_api(),runtime_context_api_v8()};
+        int started=adapter_mod?entry.adapter(&context):entry.legacy(domain,game);
         int committed=finish_runtime_registration(started);
         if(!started)fail("mod-start-failed");
         if(!committed)fail("mod-interface-contract-failed");

@@ -10,11 +10,12 @@ typedef struct {
     unsigned int length,abi,size,count;
 } MspContract;
 typedef struct {
-    char id[65];unsigned int package_abi,provides_count,requires_count;
-    const unsigned char *provides,*requires;
+    char id[65];unsigned int package_abi,provides_count,requires_count,game_count;
+    const unsigned char *provides,*requires,*game;
 } MspMod;
 static struct {
-    unsigned int count,parsed,next_owner,active;
+    unsigned int count,parsed,next_owner,active,version;
+    char profile_id[65],profile_digest[65];
     const unsigned char *end;
     MspMod mods[64];
 } service_plan;
@@ -50,6 +51,15 @@ static int msp_name(const unsigned char *p,unsigned int n,unsigned int kind){
         }
         return segment!=0;
     }
+    if(kind==3){
+        unsigned int segment=0,parts=0;
+        for(unsigned int i=0;i<n;i++){
+            unsigned char c=p[i];if(c=='.'){if(!segment)return 0;segment=0;parts++;continue;}
+            if(!segment&&(c<'a'||c>'z'))return 0;
+            if(!((c>='a'&&c<='z')||(c>='0'&&c<='9')||c=='-'))return 0;
+            segment++;
+        }return segment!=0&&parts!=0;
+    }
     if(kind==1){
         unsigned int owner=0;while(owner<n&&p[owner]!='.')owner++;
         if(owner>64||owner==n||!msp_name(p,owner,0))return 0;
@@ -69,10 +79,10 @@ static int msp_name(const unsigned char *p,unsigned int n,unsigned int kind){
 static unsigned int msp_owner_length(const unsigned char *name,unsigned int n){
     unsigned int i=0;while(i<n&&name[i]!='.')i++;return i;
 }
-static int msp_contract(MspReader *r,MspContract *entry){
+static int msp_contract_kind(MspReader *r,MspContract *entry,unsigned int kind){
     entry->name=msp_string(r,160,&entry->length);
     entry->abi=msp_number(r,4);entry->size=msp_number(r,4);entry->count=msp_number(r,4);
-    if(!r->ok||!msp_name(entry->name,entry->length,1)||!entry->abi||!entry->size
+    if(!r->ok||!msp_name(entry->name,entry->length,kind)||!entry->abi||!entry->size
        ||entry->size>65536||entry->count>MSP_MAX_LIMITS)return 0;
     entry->limits=r->p;
     const unsigned char *names[MSP_MAX_LIMITS];unsigned int lengths[MSP_MAX_LIMITS];
@@ -83,6 +93,8 @@ static int msp_contract(MspReader *r,MspContract *entry){
     }
     return r->ok;
 }
+static int msp_contract(MspReader *r,MspContract *entry){return msp_contract_kind(r,entry,1);}
+static int msp_game_contract(MspReader *r,MspContract *entry){return msp_contract_kind(r,entry,3);}
 static int msp_find(const unsigned char *name,unsigned int length,MspContract *out,unsigned int *provider){
     unsigned int owner_length=msp_owner_length(name,length);
     for(unsigned int i=0;i<service_plan.parsed;i++)if(msp_equal(name,owner_length,service_plan.mods[i].id)){
@@ -114,10 +126,24 @@ static int msp_satisfies(const MspContract *provided,const MspContract *required
     return 1;
 }
 static inline int msp_init(const void *data,unsigned int bytes){
-    static const unsigned char magic[8]={'M','S','A','P','I',1,0,0};
     if(service_plan.active||!data||bytes<12||bytes>MSP_MAX_BYTES)return 0;
-    const unsigned char *p=data;for(unsigned int i=0;i<8;i++)if(p[i]!=magic[i])return 0;
+    const unsigned char *p=data;
+    if(p[0]!='M'||p[1]!='S'||p[2]!='A'||p[3]!='P'||p[4]!='I'||(p[5]!=1&&p[5]!=2)||p[6]||p[7])return 0;
     MspReader r={p+8,p+bytes,1};service_plan.end=r.end;service_plan.parsed=0;service_plan.next_owner=0;
+    service_plan.version=p[5];service_plan.profile_id[0]=service_plan.profile_digest[0]=0;
+    if(service_plan.version==2){
+        unsigned int n;const unsigned char *value=msp_string(&r,64,&n);
+        if(!r.ok)return 0;
+        for(unsigned int i=0;i<n;i++){
+            unsigned c=value[i];if((!i&&(c<'a'||c>'z'))||!((c>='a'&&c<='z')||(c>='0'&&c<='9')||c=='.'||c=='-'||c=='_'))return 0;
+            service_plan.profile_id[i]=(char)c;
+        }service_plan.profile_id[n]=0;
+        value=msp_string(&r,64,&n);if(!r.ok||n!=64)return 0;
+        for(unsigned int i=0;i<64;i++){
+            unsigned c=value[i];if(!((c>='a'&&c<='f')||(c>='0'&&c<='9')))return 0;
+            service_plan.profile_digest[i]=(char)c;
+        }service_plan.profile_digest[64]=0;
+    }
     service_plan.count=msp_number(&r,4);if(service_plan.count>64)return 0;
     unsigned int total=0;
     for(unsigned int index=0;index<service_plan.count;index++){
@@ -127,7 +153,7 @@ static inline int msp_init(const void *data,unsigned int bytes){
         for(unsigned int j=0;j<n;j++)mod->id[j]=(char)id[j];
         mod->id[n]=0;
         mod->package_abi=msp_number(&r,4);mod->provides_count=msp_number(&r,4);mod->provides=r.p;
-        if(!r.ok||!mod->package_abi||mod->package_abi>7||mod->provides_count>64
+        if(!r.ok||!mod->package_abi||mod->package_abi>8||(mod->package_abi==8&&service_plan.version!=2)||mod->provides_count>64
            ||total+mod->provides_count>256||(mod->package_abi<6&&mod->provides_count))return 0;
         total+=mod->provides_count;
         const unsigned char *names[64];unsigned int lengths[64];
@@ -143,6 +169,13 @@ static inline int msp_init(const void *data,unsigned int bytes){
             MspContract required,provided;unsigned int provider;
             if(!msp_contract(&r,&required)||!msp_find(required.name,required.length,&provided,&provider)
                ||provider>=index||!msp_satisfies(&provided,&required))return 0;
+            names[j]=required.name;lengths[j]=required.length;
+            for(unsigned int k=0;k<j;k++)if(msp_bytes(names[j],lengths[j],names[k],lengths[k]))return 0;
+        }
+        mod->game_count=service_plan.version==2?msp_number(&r,4):0;mod->game=r.p;
+        if(!r.ok||mod->game_count>64||(mod->package_abi<8&&mod->game_count))return 0;
+        for(unsigned int j=0;j<mod->game_count;j++){
+            MspContract required;if(!msp_game_contract(&r,&required))return 0;
             names[j]=required.name;lengths[j]=required.length;
             for(unsigned int k=0;k<j;k++)if(msp_bytes(names[j],lengths[j],names[k],lengths[k]))return 0;
         }

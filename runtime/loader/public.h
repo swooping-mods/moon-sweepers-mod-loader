@@ -1,5 +1,6 @@
 /* Installed-game startup: bounded configuration, pinned inputs, no save redirect.
  * Called on the worker thread, never under the Windows loader lock. */
+#include "game_profile.h"
 __declspec(dllimport) BOOL __stdcall ReadFile(PTR,void *,DWORD,DWORD *,PTR);
 __declspec(dllimport) BOOL __stdcall SetEnvironmentVariableW(const WCHAR *,const WCHAR *);
 __declspec(dllimport) void __stdcall OutputDebugStringA(const char *);
@@ -111,7 +112,7 @@ static int public_parse(char *text){
     }
     return 1;
 }
-static int public_hash(const char *relative,const char *expected,PTR *retained){
+static int public_hash_file(const char *relative,const char *expected,char actual[65],PTR *retained){
     WCHAR path[1500];if(!public_path(path,1500,relative))return 0;
     PTR file=CreateFileW(path,0x80000000,1,0,3,0x80,0);
     if(file==(PTR)(U64)-1)return 0;
@@ -127,7 +128,11 @@ static int public_hash(const char *relative,const char *expected,PTR *retained){
     unsigned char bytes[32];
     if(BCryptFinishHash(hash,bytes,32,0)<0)goto done;
     const char *digits="0123456789abcdef";
-    for(int i=0;i<32;i++)if(expected[i*2]!=digits[bytes[i]>>4]||expected[i*2+1]!=digits[bytes[i]&15])goto done;
+    for(int i=0;i<32;i++){
+        char hi=digits[bytes[i]>>4],lo=digits[bytes[i]&15];
+        if(expected&&(expected[i*2]!=hi||expected[i*2+1]!=lo))goto done;
+        if(actual){actual[i*2]=hi;actual[i*2+1]=lo;}
+    }if(actual)actual[64]=0;
     ok=1;
 done:
     if(hash)BCryptDestroyHash(hash);
@@ -135,6 +140,7 @@ done:
     if(ok&&retained)*retained=file;else CloseHandle(file);
     return ok;
 }
+static int public_hash(const char *relative,const char *expected,PTR *retained){return public_hash_file(relative,expected,0,retained);}
 static void public_prefix(char *out){
     char *p=append(out,"MoonLab/deployments/");
     for(int i=0;i<32;i++)*p++=(char)public_generation[i];
@@ -194,7 +200,7 @@ static int public_payload(void){
      * omitted inventory row must not authorize unchecked startup contracts. */
     return entries>0&&plans==1&&(!public_managed||managed_mask==15);
 }
-static int public_startup(void){
+static int native_profile_base(void){
     DWORD n=GetModuleFileNameW(self_module,public_base,950);
     if(!n||n>=950)return 0;
     while(n&&public_base[n-1]!='\\'&&public_base[n-1]!='/')n--;
@@ -204,16 +210,22 @@ static int public_startup(void){
     static WCHAR actual[1200],expected[1200];
     if(!public_path(expected,1200,"MoonSweepers.exe")||!GetModuleFileNameW(0,actual,1200))return 0;
     if(!public_same_path(actual,expected))return 0;
+    return 1;
+}
+static int native_admit_profile(void){
+    const char *names[3]={"GameAssembly.dll","MoonSweepers.exe","UnityPlayer.dll"};
+    char actual[3][65];const char *hashes[3]={actual[0],actual[1],actual[2]};native_profile=0;
+    for(unsigned int i=0;i<3;i++)if(!public_hash_file(names[i],0,actual[i],&public_inputs[i]))return 0;
+    native_profile=moon_profile_match(hashes);return native_profile!=0;
+}
+static inline int private_startup_identity(void){return native_profile_base()&&native_admit_profile();}
+static int public_startup(void){
+    if(!native_profile_base())return 0;
     static char text[MOONLAB_MAX_NATIVE_MODS*65+256];DWORD size;
     if(!public_read("MoonLab/active.txt",text,sizeof(text),&size))return 0;
     for(DWORD i=0;i<size;i++)if(!text[i]||(unsigned char)text[i]>127)return 0;
     if(!public_parse(text))return 0;
-    const char *names[3]={"GameAssembly.dll","MoonSweepers.exe","UnityPlayer.dll"};
-    const char *hashes[3]={
-        "14f711a6a3b1b7cd803a03f85cc6c6201c5b546ab9b90329533f5cb8ae2e7f13",
-        "0e780f8e8d4bf26ed6bdd8a4068ac42a18846a66a80da7ba5c78f1917a093901",
-        "bfafc49b185eb8427ad75e3648bcba3bf5b07455567ca05ae2b2e23bc1646c0c"};
-    for(int i=0;i<3;i++)if(!public_hash(names[i],hashes[i],&public_inputs[i]))return 0;
+    if(!native_admit_profile())return 0;
     if(!public_payload())return 0;
     static WCHAR path[1500],run_id[40];char run[100];char *end=append(run,"MoonLab/logs/run-");
     U64 stamp=GetTickCount64();DWORD pid=GetCurrentProcessId();const char *hex="0123456789abcdef";
@@ -243,10 +255,21 @@ static int public_startup(void){
     }
     return 1;
 }
-static int public_game_module(PTR game){
+static int native_game_module(PTR game,const char *filename){
     static WCHAR expected[1200],actual[1200];
-    if(!public_path(expected,1200,"GameAssembly.dll")||!GetModuleFileNameW(game,actual,1200))return 0;
+    if(!public_path(expected,1200,filename)||!GetModuleFileNameW(game,actual,1200))return 0;
     return public_same_path(actual,expected);
+}
+static int public_game_module(PTR game){return native_game_module(game,"GameAssembly.dll");}
+static int native_profile_module_bounds(PTR module){
+    if(!native_profile||!module)return 0;const unsigned char *base=module;
+    if(*(const unsigned short *)base!=0x5a4d)return 0;
+    DWORD pe=*(const DWORD *)(base+0x3c);if(pe>4096)return 0;
+    if(*(const DWORD *)(base+pe)!=0x00004550||*(const unsigned short *)(base+pe+4)!=0x8664
+       ||*(const unsigned short *)(base+pe+24)!=0x20b)return 0;
+    DWORD size=*(const DWORD *)(base+pe+24+56);
+    return size>=8&&native_profile->domain_rva<=size-8&&native_profile->image_max_rva<=size
+        &&native_profile->image_min_rva<native_profile->image_max_rva;
 }
 static void public_release_inputs(void){
     for(int i=0;i<3;i++)if(public_inputs[i]){CloseHandle(public_inputs[i]);public_inputs[i]=0;}
