@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the native loader and a mod-free portable source bundle, entirely offline."""
+"""Build the native loader and curated portable source bundle, entirely offline."""
 import argparse
 import hashlib
 import json
@@ -36,7 +36,11 @@ def source_payload():
             if path.is_file() and '__pycache__' not in path.parts and path.suffix != '.pyc':
                 if path.is_relative_to(ROOT/'loader/runtime/bepinex'):
                     continue
+                if path.is_relative_to(ROOT/'vendored/mod-bundle/packages') or path.is_relative_to(ROOT/'loader/packages'):
+                    continue
                 files[path.relative_to(ROOT).as_posix()] = path.read_bytes()
+    from mod_bundle import payload
+    files.update(payload())
     for name in ('README.md', 'CONTRIBUTING.md', '.gitignore', 'run.sh', 'Start-Mod-Loader.cmd'):
         files[name] = (ROOT/name).read_bytes()
     return files
@@ -115,7 +119,7 @@ def main(argv=None):
         "source_files": {name: hashlib.sha256(data).hexdigest() for name, data in sources.items()},
         "managed_attachment": bool(managed_payload),
         "archive": archive.name, "sha256": hashlib.sha256(archive.read_bytes()).hexdigest(),
-        "limits": ["Host Python/PySide6 required", "No mod binaries bundled", "No game, Wine or native Windows execution"]}, indent=2) + "\n")
+        "limits": ["Host Python/PySide6 required", "No game, Wine or native Windows execution"]}, indent=2) + "\n")
     print(archive)
 
 

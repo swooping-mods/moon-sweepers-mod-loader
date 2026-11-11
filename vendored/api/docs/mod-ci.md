@@ -10,8 +10,9 @@ PYTHONPATH=vendored/api/python python3 -m moon_mod_api validate artifacts/my-mod
 sha256sum artifacts/my-mod.msmod > artifacts/SHA256SUMS
 ```
 
-Run feature checks before packaging. Keep game qualification separate from host/ABI tests. A PR job validates and retains an artifact; it receives no Nexus credentials. A reviewed release uses the same immutable artifact, publishes to the mod's existing Nexus file, then proposes a version/checksum/file-ID update to `swooping-mods/moon-sweepers-mod-index`.
+Run feature checks before packaging. CI can validate and retain the resulting
+artifact without access to publishing credentials. Host/ABI checks and in-game
+qualification establish different behavior.
 
-API releases never publish every consumer automatically. Consumers update their API snapshot and requalify their own behavior. This avoids coupling unrelated mod releases and avoids giving the API repository credentials for all mods.
-
-Nexus's [official upload action](https://github.com/marketplace/actions/upload-to-nexus-mods) currently uses its v3 API. It adds a version to an existing file and requires `api_key`, `file_id`, `filename` and `version`. The initial mod page/file must exist first. Select and statically review the exact uploader revision before enabling it; use a release-only secret and a reviewed immutable artifact. No uploader is installed or enabled in this local preparation.
+Consumers pin their own API snapshot and choose when to update it. API releases
+do not publish consumers automatically.

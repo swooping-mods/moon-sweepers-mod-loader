@@ -17,6 +17,7 @@ def verify_artifacts(folder, tag):
     validate_tag(tag)
     names = [f'moon-sweepers-mod-loader-{VERSION}-{kind}.zip'
              for kind in ('source', 'windows-x64')]
+    names.append(f'moon-sweepers-mod-loader-{VERSION}-linux-x64.tar.gz')
     checksums = {}
     for line in (folder / 'SHA256SUMS').read_text().splitlines():
         digest, name = line.split('  ', 1)
@@ -24,8 +25,8 @@ def verify_artifacts(folder, tag):
             raise ValueError('Invalid or duplicate checksum')
         checksums[name] = digest
     if set(checksums) != set(names):
-        raise ValueError('Checksums must cover exactly this version\'s two release ZIPs')
-    for name, receipt_name in zip(names, ('build-receipt.json', 'windows-build-receipt.json')):
+        raise ValueError('Checksums must cover exactly this version\'s source, Windows and Linux archives')
+    for name, receipt_name in zip(names, ('build-receipt.json', 'windows-build-receipt.json', 'linux-build-receipt.json')):
         receipt = json.loads((folder / receipt_name).read_text())
         with (folder / name).open('rb') as stream:
             digest = hashlib.file_digest(stream, 'sha256').hexdigest()
@@ -33,7 +34,7 @@ def verify_artifacts(folder, tag):
             raise ValueError('Build receipt version/archive mismatch')
         if receipt['sha256'] != digest or checksums[name] != digest:
             raise ValueError('Release ZIP checksum mismatch: ' + name)
-    for name in ('checks.json', 'windows-checks.json'):
+    for name in ('checks.json', 'windows-checks.json', 'linux-checks.json'):
         check = json.loads((folder / name).read_text())
         if check.get('success') is not True or check.get('failures', 0) or check.get('errors', 0) or check.get('skipped'):
             raise ValueError('Unsuccessful verification receipt: ' + name)
@@ -46,6 +47,9 @@ def verify_artifacts(folder, tag):
     windows = json.loads((folder / 'windows-checks.json').read_text())
     if windows.get('sha256') != checksums[names[1]]:
         raise ValueError('Static Windows check belongs to a different ZIP')
+    linux = json.loads((folder / 'linux-checks.json').read_text())
+    if linux.get('sha256') != checksums[names[2]] or not linux.get('actual_launcher_cli_passed'):
+        raise ValueError('Linux launcher check belongs to a different archive or did not run')
     return [folder / name for name in names] + [folder / 'SHA256SUMS']
 
 

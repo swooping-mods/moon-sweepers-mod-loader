@@ -29,6 +29,8 @@ def main():
     check_native_sdk()
     from check_managed_sources import check as check_managed_sources
     check_managed_sources()
+    from mod_bundle import payload
+    payload()
     suite = unittest.defaultTestLoader.discover(str(ROOT / "tests"))
     excluded = []
     included = []

@@ -60,7 +60,10 @@ class Service:
         return manifest
 
     def seed(self):
-        for path in sorted((self.bundle / 'packages').glob('*.msmod')):
+        package_dir = self.bundle / 'packages'
+        if not package_dir.exists():
+            package_dir = self.bundle.parent / 'vendored/mod-bundle/packages'
+        for path in sorted(package_dir.glob('*.msmod')):
             manifest = packages.examine(path)
             if manifest['id'] not in self.state['library']:
                 self.import_package(path, select=packages.game_mod(manifest) and manifest.get('default_selected', True))

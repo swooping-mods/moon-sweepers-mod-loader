@@ -7,8 +7,8 @@ read-only permissions. Same-ref runs within each caller workflow cancel older
 unfinished runs; ordinary checks, candidates and releases do not cancel one another.
 
 The Ubuntu 24.04 job uses installed Python/LLVM, runs focused host checks, stages
-exact hash-locked publisher inputs, and calls the offline Windows builder and
-package verifier. No Python packages or source installers run.
+exact hash-locked publisher inputs, and calls the offline Windows/Linux builders and
+package verifiers. No Python packages or source installers run.
 `vendored/runtime-intake.md` records dependency review and scan limits.
 `tools/fetch_windows_inputs.py` stages the reviewed lock; changed bytes fail.
 Matching LGPL source archives remain inert distribution payloads.
@@ -20,9 +20,15 @@ smoke test, then runs `Mod Loader.exe --smoke-test`. Temporary application data 
 used; no game starts. Only the artifact download step receives a read-only token.
 Job/process timeouts bound failures.
 
-The artifact `moon-sweepers-mod-loader-windows-x64` retains source/Windows ZIPs,
+The artifact `moon-sweepers-mod-loader-builds` retains source/Windows ZIPs,
+the Linux x64 tar.gz,
 SHA256SUMS and build/check receipts for 14 days. The manual release-candidate
 workflow reuses both build and Windows smoke jobs without publishing.
+
+Linux uses installed Python/PySide6. Ubuntu CI checks archive hashes and runs the
+actual Linux launcher with --help in a path containing spaces; --gui is a separate
+local smoke using installed PySide6. The Linux check receipt records that hosted
+GUI limit. See [Linux packaging](linux-packaging.md).
 
 ## GitHub prereleases
 
@@ -33,8 +39,8 @@ Version comes from `loader/moonloader/__init__.py`, used by both builders, the
 Windows checker and `tools/release.py`.
 
 The publishing job downloads this run's tested artifact without rebuilding.
-`tools/release.py` checks both build versions/filenames, the exact two-asset
-checksum set, both ZIP digests and successful host/static package receipts. Only
+`tools/release.py` checks both build versions/filenames, the exact three-archive
+checksum set, all archive digests and successful host/Windows/Linux package receipts. Only
 the documented Qt host exclusions are allowed. Native Windows execution is gated
 by the reusable job result, not inferred from static receipts.
 
@@ -47,7 +53,6 @@ releases through this workflow. Existing releases/assets are not overwritten. A 
 inspection/removal before retry. Per-tag concurrency never cancels an active
 publication. No Nexus upload, catalog update or signing occurs.
 
-See [contributing](../CONTRIBUTING.md) for the release procedure. Publication requires
-an explicitly authorized version tag; branch pushes and CI configuration alone
-create no tag or release. Windows/game/co-op are distinct qualifications;
+See [contributing](../CONTRIBUTING.md) for the release procedure. Only pushed version tags trigger publication; branch pushes and CI configuration
+alone create no tag or release. Windows/game/co-op are distinct qualifications;
 these workflows do not claim gameplay compatibility.

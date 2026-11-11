@@ -2,7 +2,7 @@
 
 The source repository is public. Versioned portable downloads are published through the existing GitHub prerelease workflow. Local recovery records remain ignored. The obsolete `loader/check_windows.py` development-package diagnostic is removed; public Windows smoke checks use `loader/check_portable_windows.py` and the bundled launcher.
 
-The repository owns the Python/PySide6 desktop app, its native Windows AMD64 bootstrap, game-build compatibility pins and private deployment/profile boundaries. It contains no gameplay mod implementations or mod asset library.
+The repository owns the Python/PySide6 desktop app, its native Windows AMD64 bootstrap, game-build compatibility pins and private deployment/profile boundaries. Gameplay source remains in owning projects; the [handpicked bundle](bundled-mods.md) vendors nine pinned prebuilt distribution inputs.
 
 The independent desktop includes the workshop's optional category/tag discovery.
 `moonloader/catalog.py` owns its presentation validation and matching. Search
@@ -13,7 +13,7 @@ search. This transfer preserves installed-game preparation, save backup,
 enable/disable and uninstall controls. `tests/test_categories.py` exercises
 actual Qt selection/filter/detail behavior without launching a game.
 
-`loader/main.py` is the CLI and desktop entrypoint. Root launchers retain the `loader/` layout so source and portable bundles locate the same pinned SDK. Default application data remains compatible with the prior loader; use `--data local/review` for an isolated review. No source-checkout mod catalog is seeded.
+`loader/main.py` is the CLI and desktop entrypoint. Root launchers retain the `loader/` layout so source and portable bundles locate the same pinned SDK. Default application data remains compatible with the prior loader; use `--data local/review` for an isolated review. Bundles and the source checkout seed the same nine pinned packages, initially unchecked, while preserving existing versions and selections.
 
 `loader/moonloader/discovery.py` owns supported game executable hashes and Steam discovery (app 5335510). The adapter targets the pinned Steam Windows x64 IL2CPP build. Manual discovery does not establish support for other storefront runtimes. Installed mode requests Steam launch using its selected compatibility runtime on Linux or native game on Windows. Private mode retains installed Proton Experimental and its separate launch route.
 
@@ -42,7 +42,7 @@ ABIs retain their existing admission rules.
 
 `runtime/loader/` implements the hook registry, startup sealing, shared Update, camera override/observers and vehicle input/physics ownership. It uses the pinned public SDK. `runtime/native/` retains the private exception bridge, original instruction emulator and version exports. Existing MoonLab symbols and package ABIs retain compatibility. Game pins require separate gameplay qualification.
 
-`tools/build.py` requires installed clang, lld-link and llvm-dlltool (unversioned or version-suffixed names). It compiles the original bootstrap and standalone diagnostic with warnings as errors, checks AMD64/export surfaces and creates a deterministic portable source ZIP plus SHA256SUMS. The ZIP retains `loader/` and `vendored/` and includes native binaries under `loader/runtime/`. This source ZIP requires host Python/PySide6 and bundles no mods or game files. `tools/build_windows.py` adds the separate fully bundled Windows portable ZIP; see [Windows packaging](windows-packaging.md).
+`tools/build.py` requires installed clang, lld-link and llvm-dlltool (unversioned or version-suffixed names). It compiles the original bootstrap and standalone diagnostic with warnings as errors, checks AMD64/export surfaces and creates a deterministic portable source ZIP plus SHA256SUMS. The ZIP retains `loader/` and `vendored/`, includes native binaries under `loader/runtime/` and the nine handpicked packages under `loader/packages/`. This source ZIP requires host Python/PySide6 and bundles no game files. `tools/build_windows.py` adds the separate fully bundled Windows portable ZIP; see [Windows packaging](windows-packaging.md).
 
 `tools/check.py` checks the API snapshot and runs the focused loader suite, including three compiled host-native programs and three Qt interaction cases. `--host-only` explicitly excludes those three Qt cases for runners without PySide6. Automated Qt verification uses a private headless Gamescope session. GitHub checks and manual candidate workflows have read-only repository permissions. The tag-triggered release workflow publishes checked artifacts to GitHub Releases; see [CI](ci.md). Hosted index consumption remains unimplemented; the loader accepts local `.msmod` files.
 

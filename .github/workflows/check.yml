@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   host:
-    name: Host checks and Windows portable build
+    name: Host checks and Linux/Windows builds
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -37,15 +37,20 @@ jobs:
         run: python3 tools/build_windows.py --inputs local/windows-inputs
       - name: Check Windows package and licenses
         run: python3 tools/check_windows_bundle.py
+      - name: Build Linux desktop archive offline
+        run: python3 tools/build_linux.py
+      - name: Check Linux archive and actual launcher
+        run: python3 tools/check_linux_bundle.py
       - name: Retain portable ZIP and verification receipts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: moon-sweepers-mod-loader-windows-x64
+          name: moon-sweepers-mod-loader-builds
           if-no-files-found: error
           retention-days: 14
           compression-level: 0
           path: |
             artifacts/*.zip
+            artifacts/*.tar.gz
             artifacts/SHA256SUMS
             artifacts/*checks.json
             artifacts/*receipt.json
@@ -61,7 +66,7 @@ jobs:
       - name: Download this run's verified bundle
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh run download "$env:GITHUB_RUN_ID" --repo "$env:GITHUB_REPOSITORY" --name moon-sweepers-mod-loader-windows-x64 --dir incoming
+        run: gh run download "$env:GITHUB_RUN_ID" --repo "$env:GITHUB_REPOSITORY" --name moon-sweepers-mod-loader-builds --dir incoming
       - name: Verify ZIP and extract into a path containing spaces
         run: |
           $receipt = Get-Content incoming/windows-build-receipt.json -Raw | ConvertFrom-Json

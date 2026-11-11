@@ -17,6 +17,11 @@ Paths with spaces are quoted; it does not invoke a shell, host Python, registry
 Python or PATH lookup. Process creation errors and nonzero exit produce a message
 with a console diagnostic command. The launcher is unsigned.
 
+`loader/packages/` contains the [nine handpicked mods/dependencies](bundled-mods.md).
+The bundle lock and provenance are retained under `vendored/`; the package check
+verifies the exact locked set in both the portable folder and ZIP. First-run GUI
+smoke checks also verify library population and unchecked defaults.
+
 The CPython embeddable runtime uses an isolated `python313._pth` that includes
 only its standard-library ZIP, runtime directory, loader and pinned API paths.
 No site initialization or dependency installer is included. `python/qt.conf` points
@@ -51,4 +56,4 @@ on Windows, checks Qt Widgets and SVG loading with temporary data and no game st
 `Mod Loader.exe --smoke-test` runs the same bounded smoke check through the actual
 launcher. GitHub CI executes both smoke paths on Windows; game compatibility and
 co-op remain distinct qualification work. Build and static-check receipts are `artifacts/windows-*.json`;
-`artifacts/SHA256SUMS` covers both source and Windows ZIP outputs.
+`artifacts/SHA256SUMS` covers source/Windows ZIPs and the Linux archive when built.

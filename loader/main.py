@@ -25,7 +25,7 @@ def main():
     parser.add_argument('--game', type=Path)
     parser.add_argument('--install', type=Path, help='Import a local .msmod package')
     parser.add_argument('--no-launch', action='store_true', help='Disable game launching while inspecting the UI')
-    parser.add_argument('--smoke-test', action='store_true', help='Check the bundled Windows GUI with temporary data, then exit without starting a game')
+    parser.add_argument('--smoke-test', action='store_true', help='Check the desktop GUI with temporary data, then exit without starting a game')
     args = parser.parse_args()
     if args.smoke_test:
         from check_portable_windows import main as smoke_test

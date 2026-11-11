@@ -1,0 +1,84 @@
+{
+  "schema": "moon-loader-mod-bundle/v1",
+  "name": "Handpicked starter mods",
+  "mods": [
+    "squishy-plushie",
+    "futuristic-car",
+    "manual-power-poles"
+  ],
+  "test_mod": "debug-menu",
+  "packages": [
+    {
+      "id": "build-menu-framework",
+      "version": "0.2.2",
+      "file": "build-menu-framework-0.2.2.msmod",
+      "sha256": "22eb7e3501d2ca2316025b367480b43722674afad350991703259113f4632372",
+      "source": "https://github.com/swooping-mods/build-menu-framework",
+      "runtime_entry_sha256": "c0defd28e143d94b7485987ad06f968afc84a17381f8a7ae08df4ff2bffb5309"
+    },
+    {
+      "id": "debug-menu",
+      "version": "0.1.1",
+      "file": "debug-menu-0.1.1.msmod",
+      "sha256": "2beebdeaad8487ff8183a1170a574ce6b946fb97daf2f7304b6089c72ec5122b",
+      "source": "https://github.com/swooping-mods/debug-menu",
+      "runtime_entry_sha256": "d366bb24726c82555ec4760357b0e60b8c0a324bb6d6c601f5756d05cea5f8d5"
+    },
+    {
+      "id": "futuristic-car",
+      "version": "0.2.1",
+      "file": "futuristic-car-0.2.1.msmod",
+      "sha256": "a0b1b3ea73cf693216edd52115858920030500cface07f29e2b86aebe808af34",
+      "source": "https://github.com/swooping-mods/futuristic-car",
+      "runtime_entry_sha256": "cbaca5eb7f495832f93f03eab8da0a5dbd7a0519bc498934d5d47bcb505794c8"
+    },
+    {
+      "id": "hints-framework",
+      "version": "0.2.0",
+      "file": "hints-framework-0.2.0.msmod",
+      "sha256": "003c360d2c880bee165fff1dcf7108694ee255f856cbf238b940311c545ea83c",
+      "source": "https://github.com/swooping-mods/hints-framework",
+      "runtime_entry_sha256": "e85b00c922016be084276c6537b876fc3340d87c1be55d1eb188334c4088b201"
+    },
+    {
+      "id": "manual-power-poles",
+      "version": "0.6.1",
+      "file": "manual-power-poles-0.6.1.msmod",
+      "sha256": "7b5634a89b5bce62f91b57d26ebf6e064133f1cb245384a7b306398dbcc69c9d",
+      "source": "https://github.com/swooping-mods/manual-power-poles",
+      "runtime_entry_sha256": "ef6a6a7754b9fcfca4ef107411126d447009728d40f5254ca874d0230a786dc3"
+    },
+    {
+      "id": "pickup-hands",
+      "version": "0.1.1",
+      "file": "pickup-hands-0.1.1.msmod",
+      "sha256": "d42ae8705a41c9a49c6842091292d51a307d20c924a3ccc09e2b545043473efc",
+      "source": "https://github.com/swooping-mods/pickup-hands",
+      "runtime_entry_sha256": "a3302c9a3692affc118763b0120b702638be7f1bea57c2e042f8a9a1fff170af"
+    },
+    {
+      "id": "sound-framework",
+      "version": "0.1.3",
+      "file": "sound-framework-0.1.3.msmod",
+      "sha256": "03723f621dee61a04dc3619bc0dc6c58c2d6871562d6f24651a3023a15ac7d36",
+      "source": "https://github.com/swooping-mods/sound-framework",
+      "runtime_entry_sha256": "c1c1a2575a62ab828e268205d1c7bcf4f81c244bf4e08bd171dcbc7eb6c5f869"
+    },
+    {
+      "id": "squishy-plushie",
+      "version": "0.2.0",
+      "file": "squishy-plushie-0.2.0.msmod",
+      "sha256": "6b48ebb65331d3505a4c345c80a31dac26d6fdda2c7f99462f4fce4f7276eaf7",
+      "source": "https://github.com/swooping-mods/squishy-plushie",
+      "runtime_entry_sha256": "8e23b1a024c6bcc17630173d4ba74c660055b3ff35ee48085c2fea84f8995e94"
+    },
+    {
+      "id": "vehicle-framework",
+      "version": "0.2.1",
+      "file": "vehicle-framework-0.2.1.msmod",
+      "sha256": "429a42038a8c09a9c206e212ab50c62016a494df831cdb93ca1ba12c53db8dee",
+      "source": "https://github.com/swooping-mods/vehicle-framework",
+      "runtime_entry_sha256": "7ba697fdd7b936c89c1c109fe0ed173fc6839747f6d42c64c86ac0565ff9d1bb"
+    }
+  ]
+}

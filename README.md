@@ -1,124 +1,104 @@
 # Moon Sweepers Mod Loader
 
-A desktop mod loader for Moon Sweepers, with local `.msmod` installation, dependency and compatibility checks, installation into the existing Steam game, and an optional private-copy mode.
+Install and select local `.msmod` packages, check dependencies and compatibility,
+and launch Moon Sweepers with the selected mods.
 
-Repository: [swooping-mods/moon-sweepers-mod-loader](https://github.com/swooping-mods/moon-sweepers-mod-loader). The source is public on GitHub.
+## Download and install
 
-The extracted adapter supports the previously pinned Steam Windows x64 IL2CPP 1.0.5 build (app 5335510). Exact executable hashes, rather than the version label alone, determine acceptance. Installed mode requests Steam's selected runtime; private mode uses native Windows or the user's installed Proton Experimental. Other game builds and storefront runtimes require separate qualification.
+Get a checked build from [GitHub Releases](https://github.com/swooping-mods/moon-sweepers-mod-loader/releases).
+Newer development builds are available from successful
+[Checks runs](https://github.com/swooping-mods/moon-sweepers-mod-loader/actions/workflows/check.yml)
+as the `moon-sweepers-mod-loader-builds` artifact.
 
-## Windows portable download
+- **Windows x64:** extract the entire Windows ZIP and open **Mod Loader.exe**.
+  Python and Qt are included; no administrator access is needed.
+- **Linux x64:** extract the Linux `.tar.gz` and run `./Moon\ Sweepers\ Mod\ Loader`.
+  Requires installed Python 3.11+ and PySide6 6.8–6.x. Set
+  `MOON_LOADER_PYTHON=/path/to/python` to use an existing Python environment.
+  The game runs through Steam Proton.
 
-Download the Windows x64 ZIP from [GitHub Releases](https://github.com/swooping-mods/moon-sweepers-mod-loader/releases), extract it completely, and
-double-click **Mod Loader.exe**. Python, PySide6/Qt and the native bootstrap are
-included; no Python installation or administrator access is needed. This is a
-Windows x64 portable folder, not a single-file executable. The launcher is unsigned.
+Downloads include **Squishy Plushie**, **Futuristic Courier**, **Power Poles**,
+**Debug Menu (F4)**, and all five required dependencies: Sound Framework, Pickup
+Hands, Hints Framework, Vehicle Framework and Build Menu Framework. They appear
+in the library on first start, initially unchecked. Existing versions and
+checkmarks are preserved. See the [bundle details](specs/bundled-mods.md).
 
-Import `.msmod` files, select a supported game installation, use **Prepare files**,
-then **Launch**. The game and mod packages are not bundled. Application state and private
-profiles use `%LOCALAPPDATA%/MoonLab/Loader`; pass `--data PATH` for another location.
-Installed-mode mod settings live under the game's `MoonLab/settings/` directory.
-For inspection, run `"Mod Loader.exe" --no-launch`.
+Select the mods and their required frameworks, or use **Select all**, choose the
+supported game installation, then **Prepare files** and
+**Launch**. Search matches names, descriptions, categories and tags. Grid, Details
+and Text views share the same filters and enabled selections. Add other packages
+with **Install mod package**.
 
-`THIRD_PARTY_NOTICES.md` and `LICENSES/` in the ZIP contain bundled component licenses,
-copyright notices, attribution manifests and matching Qt/PySide source archives.
-Qt and PySide libraries remain replaceable under LGPLv3. No project license is assigned.
+## Game compatibility and saves
 
-## GitHub CI downloads
+The adapter targets the pinned Steam Windows x64 IL2CPP 1.0.5 build (app 5335510).
+Exact executable hashes determine compatibility. Other game builds require a
+matching adapter. Gameplay, real co-op and physical-controller qualification are
+separate from launcher checks.
 
-The **Checks** workflow runs on main pushes and pull requests. It checks the source,
-builds the bundled Windows ZIP, then tests the bundled Qt runtime and actual EXE
-on a Windows runner. After both jobs pass, download the
-`moon-sweepers-mod-loader-windows-x64` artifact from the run's Actions page; artifacts
-are retained for 14 days. Manual **Release candidate** builds remain available.
-Tagged versions also run these checks before the **Publish prerelease** workflow publishes the verified ZIPs and SHA-256 checksums
-as GitHub prerelease assets, excluded from the stable/latest channel.
+**Existing Steam game** adds owned loader files and selected mods without copying
+the game or replacing original game DLLs. It uses normal Steam saves: back up the
+save folder and sidecars before enabling save-affecting mods, or choose a fresh
+Steam profile. The UI can back up an explicitly selected save folder.
 
-## Run locally
+On Proton, merge `WINEDLLOVERRIDES="version=n,b"` into the Steam launch options,
+preserving existing settings. The simple case is
+`WINEDLLOVERRIDES="version=n,b" %command%`. **View launch plan** shows the selected
+mode. Steam accepting a launch request does not confirm that the game started.
 
-Use installed Python 3.11+ and PySide6 6.x. `loader/requirements.txt` documents the UI dependency; nothing is installed automatically.
+**Disable mods** applies on the next start. **Uninstall loader** removes unchanged
+owned additions and retains settings/saves; externally changed files are preserved
+and reported. Removing mods cannot make every modded save compatible with vanilla.
+Existing private-copy profiles remain available through **Private game copy**.
+See [deployment details](specs/public-deployment.md) for recovery and path limits.
 
-```sh
-./run.sh --no-launch --data local/review
-```
+Application data uses `%LOCALAPPDATA%/MoonLab/Loader` on Windows and
+`$XDG_DATA_HOME/moonlab-loader` (normally `~/.local/share/moonlab-loader`) on Linux.
+Use `--data PATH` for another location, or `--no-launch` to inspect the UI with
+launch disabled.
 
-Windows: run `Start-Mod-Loader.cmd`, or `py -3 loader/main.py --no-launch --data local/review`.
+## Build and development
 
-This source checkout opens an empty mod library. Import your `.msmod` files through **Install mod package**. The native bootstrap is produced by the build command below. The separate `artifacts/moon-sweepers-mod-loader-0.2.0-source.zip` includes the native bootstrap, diagnostic, original runtime/build/test sources, specs and native author SDK, and requires host Python/PySide6. The Windows portable ZIP above includes those dependencies and an executable launcher.
-
-Search combines words across names, descriptions, categories and tags. Framework,
-QoL and Additions filters work in Grid, Details and Text views; Enabled retains
-your existing checkmarks.
-
-Mod authors can use the checked game bindings under `sdk/native/` without the
-development workshop. Core contracts remain owned by Moon Sweepers API;
-framework/gameplay implementations remain separate mod repositories. See
-[native authoring](specs/native-adapter.md). The optional original managed
-adapter sources and their explicit offline builder are also included; see
-[managed runtime](specs/managed-runtime.md).
-
-Only the explicit Launch action requests a game start. New loader data uses **Existing Steam game**: **Prepare files** adds the bootstrap and selected mods without copying the game or Proton or replacing original game DLLs. Existing loader data keeps **Private game copy**, with its existing isolated profiles. Changing the selector never deletes or migrates a private setup. `--no-launch` disables launch for inspection.
-
-Installed mode uses normal Steam saves. Back up the save folder and sidecars before enabling save-affecting mods, or explicitly confirm a fresh Steam profile when prompted. The UI can back up an explicitly chosen Steam save folder. **Disable mods** applies on the next start; **Uninstall loader** removes unchanged owned additions and retains saves/settings. Binary removal cannot make every modded save compatible with vanilla. Conflicting loaders or externally changed files are preserved and reported.
-
-On Proton, merge `WINEDLLOVERRIDES="version=n,b"` into the game's Steam launch options, preserving existing settings; the simple case is `WINEDLLOVERRIDES="version=n,b" %command%`. Use **View launch plan** for the selected mode. Installed mode asks Steam to launch app 5335510 using its chosen runtime/prefix. A successful request is not confirmation that the game or mods started. Steam options are not edited automatically.
-
-CLI examples (all preparation/removal actions start no game):
+With installed Python 3.11+, PySide6 6.8–6.x and LLVM cross tools:
 
 ```sh
-./run.sh --game /path/to/MoonSweepers --mode installed --normal-saves backed-up --prepare
-./run.sh --game /path/to/MoonSweepers --disable
-./run.sh --game /path/to/MoonSweepers --uninstall-loader
-```
-
-Use `--backup-steam-saves PATH` to make a verified copy of an explicitly chosen Steam save folder, including sidecars. Fresh private profiles never use personal Steam/Bottles saves. Creating a new private copy requires a clean source; uninstall the public bootstrap first if needed. See the [deployment contract](specs/public-deployment.md) for recovery, path limits and qualification boundaries. Native Windows gameplay, Cloud and two-account co-op remain separate qualification requirements.
-
-## Verify and build
-
-```sh
+./run.sh --no-launch
 python3 tools/check.py
 python3 tools/build.py
+python3 tools/build_linux.py
+python3 tools/check_linux_bundle.py --gui
 ```
 
-Checks cover the package/API snapshot, dependency resolution, deployment recovery, profile isolation, native dispatcher and offscreen Qt interactions. `--host-only` explicitly excludes the three Qt tests for CI runners without PySide6. The native build requires installed `clang`, `lld-link` and `llvm-dlltool`; it downloads nothing. Build outputs and verification receipts remain ignored under `artifacts/`.
-
-To reproduce the Windows package offline, provide the previously screened publisher
-files matching `vendored/windows-runtime.lock.json`:
+The Linux archive uses system Python/PySide6. Windows packaging uses the exact
+reviewed inputs pinned in `vendored/windows-runtime.lock.json`:
 
 ```sh
-python3 tools/build_windows.py --inputs /absolute/path/to/reviewed-inputs
+python3 tools/build_windows.py --inputs /path/to/reviewed-inputs
 python3 tools/check_windows_bundle.py
+python3 tools/build_linux.py
 ```
 
-This command verifies input hashes and downloads nothing. Before acquiring new
-inputs, follow the workstation external-intake workflow. The package check verifies
-AMD64 images, DLL import closure, required runtime files, licenses and source hashes.
-On Windows, the bundled runtime smoke check is:
+Builders run offline. The full host suite includes Qt interactions; `--host-only`
+explicitly excludes three Qt tests on runners without PySide6. CI builds both
+platform archives and checks the Linux launcher, Windows bundled Qt runtime and
+actual Windows EXE. Version tags run the same gates before publishing prerelease
+assets. See [CI](specs/ci.md) and [contributing](CONTRIBUTING.md).
 
-```bat
-python\python.exe loader\check_portable_windows.py
-```
+## SDK and credits
 
-It constructs the UI with temporary data, checks SVG loading, then exits without
-starting a game. Native Windows execution remains a separate qualification gate;
-the Linux host checks do not establish it.
+The loader pins [Moon Sweepers API](https://github.com/swooping-mods/moon-sweepers-api)
+0.6.1. Native v6/v7 mods use its runtime registry; v7 declares exact adapter ABIs
+in `requires_host`. Unsupported hosts or missing capabilities reject before game
+preparation. The checked game bindings under `sdk/native/` and optional managed
+adapter sources under `runtime/bepinex/` support independent mod builds. Gameplay
+frameworks remain separate mods. See [native authoring](specs/native-adapter.md)
+and [managed runtime](specs/managed-runtime.md).
 
+The Windows bundle retains Python, Qt/PySide and Microsoft notices, licenses and
+matching Qt/PySide sources in `LICENSES/`; its shared libraries remain replaceable.
+See [third-party notices](vendored/THIRD_PARTY_NOTICES.md). The Windows launcher is
+unsigned. No project-wide license has been assigned.
 
-`vendored/api/` is the pinned first-party SDK from `moon-sweepers-api`, with a file-hash lock. The loader owns the desktop application, native bootstrap, supported game pins and profile/deployment behavior. Gameplay mod implementations and assets are not bundled. Existing `MoonLab_*` native symbols remain unchanged.
-
-The SDK pin is 0.6.0 and understands managed packages and independently owned
-framework interfaces. Native v6/v7 packages use the implemented runtime registry,
-typed frames, input and camera services. Default builds host native mods;
-importing a managed package does not install its required host. Unsupported
-backends and unavailable runtime capabilities reject before game preparation.
-Native v7 declares exact adapter ABIs in `requires_host`; the loader checks its
-runtime receipt's `host_capabilities` at selection and preparation. The separate
-interaction adapter supplies exclusive actions while retaining InputApiV1 and
-the existing generic Update delivery contract.
-
-## Downloads and contributions
-
-Download versioned builds from [GitHub Releases](https://github.com/swooping-mods/moon-sweepers-mod-loader/releases). Import local `.msmod` packages through **Install mod package**. Hosted mod discovery is not implemented.
-
-Report desktop, installation, profile, compatibility-check and launch problems in this repository's [issue tracker](https://github.com/swooping-mods/moon-sweepers-mod-loader/issues). Gameplay mod issues belong with the mod author. See [contributing](CONTRIBUTING.md) for development and release instructions.
-
-Read [specs/_readme.md](specs/_readme.md) and [third-party notices](vendored/THIRD_PARTY_NOTICES.md). The launcher is unsigned. Windows CI checks the bundled GUI and launcher; gameplay and co-op require separate qualification. No project license is assigned.
+Report loader and deployment issues in [this repository](https://github.com/swooping-mods/moon-sweepers-mod-loader/issues).
+Gameplay issues belong in the mod's repository. Current contracts are indexed by
+[specs/_readme.md](specs/_readme.md).

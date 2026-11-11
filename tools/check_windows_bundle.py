@@ -8,6 +8,7 @@ import subprocess
 import zipfile
 from pe import PE
 from build import VERSION
+from mod_bundle import payload as bundled_payload
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -28,11 +29,14 @@ def main():
                 'LICENSES/Python/LICENSE.txt', 'LICENSES/README.md',
                 'THIRD_PARTY_NOTICES.md', 'vendored/api/python/moon_mod_api/__init__.py']
     required += ['python/' + name for name in lock['wheel_members']]
+    bundled = bundled_payload(folder / 'loader/packages')
+    required += list(bundled) + ['vendored/mod-bundle.json', 'vendored/mod-bundle/README.md']
     for name in required:
         assert (folder / name).is_file(), name
     with zipfile.ZipFile(archive) as z:
         for name in required:
             assert z.read(name) == (folder / name).read_bytes(), name
+        assert {name for name in z.namelist() if name.startswith('loader/packages/')} == set(bundled)
         for item in lock['files']:
             if item['role'] in ('source', 'license'):
                 data = z.read('LICENSES/' + item['name'])
@@ -57,6 +61,7 @@ def main():
     licenses = list((folder / 'LICENSES/upstream').rglob('LGPL-3.0-only.txt'))
     assert len(licenses) == 3
     receipt = {'success': True, 'required_files': len(required), 'amd64_runtime_images': len(native),
+               'bundled_mods_checked': len(bundled),
                'library_source_hashes_verified': True, 'runtime_import_closure': 'Windows system libraries plus bundled DLLs',
                'sha256': hashlib.sha256(archive.read_bytes()).hexdigest(),
                'limits': ['Static package verification; Windows GUI and launcher execution not tested']}

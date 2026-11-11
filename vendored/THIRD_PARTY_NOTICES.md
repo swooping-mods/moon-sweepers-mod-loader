@@ -20,6 +20,8 @@ snapshot from `swooping-mods/moon-sweepers-api`. It retains the MoonLab ABI.
 GitHub Actions are referenced by immutable revisions and remain subject to their
 upstream terms; they are not included in this source tree. No Nexus uploader is
 bundled or activated. Steam, Proton, game binaries, extracted game assets and
-third-party mods/assets are excluded.
+third-party mods are excluded. The maintainer's selected mods and dependencies
+are included as pinned prebuilt packages; see [bundle provenance](mod-bundle/README.md).
+Their applicable credits and licenses remain inside the packages.
 
 No project license is assigned.
