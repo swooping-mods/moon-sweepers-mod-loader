@@ -227,6 +227,8 @@ class Window(QMainWindow):
         self.notice(str(error))
 
     def open_logs(self):
+        installation = self.current_installation()
+        if installation: diagnostics.collect_selected_installed(self.service, installation)
         self.diagnostics.event('logs-opened', 'Opening local loader diagnostics')
         if self.diagnostics.error:
             self.notice('Could not save logs: '+self.diagnostics.error); return

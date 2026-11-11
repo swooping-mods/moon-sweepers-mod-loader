@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import sys
 import stat
 import threading
@@ -202,6 +203,94 @@ def prepare_run(root, record):
         return
 
 
+def prepare_installed(service, installation, record):
+    """Remember the exact deployed generation before the short Steam request."""
+    try:
+        from . import public
+        from .storage import contained, write
+        data = service.install_root(installation)
+        deployed = public.receipt(data, installation)
+        watch = {'mode': 'installed', 'cwd': installation.path, 'run': record['run'],
+                 'installed_log_watch': {'installation': installation.record(),
+                     'generation': deployed['generation'], 'data': str(data), 'since_ns': time.time_ns()}}
+        record['installed_log_watch'] = watch['installed_log_watch']
+        write(contained(data, 'diagnostics-watch.json'), watch)
+    except Exception as error:
+        start(service.root).exception('installed-diagnostics-setup-failed', error)
+
+
+def collect_installed(root, record):
+    """Copy only fresh bootstrap logs attributed to the prepared installed generation."""
+    session = start(root)
+    result = {'schema': 'moon-loader-installed-diagnostics/v1',
+              'game_process_lifetime': 'unverified', 'game_crash': 'not established', 'logs': []}
+    try:
+        from . import public
+        from .discovery import Installation
+        from .storage import contained, load, write
+        meta = record['installed_log_watch']; installation = Installation(**meta['installation'])
+        data = Path(meta['data']).absolute()
+        data = contained(session.root, data.relative_to(session.root).as_posix())
+        run = Path(record['run']).absolute()
+        if run.parent != data/'runs': raise ValueError('Installed diagnostic watch has an unrelated run')
+        contained(data, run.relative_to(data).as_posix())
+        game = Path(installation.path).absolute()
+        if record['cwd'] != installation.path: raise ValueError('Installed diagnostic watch changed its game')
+        owner = load(contained(game, 'MoonLab/owner.json'), {})
+        if owner != {'schema': public.SCHEMA, 'data': str(data)}: raise ValueError('Installed log ownership changed')
+        deployed = public.receipt(data, installation)
+        generation = meta['generation']
+        if not re.fullmatch('[a-f0-9]{32}', generation) or deployed['generation'] != generation:
+            raise ValueError('Installed diagnostic generation changed')
+        since = meta['since_ns']
+        if not isinstance(since, int) or since < 1: raise ValueError('Invalid installed diagnostic start time')
+        folder = contained(game, 'MoonLab/logs')
+        if folder.is_dir():
+            from itertools import islice
+            candidates = []
+            for item in islice(folder.iterdir(), 4096):
+                if not re.fullmatch(r'run-[a-f0-9]{16}-[a-f0-9]{8}', item.name): continue
+                path = contained(game, 'MoonLab/logs/'+item.name+'/loader.jsonl')
+                if path.is_file() and path.stat().st_mtime_ns >= since: candidates.append(path)
+            for path in sorted(candidates, key=lambda p: p.stat().st_mtime_ns, reverse=True)[:16]:
+                with path.open('rb') as stream:
+                    head = stream.read(16384)
+                    stream.seek(0, 2); size = stream.tell(); stream.seek(max(0, size-TAIL_BYTES))
+                    tail = stream.read(TAIL_BYTES).decode('utf-8', errors='replace')
+                attributed = False
+                for line in head.splitlines():
+                    try: event = json.loads(line)
+                    except (ValueError, UnicodeError): continue
+                    if isinstance(event, dict) and event.get('case') == 'deployment' and event.get('success') is True and event.get('installation') == installation.identity and event.get('generation') == generation:
+                        attributed = True; break
+                if attributed:
+                    result['logs'].append({'run': path.parent.name, 'path': str(path), 'bytes': size,
+                                           'tail': tail, 'truncated': size > TAIL_BYTES})
+        result.update(installation=installation.identity, generation=generation,
+                      status='bootstrap-observed' if result['logs'] else 'no-attributed-bootstrap-log-yet')
+        write(_log_path(session.root, 'installed-bootstrap.json'), result)
+        session.event('installed-bootstrap-collected', result['status'], logs=len(result['logs']))
+    except Exception as error:
+        result.update(status='collection-unavailable', message=str(error))
+        try:
+            from .storage import write
+            write(_log_path(session.root, 'installed-bootstrap.json'), result)
+        except Exception: pass
+        session.exception('installed-log-collection-failed', error)
+    return result
+
+
+def collect_selected_installed(service, installation):
+    """Explicit Open logs refresh, including evidence produced after request exit."""
+    try:
+        from .storage import contained, load
+        if service.mode(installation) != 'installed': return
+        record = load(contained(service.install_root(installation), 'diagnostics-watch.json'))
+        if record: return collect_installed(service.root, record)
+    except Exception as error:
+        start(service.root).exception('installed-log-collection-failed', error)
+
+
 def finish_run(root, record, code, detail=''):
     """Summarize only a loader-owned current run, without guessing Steam lifetime."""
     session = start(root)
@@ -248,6 +337,9 @@ def finish_run(root, record, code, detail=''):
             elif code < 0 or code >= 0x80000000:
                 summary['status'] = status = 'crashed'
         write(contained(run, 'diagnostics.json'), summary)
+        if installed and record.get('installed_log_watch'):
+            summary['installed_bootstrap'] = collect_installed(root, record)
+            write(contained(run, 'diagnostics.json'), summary)
         session.event('launch-finished', detail or status, 'ERROR' if code or detail or status in ('crashed', 'failed', 'steam-request-failed') else 'INFO',
                       run=str(run), status=status, exit_code=code)
     except Exception as error:

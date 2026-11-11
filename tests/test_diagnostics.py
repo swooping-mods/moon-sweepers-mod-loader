@@ -170,5 +170,61 @@ class DiagnosticsChecks(unittest.TestCase):
         self.assertFalse((outside/'diagnostics.json').exists())
         self.assertEqual(result['tails'], {})
 
+    def installed_fixture(self):
+        from moonloader import public
+        from moonloader.discovery import Installation
+        from moonloader.storage import write
+        data = self.root/'data'; install = data/'installs/test-installed'; game = self.root/'game'
+        (game/'MoonLab/logs').mkdir(parents=True); install.mkdir(parents=True)
+        installation = Installation(str(game), 'steam', str(self.root/'steam'), True)
+        deployed = {**public.empty(installation), 'generation':'a'*32, 'enabled':True}
+        write(install/'deployment.json',deployed)
+        write(game/'MoonLab/owner.json',{'schema':public.SCHEMA,'data':str(install)})
+        service = SimpleNamespace(root=data,install_root=lambda _:install,mode=lambda _:'installed')
+        record = {'mode':'installed','cwd':str(game),'run':str(install/'runs/fixture')}
+        diagnostics.prepare_installed(service,installation,record)
+        return service,installation,record,deployed
+
+    def bootstrap(self, installation, name, generation='a'*32, identity=None):
+        path = Path(installation.path)/'MoonLab/logs'/name/'loader.jsonl';path.parent.mkdir()
+        rows = [{'case':'loader-ready','success':True},
+                {'case':'deployment','success':True,'installation':identity or installation.identity,'generation':generation},
+                {'case':'mod-start-failed','success':False,'mod':'fixture'}]
+        path.write_text(''.join(json.dumps(row)+'\n' for row in rows))
+        return path
+
+    def test_installed_bootstrap_collects_only_fresh_attributed_generation(self):
+        service,installation,record,_ = self.installed_fixture()
+        fresh = self.bootstrap(installation,'run-0000000000000001-00000001')
+        stale = self.bootstrap(installation,'run-0000000000000002-00000001');os.utime(stale,ns=(1,1))
+        self.bootstrap(installation,'run-0000000000000003-00000001',generation='b'*32)
+        self.bootstrap(installation,'run-0000000000000004-00000001',identity='other-installation')
+        result = diagnostics.collect_installed(service.root,record)
+        self.assertEqual([row['path'] for row in result['logs']],[str(fresh)])
+        self.assertEqual(result['status'],'bootstrap-observed')
+        self.assertEqual(result['game_process_lifetime'],'unverified')
+        self.assertEqual(result['game_crash'],'not established')
+        self.assertIn('mod-start-failed',result['logs'][0]['tail'])
+
+    def test_open_logs_can_refresh_late_bootstrap_after_request_exit(self):
+        service,installation,record,_ = self.installed_fixture()
+        self.assertEqual(diagnostics.collect_installed(service.root,record)['status'],'no-attributed-bootstrap-log-yet')
+        fresh = self.bootstrap(installation,'run-0000000000000001-00000001')
+        result = diagnostics.collect_selected_installed(service,installation)
+        self.assertEqual([row['path'] for row in result['logs']],[str(fresh)])
+        self.assertTrue((service.root/'logs/installed-bootstrap.json').is_file())
+
+    def test_changed_installed_owner_or_generation_cannot_attribute_logs(self):
+        from moonloader.storage import write
+        service,installation,record,deployed = self.installed_fixture()
+        self.bootstrap(installation,'run-0000000000000001-00000001')
+        write(service.install_root(installation)/'deployment.json',{**deployed,'generation':'b'*32})
+        result = diagnostics.collect_installed(service.root,record)
+        self.assertEqual(result['status'],'collection-unavailable');self.assertEqual(result['logs'],[])
+        write(service.install_root(installation)/'deployment.json',deployed)
+        write(Path(installation.path)/'MoonLab/owner.json',{'schema':'foreign-owner','data':'elsewhere'})
+        result = diagnostics.collect_installed(service.root,record)
+        self.assertEqual(result['status'],'collection-unavailable');self.assertEqual(result['logs'],[])
+
 
 if __name__ == '__main__': unittest.main()

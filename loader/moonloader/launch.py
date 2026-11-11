@@ -195,6 +195,7 @@ def _start_locked(service, installation, lease):
         steam_options.require_ready(installation, record['platform'])
     service.prepare(installation, _session_owner=True)
     if record.get('mode') == 'installed':
+        diagnostics.prepare_installed(service, installation, record)
         run = Path(record['run']); run.mkdir(parents=True, exist_ok=True)
         write(run / 'launch.json', record)
         logger.event('steam-request-starting', 'Files prepared; requesting Steam launch. Game startup remains unconfirmed.', run=str(run), mods=record.get('order', []), platform=record.get('platform'))
