@@ -91,6 +91,18 @@ Existing frame callbacks carry a borrowed walker for legacy consumers; v8
 adapter-only consumers treat it as opaque and never dereference game internals.
 The clock contract does not imply other game services.
 
+`unity.time-scale` ABI 1 is a separate read-only 16-byte table and 16-byte
+`MoonGameTimeScaleSampleV1`. Declare it explicitly with `abi: 1, min_size: 16`;
+finding `unity.clock` does not grant it. Initialize sample `size`, `abi` and
+`reserved = 0`. Its `sample` has the same admitted game-thread frame boundary,
+returns Unity's configured finite nonnegative `timeScale` (zero means paused),
+and writes reserved zero on success. Invalid descriptors, unavailable bindings,
+wrong-thread/outside-frame calls and invalid engine values return zero without
+changing caller storage. It exposes no time-scale setter. This source contract
+does not imply an installed loader advertises it: require a matching reviewed
+profile and actual runtime offer. The initial loader candidate remains
+unadvertised pending its separate qualification gates.
+
 Native DLLs are not sandboxed. V8 is an authoring/runtime contract, not a binary
 proof that arbitrary code never calls another Win32 export.
 

@@ -4,6 +4,7 @@
 #define MOON_GAME_ADAPTER_ABI 1u
 #define MOON_MOD_CONTEXT_V8_ABI 8u
 #define MOON_GAME_CLOCK_ABI 1u
+#define MOON_GAME_TIME_SCALE_ABI 1u
 /* The loader supplies tables only from the exact reviewed game profile. Find
  * is admitted during this owner's ModStart_v8 and only for declared needs.
  * Requested ABI must match the declaration and the requested prefix must not
@@ -36,6 +37,21 @@ typedef struct {
      * deltaTime; frame zero-extends the unsigned 32-bit frameCount (may wrap). */
     int (*sample)(MoonGameClockSampleV1 *);
 } MoonGameClockV1;
+/* Separate unity.time-scale capability; clock ABI1 is unchanged. The value is
+ * Unity's configured timeScale, not an inferred ratio of delta times. */
+typedef struct {
+    unsigned int size,abi;
+    float time_scale;
+    unsigned int reserved;
+} MoonGameTimeScaleSampleV1;
+typedef struct {
+    unsigned int size,abi;
+    /* Initialize sample size/ABI and reserved=0. Returns zero without an engine
+     * call outside an admitted game-thread frame or for an invalid descriptor.
+     * Success writes a finite nonnegative scale (zero means paused), reserved=0.
+     * Failure leaves caller storage unchanged. No setter is exposed. */
+    int (*sample)(MoonGameTimeScaleSampleV1 *);
+} MoonGameTimeScaleV1;
 static inline int moon_game_adapter_valid(const MoonGameAdapterApiV1 *api){
     return api&&api->size>=sizeof(*api)&&api->abi==MOON_GAME_ADAPTER_ABI
         &&api->profile_id&&api->profile_digest&&api->find;
@@ -47,8 +63,13 @@ static inline int moon_mod_context_v8_valid(const MoonModContextV8 *context){
 static inline int moon_game_clock_valid(const MoonGameClockV1 *clock){
     return clock&&clock->size>=sizeof(*clock)&&clock->abi==MOON_GAME_CLOCK_ABI&&clock->sample;
 }
+static inline int moon_game_time_scale_valid(const MoonGameTimeScaleV1 *scale){
+    return scale&&scale->size>=sizeof(*scale)&&scale->abi==MOON_GAME_TIME_SCALE_ABI&&scale->sample;
+}
 _Static_assert(sizeof(MoonGameAdapterApiV1)==32,"game adapter ABI v1");
 _Static_assert(sizeof(MoonModContextV8)==24,"broker-only mod context v8");
 _Static_assert(sizeof(MoonGameClockV1)==16,"game clock ABI v1");
 _Static_assert(sizeof(MoonGameClockSampleV1)==32,"game clock sample ABI v1");
+_Static_assert(sizeof(MoonGameTimeScaleV1)==16,"game time-scale ABI v1");
+_Static_assert(sizeof(MoonGameTimeScaleSampleV1)==16,"game time-scale sample ABI v1");
 #endif

@@ -17,7 +17,7 @@
     "runtime/sdk/camera_host.h": "6d4886166c7ea02bc71de69f99a043a8a55b26d88bf06d02b9fcd335d519dda5",
     "runtime/sdk/camera_registry.h": "0428ed4a1bd5029115166c39629a46bbb6fd796244d50a7600c14ec14cce30ce",
     "runtime/sdk/context.h": "6c84145cc761550c4943aa10c52242a538e92243f79a1b20c65b6a4ef9e82605",
-    "runtime/sdk/game_adapter.h": "5285749438101a72af27711c408d4123c04f9c05fa9a691dfa309523e63efc20",
+    "runtime/sdk/game_adapter.h": "4478271459cf5307e888701f898a49f1751d1d0c83d04c84c05494d58aabb90c",
     "runtime/sdk/hooks.h": "7c006f1254dd6a130f56dac499ba8196fb84ee4883443ee4f12d601534df56ec",
     "runtime/sdk/input.h": "33739269793e88776c6f611a05e19ade01bd8326a115d38a0eec71ff64344ac8",
     "runtime/sdk/input_host.h": "8d3f59ed3e21bdb7c7528737dd263b234c65e05b481a142eaf5f33f70604e0cb",
@@ -82,6 +82,7 @@
   "gameplay_qualification": "None inherited for changed builds",
   "game_adapter_contract": {
     "source": "moon-sweepers-api/include/moon_sweepers/game_adapter.h",
-    "api_version": "0.7.0"
+    "api_version": "0.7.0",
+    "source_revision": "3ad355d"
   }
 }

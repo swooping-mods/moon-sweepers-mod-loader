@@ -9,6 +9,12 @@
       "kind": 193,
       "key": "manual-power-poles.power-pole",
       "status": "active"
+    },
+    {
+      "mod": "basketball-hoop",
+      "kind": 194,
+      "key": "basketball-hoop.recreation.hoop",
+      "status": "reserved"
     }
   ]
 }
