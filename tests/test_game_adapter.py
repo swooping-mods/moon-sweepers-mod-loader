@@ -108,7 +108,8 @@ class GameAdapterChecks(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'alias'):generate(root)
 
     def test_independent_immutable_binaries_on_relocated_adapters(self):
-        with tempfile.TemporaryDirectory(prefix='native-game-adapter-',dir=ROOT/'artifacts') as temporary:
+        artifacts=ROOT/'artifacts';artifacts.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix='native-game-adapter-',dir=artifacts) as temporary:
             output=Path(temporary)/'proof'
             result=subprocess.run([sys.executable,str(ROOT/'tools/check_game_adapter.py'),'--output',str(output)],capture_output=True,text=True,timeout=120)
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)

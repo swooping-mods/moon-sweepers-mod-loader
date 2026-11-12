@@ -28,8 +28,10 @@ The reviewed Microsoft license DOCX inputs are vendored at unchanged hashes
 because their publisher intermittently denies CI requests. Other downloads retry
 transport errors up to three attempts; permission errors and changed hashes fail.
 
-Host-only checks explicitly exclude the three Linux Qt interaction cases; the local
-full suite covers those. A downstream Windows Server 2022 job checks the Windows
+Host-only checks explicitly exclude the Qt interaction methods listed in
+`tools/check.py`, including unknown-build compatibility inspection. The full
+suite retains those methods and requires installed PySide6; missing Qt is not
+silently skipped. A downstream Windows Server 2022 job checks the Windows
 ZIP digest, extracts into a path containing spaces, runs the bundled Python/Qt/SVG
 smoke test, then runs `Mod Loader.exe --smoke-test`. Temporary application data is
 used; no game starts. Only the artifact download step receives a read-only token.
@@ -49,8 +51,8 @@ workflow reuses both build and Windows smoke jobs without publishing.
 Linux bundles its checked Python/PySide6 and desktop helper libraries. Ubuntu CI
 executes the real archive launcher and both single-file formats with isolated
 temporary data, verifies the bundled Qt/SVG and starter library, and exercises
-AppImage without FUSE. Host-only checks still exclude the three system-PySide6
-interaction cases; the local complete suite covers them. See [Linux packaging](linux-packaging.md).
+AppImage without FUSE. Host-only checks exclude the explicit system-PySide6
+interaction methods; the local complete suite covers them. See [Linux packaging](linux-packaging.md).
 
 ## GitHub prereleases
 
