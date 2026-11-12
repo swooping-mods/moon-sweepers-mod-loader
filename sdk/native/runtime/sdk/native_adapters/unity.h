@@ -75,13 +75,19 @@ static inline PTR su_new(const char *ns,const char *name){PTR k=find_class(ns,na
 static inline SURoot su_hold(PTR obj){return obj?su.root(obj,0):0;}
 static inline PTR su_get(SURoot root){return root?su.target(root):0;}
 static inline void su_drop(SURoot *root){if(*root)su.unroot(*root);*root=0;}
-static inline int su_alive(PTR obj){if(!obj)return 0;int ok=1;void *a[]={obj};PTR value=call(su.obj_alive,0,a,&ok);return ok&&value&&*(unsigned char *)unbox(value);}
+static inline int su_alive(PTR obj){if(!obj)return 0;int ok=1;void *a[]={obj};PTR value=call(su.obj_alive,0,a,&ok);PTR data=ok&&value?unbox(value):0;return data&&*(unsigned char *)data;}
 static inline PTR su_transform(PTR go){int ok=1;return call(su.go_transform,go,0,&ok);}
 static inline PTR su_add_component(PTR go,const char *name){int ok=1;PTR t=su_type("UnityEngine",name);void *a[]={t};return t?call(su.go_add,go,a,&ok):0;}
 static inline PTR su_component(PTR go,const char *name){int ok=1;PTR t=su_type("UnityEngine",name);void *a[]={t};return t?call(su.go_component,go,a,&ok):0;}
 static inline void su_set_vector(PTR method_id,PTR transform,SPVec3 v){int ok=1;void *a[]={&v};call(method_id,transform,a,&ok);}
-static inline SPVec3 su_vector(PTR method_id,PTR transform){int ok=1;SPVec3 v={0};PTR boxed=call(method_id,transform,0,&ok);if(ok&&boxed)su_copy(&v,unbox(boxed),sizeof(v));return v;}
-static inline SUQuat su_rotation(SPVec3 forward,SPVec3 up){int ok=1;SUQuat q={0,0,0,1};void *a[]={&forward,&up};PTR b=call(su.look_rotation,0,a,&ok);if(ok&&b)su_copy(&q,unbox(b),sizeof(q));return q;}
+/* Checked readers preserve caller output on failure. Legacy wrappers below
+ * retain their zero defaults; neither route filters finite or business values. */
+static inline int su_vector_checked(PTR method_id,PTR transform,SPVec3 *out){
+    if(!out)return 0;int ok=1;PTR boxed=call(method_id,transform,0,&ok);PTR data=ok&&boxed?unbox(boxed):0;
+    if(!data)return 0;su_copy(out,data,sizeof(*out));return 1;
+}
+static inline SPVec3 su_vector(PTR method_id,PTR transform){SPVec3 v={0};(void)su_vector_checked(method_id,transform,&v);return v;}
+static inline SUQuat su_rotation(SPVec3 forward,SPVec3 up){int ok=1;SUQuat q={0,0,0,1};void *a[]={&forward,&up};PTR b=call(su.look_rotation,0,a,&ok);PTR data=ok&&b?unbox(b):0;if(data)su_copy(&q,data,sizeof(q));return q;}
 static inline void su_set_quat(PTR method_id,PTR transform,SUQuat q){int ok=1;void *a[]={&q};call(method_id,transform,a,&ok);}
 static inline void su_parent(PTR child,PTR parent){int ok=1;unsigned char keep_world=0;void *a[]={parent,&keep_world};call(su.tr_parent,child,a,&ok);}
 static inline PTR su_gameobject(const char *name,PTR parent){
@@ -92,7 +98,11 @@ static inline void su_destroy(PTR obj){if(!obj)return;int ok=1;void *a[]={obj};c
 static inline void su_bool(PTR method_id,PTR self,int enabled){int ok=1;unsigned char value=(unsigned char)!!enabled;void *a[]={&value};call(method_id,self,a,&ok);}
 static inline void su_float(PTR method_id,PTR self,float value){int ok=1;void *a[]={&value};call(method_id,self,a,&ok);}
 static inline void su_int(PTR method_id,PTR self,int value){int ok=1;void *a[]={&value};call(method_id,self,a,&ok);}
-static inline float su_number(PTR method_id,PTR self){int ok=1;PTR v=call(method_id,self,0,&ok);return ok&&v?*(float *)unbox(v):0;}
+static inline int su_number_checked(PTR method_id,PTR self,float *out){
+    if(!out)return 0;int ok=1;PTR boxed=call(method_id,self,0,&ok);PTR data=ok&&boxed?unbox(boxed):0;
+    if(!data)return 0;su_copy(out,data,sizeof(*out));return 1;
+}
+static inline float su_number(PTR method_id,PTR self){float value=0;(void)su_number_checked(method_id,self,&value);return value;}
 static inline PTR su_array(PTR klass,U64 count,const void *values,int stride){PTR a=su.new_array(klass,count);if(a&&count&&values)su_copy(su.array_address(a,stride,0),values,count*(U64)stride);return a;}
 static inline void su_text(PTR text,const char *value){int ok=1;void *a[]={su.string(value)};call(su.text_text,text,a,&ok);}
 static inline int su_string(PTR str,char *out,int cap){
