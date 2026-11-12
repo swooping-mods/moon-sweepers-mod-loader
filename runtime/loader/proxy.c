@@ -172,6 +172,10 @@ static DWORD __stdcall worker(PTR unused){
         if(game_clock_bind_failure)event(game_clock_bind_failure,0);
         fail("game-clock-binding");
     }
+    if(!game_time_scale_bind(domain,game)){
+        if(game_time_scale_bind_failure)event(game_time_scale_bind_failure,0);
+        fail("game-time-scale-binding");
+    }
     /* Include every maximum-length ID plus separators and termination. */
     static WCHAR ids[MOONLAB_MAX_NATIVE_MODS*65+1];
     n=GetEnvironmentVariableW(L"MOONLAB_MODS",ids,MOONLAB_MAX_NATIVE_MODS*65+1);

@@ -3,10 +3,13 @@
 /* The catalog is compiled, not loaded from player-editable deployment data.
  * Its family selects the complete reviewed core adapter, including the input,
  * camera and object-layout assumptions that are not generic capability names. */
+#define MOON_PROFILE_CLOCK 1u
+#define MOON_PROFILE_TIME_SCALE 2u
 typedef struct {
     const char *id,*digest,*hashes[3];
     unsigned int domain_rva,domain_ready_offset,image_min_rva,image_max_rva;
     unsigned int update_token,late_update_token,late_update_rva,vehicle_fixed_token,vehicle_fixed_rva;
+    unsigned int capabilities;
 } MoonNativeGameProfile;
 #include "game_profiles.generated.h"
 static const MoonNativeGameProfile *native_profile;

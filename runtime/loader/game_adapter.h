@@ -52,6 +52,47 @@ static int game_clock_bind(PTR domain,PTR game){
     if(!game_clock.delta)return game_clock_bind_reject("clock-delta-icall");
     return 1;
 }
+static const char *game_time_scale_bind_failure;
+static int game_time_scale_bind_reject(const char *stage){game_time_scale_bind_failure=stage;return 0;}
+static int game_time_scale_bind(PTR domain,PTR game){
+    game_time_scale_bind_failure=0;game_time_scale=0;
+    if(!moon_game_time_scale_required())return 1;
+    const PTR *(*assemblies)(PTR,U64 *)=(const PTR *(*)(PTR,U64 *))GetProcAddress(game,"il2cpp_domain_get_assemblies");
+    PTR (*image)(PTR)=(PTR(*)(PTR))GetProcAddress(game,"il2cpp_assembly_get_image");
+    PTR (*klass)(PTR,const char *,const char *)=(PTR(*)(PTR,const char *,const char *))GetProcAddress(game,"il2cpp_class_from_name");
+    PTR (*method)(PTR,const char *,int)=(PTR(*)(PTR,const char *,int))GetProcAddress(game,"il2cpp_class_get_method_from_name");
+    unsigned int (*arity)(PTR)=(unsigned int(*)(PTR))GetProcAddress(game,"il2cpp_method_get_param_count");
+    unsigned int (*flags)(PTR,unsigned int *)=(unsigned int(*)(PTR,unsigned int *))GetProcAddress(game,"il2cpp_method_get_flags");
+    PTR (*result)(PTR)=(PTR(*)(PTR))GetProcAddress(game,"il2cpp_method_get_return_type");
+    char *(*type_name)(PTR)=(char *(*)(PTR))GetProcAddress(game,"il2cpp_type_get_name");
+    void (*release)(PTR)=(void(*)(PTR))GetProcAddress(game,"il2cpp_free");
+    PTR (*resolve)(const char *)=(PTR(*)(const char *))GetProcAddress(game,"il2cpp_resolve_icall");
+    if(!assemblies)return game_time_scale_bind_reject("time-scale-export-assemblies");
+    if(!image)return game_time_scale_bind_reject("time-scale-export-image");
+    if(!klass)return game_time_scale_bind_reject("time-scale-export-class");
+    if(!method)return game_time_scale_bind_reject("time-scale-export-method");
+    if(!arity)return game_time_scale_bind_reject("time-scale-export-arity");
+    if(!flags)return game_time_scale_bind_reject("time-scale-export-flags");
+    if(!result)return game_time_scale_bind_reject("time-scale-export-return");
+    if(!type_name)return game_time_scale_bind_reject("time-scale-export-type-name");
+    if(!release)return game_time_scale_bind_reject("time-scale-export-free");
+    if(!resolve)return game_time_scale_bind_reject("time-scale-export-icall");
+    U64 count=0;const PTR *list=assemblies(domain,&count);
+    if(!list||count>4096)return game_time_scale_bind_reject("time-scale-assemblies-bounds");
+    PTR time=0;
+    for(U64 i=0;i<count;i++){
+        PTR k=klass(image(list[i]),"UnityEngine","Time");
+        if(k){if(time&&time!=k)return game_time_scale_bind_reject("time-scale-class-ambiguous");time=k;}
+    }
+    if(!time)return game_time_scale_bind_reject("time-scale-class-missing");
+    PTR m=method(time,"get_timeScale",0);unsigned int implementation=0;
+    if(!m)return game_time_scale_bind_reject("time-scale-method");
+    if(arity(m)||!(flags(m,&implementation)&0x10))return game_time_scale_bind_reject("time-scale-signature");
+    char *name=type_name(result(m));int ok=name&&equal(name,"System.Single");if(name)release(name);
+    if(!ok)return game_time_scale_bind_reject("time-scale-return");
+    game_time_scale=(float(*)(void))resolve("UnityEngine.Time::get_timeScale()");
+    return game_time_scale?1:game_time_scale_bind_reject("time-scale-icall");
+}
 __declspec(dllexport) unsigned int MoonLab_GameAdapterAbi_v1(void){return MOON_GAME_ADAPTER_ABI;}
 __declspec(dllexport) const MoonGameAdapterApiV1 *MoonLab_GetGameAdapterApi_v1(void){
     return registration_thread_matches()&&registration_owner&&service_plan.mods[registration_owner-1].package_abi==8?moon_game_adapter_api():0;

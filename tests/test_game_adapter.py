@@ -31,6 +31,28 @@ class GameAdapterChecks(unittest.TestCase):
             header.write_text(generate(root));check(root)
             self.assertNotEqual(digest(document['profiles'][0]),digest(profiles()[0]))
 
+    def test_time_scale_candidate_requires_explicit_profile_promotion(self):
+        document=json.loads((ROOT/CATALOG).read_text())
+        original_digest=digest(document['profiles'][0])
+        self.assertNotIn('unity.time-scale',document['profiles'][0]['capabilities'])
+        self.assertRegex(generate(),r',1u\},\n\};')
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary);path,header=self.fixture(root,document)
+            header.write_text(generate(root));check(root)
+            document['profiles'][0]['capabilities']['unity.time-scale']={'abi':1,'size':16,'limits':{}}
+            path.write_text(json.dumps(document))
+            with self.assertRaisesRegex(ValueError,'Compiled native profiles'):check(root)
+            candidate=generate(root);self.assertRegex(candidate,r',3u\},\n\};')
+            header.write_text(candidate);result=check(root)
+            self.assertNotEqual(original_digest,result['profiles'][document['profiles'][0]['id']]['digest'])
+            self.assertEqual(document['profiles'][0]['hashes'],profiles()[0]['hashes'])
+            for field,value in [('abi',2),('abi',True),('size',32),('size',True),('limits',{'max_reads':1})]:
+                with self.subTest(field=field,value=value):
+                    cap={'abi':1,'size':16,'limits':{}};cap[field]=value
+                    document['profiles'][0]['capabilities']['unity.time-scale']=cap
+                    path.write_text(json.dumps(document))
+                    with self.assertRaisesRegex(ValueError,'capability differs'):generate(root)
+
     def test_unknown_layout_and_false_capabilities_refuse_generation(self):
         original=json.loads((ROOT/CATALOG).read_text())
         mutations=[lambda r:r['adapter'].update(layout='unknown/v1'),
@@ -74,5 +96,5 @@ class GameAdapterChecks(unittest.TestCase):
             result=subprocess.run([sys.executable,str(ROOT/'tools/check_game_adapter.py'),'--output',str(output)],capture_output=True,text=True,timeout=120)
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)
             receipt=json.loads((output/'result.json').read_text())
-            self.assertTrue(receipt['success']);self.assertEqual(len(receipt['cases']),15)
-            self.assertEqual(set(receipt['immutable_binaries']),{'framework','consumer'})
+            self.assertTrue(receipt['success']);self.assertEqual(len(receipt['cases']),23)
+            self.assertEqual(set(receipt['immutable_binaries']),{'framework','consumer','time-scale-consumer'})
