@@ -119,6 +119,15 @@ bounded `time-scale-*` stages and terminal `game-time-scale-binding`.
 Clock and scale requirements are scanned separately: a scale-only module does
 not bind clock, and clock-only startup does no scale metadata work.
 
+The time-scale proof uses dedicated subscription-only manifests with empty
+`provides` and `requires_apis`, rather than inheriting the Clock Framework's
+elapsed/hidden publication obligations. The second owner keeps its ordinary
+dependency for startup order but has no game/API requirement, retaining the
+undeclared time-scale lookup refusal check. Native proof assertions verify those
+plan counts before the unchanged registration commit/startup gates. This repairs
+independent finding API-001; manifest construction has source-only checks, while
+the compiled 23-scenario proof remains deferred and has not been run.
+
 `IMPLEMENTED_CAPABILITIES` in the generator accepts the exact candidate
 `"unity.time-scale": {"abi": 1, "size": 16, "limits": {}}` alongside clock.
 The production `game_profiles.json` row deliberately still advertises clock

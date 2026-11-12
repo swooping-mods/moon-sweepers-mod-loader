@@ -8,9 +8,26 @@ import tempfile
 import unittest
 
 from game_profiles_native import ROOT,CATALOG,HEADER,check,digest,generate,profiles
+from check_game_adapter import time_scale_manifests
 
 
 class GameAdapterChecks(unittest.TestCase):
+    def test_time_scale_fixture_declares_no_unpublished_clock_services(self):
+        hashes={'GameAssembly.dll':'a'*64,'MoonSweepers.exe':'b'*64,'UnityPlayer.dll':'c'*64}
+        manifests=time_scale_manifests(hashes)
+        self.assertEqual(list(manifests),['clock-framework','clock-feature'])
+        for manifest in manifests.values():
+            self.assertEqual(manifest['provides'],{})
+            self.assertEqual(manifest['requires_apis'],[])
+            self.assertEqual(manifest['claims'],[])
+        self.assertEqual(manifests['clock-framework']['requires_game'],
+                         {'unity.time-scale':{'abi':1,'min_size':16}})
+        self.assertEqual(manifests['clock-feature']['requires_game'],{})
+        self.assertEqual(manifests['clock-feature']['requires'],['clock-framework'])
+        manifests['clock-framework']['game']['hashes']['GameAssembly.dll']='d'*64
+        self.assertEqual(hashes['GameAssembly.dll'],'a'*64)
+        self.assertEqual(manifests['clock-feature']['game']['hashes']['GameAssembly.dll'],'a'*64)
+
     def test_compiled_catalog_is_current_and_complete(self):
         result=check();rows=profiles()
         self.assertEqual(len(rows),1)

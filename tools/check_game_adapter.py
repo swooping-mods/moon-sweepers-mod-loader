@@ -13,6 +13,18 @@ import uuid
 ROOT=Path(__file__).resolve().parents[1]
 
 
+def time_scale_manifests(hashes):
+    # These IDs match the native harness's owner scopes. Unlike the Clock
+    # Framework fixture, the scale module only subscribes and publishes no API.
+    return {name: {'id':name,'kind':'native','abi':'MoonLab_ModStart/v8','runtime_api_abi':1,
+                   'game_access':'adapter','game_api_abi':1,
+                   'requires_game':{'unity.time-scale':{'abi':1,'min_size':16}} if name=='clock-framework' else {},
+                   'requires':[] if name=='clock-framework' else ['clock-framework'],
+                   'game':{'id':'moon-sweepers','appid':'5335510','hashes':dict(hashes)},
+                   'provides':{},'requires_apis':[],'claims':[]}
+            for name in ('clock-framework','clock-feature')}
+
+
 def check(api, output):
     api=Path(api).resolve();output=Path(output).resolve()
     if not output.is_relative_to(ROOT/'artifacts'):
@@ -93,8 +105,7 @@ def check(api, output):
     scenario('missing-v8-entry-no-legacy-fallback',profiles[0],mode='entry-missing',consumer='legacy-entry')
     scenario('wrong-runtime-marker',profiles[0],mode='entry-runtime',consumer='wrong-runtime')
     scenario('missing-runtime-marker',profiles[0],mode='entry-runtime',consumer='missing-runtime')
-    scale=copy.deepcopy(manifests)
-    scale['clock-framework']['requires_game']={'unity.time-scale':{'abi':1,'min_size':16}}
+    scale=time_scale_manifests(profiles[0]['hashes'])
     for profile in profiles:
         key=profile['id'].rsplit('-',1)[-1]
         scenario('time-scale-only-'+key,profile,scale,mode='time-scale-only',framework='time-scale-consumer')

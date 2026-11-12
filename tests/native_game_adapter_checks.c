@@ -81,6 +81,12 @@ static void *foreign_scale(void *data){
     }return 0;
 }
 static int check_time_scale(const char *module_path,int clock_required){
+    /* The subscription-only module owes no Clock Framework publications. Keep
+     * a separate owner with no game declaration for scoped-lookup refusal. */
+    CHECK(service_plan.count==2);
+    CHECK(!service_plan.mods[0].provides_count&&!service_plan.mods[1].provides_count);
+    CHECK(!service_plan.mods[0].requires_count&&!service_plan.mods[1].requires_count);
+    CHECK(!service_plan.mods[1].game_count);
     CHECK(moon_game_time_scale_required());CHECK(moon_game_clock_required()==clock_required);
     CHECK(!game_find("unity.time-scale",1,16));
     absent_scale_method=1;CHECK(!game_time_scale_bind((PTR)1,(PTR)2));CHECK(equal(game_time_scale_bind_failure,"time-scale-method"));absent_scale_method=0;
