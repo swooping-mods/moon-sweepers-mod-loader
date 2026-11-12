@@ -45,6 +45,7 @@ class LaunchFeedback:
             'waiting': 'Launch handed to Steam. Waiting for Moon Sweepers to appear; first managed startup can take longer.',
             'unconfirmed': 'Game startup or lifetime is unconfirmed. Check Steam and the game. If it closed or did not start, use “Game closed / did not start…”.',
             'running': 'Moon Sweepers is running. Mod startup is not confirmed by process detection. Close the game normally before another launch.',
+            'finishing': 'Moon Sweepers is no longer observed. Waiting for the launch request or runner to finish before another launch.',
             'closed': 'Moon Sweepers closed. You can change mods or launch again.',
             'failed': 'Steam could not complete the launch request. Check Steam and launch diagnostics. If no game is running, use “Game closed / did not start…”.',
         }.get(self.phase, '')

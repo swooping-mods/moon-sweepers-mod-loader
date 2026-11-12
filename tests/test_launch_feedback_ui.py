@@ -70,3 +70,13 @@ class LaunchFeedbackUiChecks(unittest.TestCase):
         window.no_launch = True
         with patch('moonloader.ui.launch.start') as start:
             window.start_game(); start.assert_not_called()
+
+    def test_ui_launch_request_outliving_game_does_not_claim_running(self):
+        window = self.window()
+        window.started((SimpleNamespace(poll=lambda:None), {'mode':'installed', 'run':'fixture'}))
+        with patch('moonloader.ui.game_process.observe', return_value={'status':'running'}): window.poll_process()
+        with patch('moonloader.ui.game_process.observe', return_value={'status':'absent'}): window.poll_process()
+        self.assertEqual(window.feedback.phase, 'finishing')
+        self.assertFalse(window.launch_button.isEnabled())
+        self.assertIn('Waiting for the launch', window.launch_status.text())
+        self.assertNotIn('is running', window.launch_status.text())

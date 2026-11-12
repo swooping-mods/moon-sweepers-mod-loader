@@ -211,7 +211,7 @@ class DiagnosticsChecks(unittest.TestCase):
         (run/'adapter-failure.txt').mkdir()
         (run/'loader.jsonl').write_text('current bootstrap evidence')
         result = diagnostics.finish_run(self.root, {'run':str(run)}, 0)
-        self.assertEqual(result['status'], 'closed')
+        self.assertEqual(result['status'], 'lifetime-unconfirmed')
         self.assertEqual(set(result['tails']), {'loader.jsonl'})
         self.assertTrue((run/'diagnostics.json').is_file())
         self.assertEqual(outside.read_text(), 'Crash!!! private data')
@@ -460,6 +460,26 @@ class DiagnosticsChecks(unittest.TestCase):
         result = diagnostics.finish_run(self.root,{'run':str(run)},0)
         self.assertEqual(result['status'],'adapter-failed')
         self.assertEqual(next(row for row in self.rows() if row['event']=='launch-finished')['level'],'ERROR')
+
+
+class RunnerAttributionChecks(unittest.TestCase):
+    def test_private_linux_runner_result_never_establishes_game_exit_or_crash(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary); run = root / 'runs/fixture'; run.mkdir(parents=True)
+            for code in (0, 1, -11, 0xc0000005):
+                result = diagnostics.finish_run(root, {'run':str(run), 'platform':'linux'}, code)
+                self.assertEqual(result['status'], 'runner-failed' if code else 'lifetime-unconfirmed')
+                self.assertEqual(result['process_role'], 'private-runner')
+                self.assertEqual(result['game_lifetime'], 'unverified')
+                self.assertIs(result['game_startup_confirmed'], False)
+
+    def test_direct_windows_game_fatal_code_and_player_crash_remain_evidence(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary); run = root / 'runs/fixture'; run.mkdir(parents=True)
+            record = {'run':str(run), 'platform':'win32'}
+            self.assertEqual(diagnostics.finish_run(root, record, 0xc0000005)['status'], 'crashed')
+            (run / 'Player.log').write_text('Crash!!! current run\n')
+            self.assertEqual(diagnostics.finish_run(root, {**record, 'platform':'linux'}, 0)['status'], 'crashed')
 
 
 if __name__ == '__main__': unittest.main()

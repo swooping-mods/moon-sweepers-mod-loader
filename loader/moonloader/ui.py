@@ -499,7 +499,7 @@ class Window(QMainWindow):
         self.select_all_button.setEnabled(not active and bool(native - set(selected)))
         self.deselect_all_button.setEnabled(not active and bool(selected))
         self.launch_button.setEnabled(ready and not active and not self.no_launch)
-        launch_title = {'waiting':'Starting…', 'running':'Game running', 'unconfirmed':'Launch unconfirmed', 'failed':'Launch needs attention'}.get(self.feedback.phase)
+        launch_title = {'waiting':'Starting…', 'running':'Game running', 'unconfirmed':'Launch unconfirmed', 'failed':'Launch needs attention', 'finishing':'Finishing launch…'}.get(self.feedback.phase)
         self.launch_button.setText('Preparing…' if self._launch_job and self._busy else launch_title or ('Launch via Steam' if installed else 'Launch modded game'))
         self.prepare_button.setEnabled(ready and not active); self.plan_button.setEnabled(ready and not active)
         self.launch_button.setToolTip('Game starts are disabled in this UI inspection session.' if self.no_launch else reason or ('Launch automatically applies selected mods, then requests Steam launch. Prepare files is optional.' if installed else 'Prepare a private game copy and launch the checked mods.'))
@@ -627,7 +627,7 @@ class Window(QMainWindow):
                 'Confirm Moon Sweepers is closed or did not start. If Steam still says Launching or Running, wait or close the game normally first. This only clears the loader’s launch guard; it does not stop anything.') != QMessageBox.StandardButton.Yes: return
         run = self.launch_record['run']
         def cleared(_):
-            self.feedback = LaunchFeedback(); self.timer.stop(); self.launch_status.setText('Launch guard cleared after your confirmation. Launch will apply selected mods automatically.')
+            self.feedback = LaunchFeedback(); self._launch_guard_error = ''; self.timer.stop(); self.launch_status.setText('Launch guard cleared after your confirmation. Launch will apply selected mods automatically.')
             self.diagnostics.event('launch-acknowledged-closed', 'User confirmed game closed or did not start', run=run)
         self.work('Checking that Moon Sweepers is closed…', lambda:acknowledge_launch_closed(self.service.root, run), cleared)
 
@@ -658,11 +658,11 @@ class Window(QMainWindow):
             previous = self.feedback.phase
             self.feedback.observe(observation['status'])
             if self.feedback.phase == 'closed' and self.process is not None:
-                self.feedback.phase = 'running'  # Keep the guard until the request also ends.
+                self.feedback.phase = 'finishing'  # The request outlived the observed game.
             if self.feedback.phase == 'closed' and self.process is None:
                 try:
                     acknowledge_launch_closed(self.service.root, self.launch_record['run'])
-                    self.timer.stop()
+                    self._launch_guard_error = ''; self.timer.stop()
                 except (ValueError, OSError):
                     # An uncertain scan or still-active runner never unlocks launch.
                     self.feedback.phase = 'unconfirmed'

@@ -457,10 +457,15 @@ def finish_run(root, record, code, detail=''):
     """Summarize only a loader-owned current run, without guessing Steam lifetime."""
     session = start(root)
     installed = record.get('mode') == 'installed'
+    direct_game = not installed and record.get('platform') == 'win32'
+    runner = not installed and not direct_game
     status = ('steam-request-failed' if code else 'startup-unconfirmed') if installed else ('failed' if code or detail else 'closed')
+    if runner: status = 'runner-failed' if code or detail else 'lifetime-unconfirmed'
     summary = {'schema': 'moon-loader-run-diagnostics/v1', 'status': status,
                'exit_code': code, 'mode': record.get('mode', 'private'),
-               'game_startup_confirmed': False if installed else None,
+               'game_startup_confirmed': False if installed or runner else None,
+               'process_role': 'steam-request' if installed else 'game' if direct_game else 'private-runner',
+               'game_lifetime': 'unverified' if installed or runner else 'direct-process-exit',
                'message': detail, 'tails': {}}
     try:
         from .storage import contained, write
@@ -488,7 +493,7 @@ def finish_run(root, record, code, detail=''):
             player = summary['tails'].get('Player.log', {}).get('tail', '')
             if any(marker in player for marker in ('Crash!!!', 'Native Crash Reporting', 'Received signal ', 'FATAL ERROR:')):
                 summary['status'] = status = 'crashed'
-            elif code < 0 or code >= 0x80000000:
+            elif direct_game and (code < 0 or code >= 0x80000000):
                 summary['status'] = status = 'crashed'
             if any(name in summary['tails'] for name in ('adapter-failed.json', 'adapter-failure.txt')):
                 summary['status'] = status = 'adapter-failed'

@@ -58,7 +58,7 @@ def process_birth(pid):
 
 def assert_inactive(root):
     record = load(Path(root) / 'active.json')
-    if record and record.get('state') in ('steam-starting', 'steam-unconfirmed', 'private-unconfirmed'):
+    if record and record.get('state') in ('steam-starting', 'steam-unconfirmed', 'private-unconfirmed', 'running'):
         raise ValueError('Game lifetime is unconfirmed. Close the game or confirm it did not start in the loader before changing files or launching again.')
     if record and record.get('state') == 'starting':
         raise ValueError('An interrupted launch record needs inspection before changing game files: active.json')
@@ -69,7 +69,7 @@ def assert_inactive(root):
 def pending_launch(root):
     record = load(contained(root, 'active.json'), {})
     if not isinstance(record, dict): raise ValueError('Invalid launch state: inspect active.json before launching')
-    return record if record.get('state') in ('steam-starting', 'steam-unconfirmed', 'private-unconfirmed') else None
+    return record if record.get('state') in ('steam-starting', 'steam-unconfirmed', 'private-unconfirmed', 'running') else None
 
 
 def acknowledge_launch_closed(root, run):
@@ -79,6 +79,11 @@ def acknowledge_launch_closed(root, run):
         record = pending_launch(root)
         if not record or record.get('run') != run:
             raise ValueError('Launch state changed; review the current request before continuing')
+        if record.get('state') == 'running':
+            if record.get('birth') is None:
+                raise ValueError('Cannot verify the private launch process; inspect active.json before continuing')
+            if process_birth(record['pid']) == record['birth']:
+                raise ValueError('The private launch process is still active; wait for it to finish')
         public.assert_stopped()
         write(Path(root) / 'active.json', {'state':'closed', 'run':run})
 

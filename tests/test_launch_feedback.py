@@ -47,7 +47,7 @@ class GuardChecks(unittest.TestCase):
         storage.write(self.root / 'active.json', {'state':state, 'run':run})
 
     def test_guard_survives_a_new_reader_and_blocks_file_changes(self):
-        for state in ('steam-starting', 'steam-unconfirmed', 'private-unconfirmed'):
+        for state in ('steam-starting', 'steam-unconfirmed', 'private-unconfirmed', 'running'):
             self.record(state)
             self.assertEqual(storage.pending_launch(self.root)['state'], state)
             with self.assertRaisesRegex(ValueError, 'lifetime is unconfirmed'): storage.assert_inactive(self.root)
@@ -86,6 +86,20 @@ class GuardChecks(unittest.TestCase):
         self.assertTrue(any('automatically' in call.args[0] for call in progress.call_args_list))
         with storage.locked(self.root, 'session.lock'): pass
 
+
+    def test_closed_window_retains_private_guard_after_runner_pid_dies(self):
+        storage.write(self.root / 'active.json', {'state':'running', 'run':'private-run', 'pid':123, 'birth':'old'})
+        with patch.object(storage, 'process_birth', return_value=None), patch('moonloader.public.assert_stopped'):
+            self.assertIsNotNone(storage.pending_launch(self.root))
+            with self.assertRaisesRegex(ValueError, 'lifetime is unconfirmed'): storage.assert_inactive(self.root)
+            storage.acknowledge_launch_closed(self.root, 'private-run')
+        self.assertIsNone(storage.pending_launch(self.root))
+
+    def test_private_running_guard_cannot_be_acknowledged_while_runner_active(self):
+        storage.write(self.root / 'active.json', {'state':'running', 'run':'private-run', 'pid':123, 'birth':'live'})
+        with patch.object(storage, 'process_birth', return_value='live'), patch('moonloader.public.assert_stopped'):
+            with self.assertRaisesRegex(ValueError, 'still active'): storage.acknowledge_launch_closed(self.root, 'private-run')
+        self.assertIsNotNone(storage.pending_launch(self.root))
 
     def test_private_runner_exit_retains_uncertainty_before_releasing_lease(self):
         self.record('running', 'private-run')
