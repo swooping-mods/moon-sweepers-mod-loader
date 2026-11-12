@@ -8,6 +8,7 @@ static DWORD game_frame_thread;
 static const void *game_find(const char *,unsigned int,unsigned int);
 static MoonGameAdapterApiV1 game_adapter_api={sizeof(MoonGameAdapterApiV1),MOON_GAME_ADAPTER_ABI,0,0,game_find};
 static struct {int (*frame)(void);float (*time)(void);float (*delta)(void);} game_clock;
+static float (*game_time_scale)(void);
 static int game_double_valid(double value){union{double f;U64 u;}x={value};return (x.u&0x7ff0000000000000ull)!=0x7ff0000000000000ull;}
 static int game_clock_sample(MoonGameClockSampleV1 *out){
     if(!out||out->size<sizeof(*out)||out->abi!=MOON_GAME_CLOCK_ABI||!game_plan_admitted
@@ -22,9 +23,23 @@ static int game_clock_sample(MoonGameClockSampleV1 *out){
     *out=value;return 1;
 }
 static const MoonGameClockV1 game_clock_api={sizeof(MoonGameClockV1),MOON_GAME_CLOCK_ABI,game_clock_sample};
+static int game_time_scale_sample(MoonGameTimeScaleSampleV1 *out){
+    if(!out||out->size<sizeof(*out)||out->abi!=MOON_GAME_TIME_SCALE_ABI||out->reserved||!game_plan_admitted
+       ||MoonLab_RuntimeState_v1()!=MOON_RUNTIME_READY)return 0;
+    DWORD thread=__atomic_load_n(&game_frame_thread,__ATOMIC_ACQUIRE);
+    /* Match clock admission; foreign threads never inspect mutable frame depth. */
+    if(!thread||thread!=GetCurrentThreadId()||!game_frame_depth||!game_time_scale)return 0;
+    MoonGameTimeScaleSampleV1 value={sizeof(value),MOON_GAME_TIME_SCALE_ABI,game_time_scale(),0};
+    if(!game_double_valid((double)value.time_scale)||value.time_scale<0)return 0;
+    *out=value;return 1;
+}
+static const MoonGameTimeScaleV1 game_time_scale_api={sizeof(MoonGameTimeScaleV1),MOON_GAME_TIME_SCALE_ABI,game_time_scale_sample};
 static int game_contract_supported(const MspContract *contract){
-    return msp_equal(contract->name,contract->length,"unity.clock")&&contract->abi==MOON_GAME_CLOCK_ABI
-        &&contract->size<=sizeof(game_clock_api)&&!contract->count;
+    if(!native_profile||contract->count)return 0;
+    if(msp_equal(contract->name,contract->length,"unity.clock"))return (native_profile->capabilities&MOON_PROFILE_CLOCK)
+        &&contract->abi==MOON_GAME_CLOCK_ABI&&contract->size<=sizeof(game_clock_api);
+    return msp_equal(contract->name,contract->length,"unity.time-scale")&&(native_profile->capabilities&MOON_PROFILE_TIME_SCALE)
+        &&contract->abi==MOON_GAME_TIME_SCALE_ABI&&contract->size<=sizeof(game_time_scale_api);
 }
 static int moon_game_plan_valid(void){
     if(game_plan_admitted)return 0;
@@ -44,10 +59,18 @@ static int moon_game_plan_valid(void){
     game_adapter_api.profile_id=native_profile->id;game_adapter_api.profile_digest=native_profile->digest;
     game_plan_admitted=1;return 1;
 }
-static int moon_game_clock_required(void){
-    for(unsigned int i=0;i<service_plan.count;i++)if(service_plan.mods[i].game_count)return 1;
+static int moon_game_capability_required(const char *name){
+    for(unsigned int i=0;i<service_plan.count;i++){
+        MspMod *mod=service_plan.mods+i;MspReader reader={mod->game,service_plan.end,1};
+        for(unsigned int j=0;j<mod->game_count;j++){
+            MspContract need;if(!msp_game_contract(&reader,&need))return 0;
+            if(msp_equal(need.name,need.length,name))return 1;
+        }
+    }
     return 0;
 }
+static int moon_game_clock_required(void){return moon_game_capability_required("unity.clock");}
+static int moon_game_time_scale_required(void){return moon_game_capability_required("unity.time-scale");}
 static const void *game_find(const char *name,unsigned int abi,unsigned int size){
     if(!game_plan_admitted||!registration_thread_matches()||update_sealed||!registration_owner
        ||registration_owner>service_plan.count||!name||!size)return 0;
@@ -55,8 +78,11 @@ static const void *game_find(const char *name,unsigned int abi,unsigned int size
     MspReader reader={mod->game,service_plan.end,1};
     for(unsigned int i=0;i<mod->game_count;i++){
         MspContract need;if(!msp_game_contract(&reader,&need))return 0;
-        if(msp_equal(need.name,need.length,name))return abi==need.abi&&size<=need.size&&game_contract_supported(&need)
-            &&game_clock.frame&&game_clock.time&&game_clock.delta?&game_clock_api:0;
+        if(msp_equal(need.name,need.length,name)){
+            if(abi!=need.abi||size>need.size||!game_contract_supported(&need))return 0;
+            if(msp_equal(need.name,need.length,"unity.clock"))return game_clock.frame&&game_clock.time&&game_clock.delta?&game_clock_api:0;
+            return game_time_scale?&game_time_scale_api:0;
+        }
     }return 0;
 }
 static const MoonGameAdapterApiV1 *moon_game_adapter_api(void){

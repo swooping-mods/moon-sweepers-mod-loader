@@ -28,6 +28,36 @@ Exact prior qualified DLLs remain separately retained; a new compilation never
 inherits their gameplay proof. Host compilation and hash checks do not qualify
 Unity behavior, native Windows gameplay, real co-op or performance.
 
+The pinned native `gameplay.h` integer/Boolean readers and reflection
+`dnumber`/`dvector` reject failed invocation, absent boxes and absent unboxed
+payloads before dereferencing/copying. Failure returns the historical zero value
+and preserves/sets the caller's sticky `ok=0`. They never turn an already failed
+query back into a successful observation. Nonnull `ok` remains the caller contract.
+Unity `su_number`/`su_vector` keep their original zero defaults;
+`su_number_checked`/`su_vector_checked` additionally return success/failure and
+preserve the supplied output on failure. A null output refuses before invocation.
+`su_alive` and `su_rotation` also guard payloads, preserving false/identity
+defaults. These compile-time helper changes add no service ABI or game capability.
+
+Null checks do not validate a boxed type or payload size; the existing exact
+binding and Unity-thread admission remain prerequisites. Finite values, allowed
+ranges, occupancy/authority and other business policy remain caller-owned. In
+particular, a readable zero is not an error and a nonfinite float still reaches
+the caller for its existing policy to handle. Vehicle Statistics/caller fixes are
+owned separately and are not supplied by these shared helper changes.
+
+`tests/native_unbox_checks.c` includes the actual three SDK headers and injects
+missing boxes, null payloads, exceptions with nonnull boxes, sticky query failure,
+valid zero/negative/Boolean/vector/quaternion values and nonfinite transport. It
+checks legacy defaults, checked-output preservation and refused null outputs.
+The fixture's Windows-only unused functions are discarded by the host runner;
+no game library or managed runtime is loaded. Neither this new fixture nor its
+runner has been compiled/executed in the source-only workstation pass. Later run
+`PYTHONPATH=tests:tools python3 -m unittest test_native_unbox.NativeUnboxHostChecks`,
+then relocated Windows source compilation, affected consumer rebuilds and the
+normal native/runtime gates in an admitted execution window. Exact old DLL
+qualification does not transfer to rebuilt headers or consumers.
+
 SDK 0.7 also supplies `runtime/sdk/game_adapter.h`, copied from the public API
 snapshot. This is the broker-only native v8 context and typed game-clock
 contract. New v8 code uses logical game capabilities and framework APIs; it

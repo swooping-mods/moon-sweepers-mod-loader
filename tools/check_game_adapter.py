@@ -13,6 +13,18 @@ import uuid
 ROOT=Path(__file__).resolve().parents[1]
 
 
+def time_scale_manifests(hashes):
+    # These IDs match the native harness's owner scopes. Unlike the Clock
+    # Framework fixture, the scale module only subscribes and publishes no API.
+    return {name: {'id':name,'kind':'native','abi':'MoonLab_ModStart/v8','runtime_api_abi':1,
+                   'game_access':'adapter','game_api_abi':1,
+                   'requires_game':{'unity.time-scale':{'abi':1,'min_size':16}} if name=='clock-framework' else {},
+                   'requires':[] if name=='clock-framework' else ['clock-framework'],
+                   'game':{'id':'moon-sweepers','appid':'5335510','hashes':dict(hashes)},
+                   'provides':{},'requires_apis':[],'claims':[]}
+            for name in ('clock-framework','clock-feature')}
+
+
 def check(api, output):
     api=Path(api).resolve();output=Path(output).resolve()
     if not output.is_relative_to(ROOT/'artifacts'):
@@ -29,7 +41,8 @@ def check(api, output):
     for index,key in enumerate(('a','b')):
         profile={'id':'synthetic.profile-'+key,
                  'hashes':{name:str(index*3+i+1)*64 for i,name in enumerate(('GameAssembly.dll','MoonSweepers.exe','UnityPlayer.dll'))},
-                 'capabilities':{'unity.clock':{'abi':1,'size':16,'limits':{}}},
+                 'capabilities':{'unity.clock':{'abi':1,'size':16,'limits':{}},
+                                 'unity.time-scale':{'abi':1,'size':16,'limits':{}}},
                  'native':{'domain_rva':16 if key=='a' else 128,'test_only_relocated_state':key}}
         profile['digest']=profile_digest(profile);profiles.append(profile)
     header=output/'profile-identities.h'
@@ -46,6 +59,7 @@ def check(api, output):
         if result.returncode:raise ValueError('Diagnostic compilation failed\n'+result.stdout+result.stderr)
     for name in ('framework','consumer'):
         run(common+['-fPIC','-shared',str(ROOT/'tests/fixtures'/('game_clock_'+name+'.c')),'-o',str(output/(name+'.so'))])
+    run(common+['-fPIC','-shared',str(ROOT/'tests/fixtures/game_time_scale_consumer.c'),'-o',str(output/'time-scale-consumer.so')])
     variants={'legacy-entry':('game_legacy_entry.c',[]),
               'wrong-runtime':('game_clock_consumer.c',['-DPROBE_RUNTIME_MARKER=2']),
               'missing-runtime':('game_clock_consumer.c',['-DPROBE_OMIT_RUNTIME_MARKER=1'])}
@@ -63,12 +77,12 @@ def check(api, output):
         provides={'clock-framework.elapsed':{'abi':1,'size':16},'clock-framework.hidden':{'abi':1,'size':16}})
     manifests['clock-feature'].update(requires=['clock-framework'],requires_apis=[{'api':'clock-framework.elapsed','abi':1,'min_size':16,'optional':False}])
     order=['clock-framework','clock-feature'];cases=[]
-    immutable={name:hashlib.sha256((output/(name+'.so')).read_bytes()).hexdigest() for name in ('framework','consumer')}
-    def scenario(name,profile,records=None,mode='accept',adapter=None,mutate=None,consumer='consumer'):
+    immutable={name:hashlib.sha256((output/(name+'.so')).read_bytes()).hexdigest() for name in ('framework','consumer','time-scale-consumer')}
+    def scenario(name,profile,records=None,mode='accept',adapter=None,mutate=None,consumer='consumer',framework='framework'):
         data=encode(records or manifests,order,game_profile=profile)
         if mutate:data=mutate(data)
         path=output/(name+'.bin');path.write_bytes(data)
-        result=subprocess.run([str(binary),str(path),adapter or ('b' if profile['id'].endswith('-b') else 'a'),str(output/'framework.so'),str(output/(consumer+'.so')),mode],capture_output=True,text=True,timeout=30)
+        result=subprocess.run([str(binary),str(path),adapter or ('b' if profile['id'].endswith('-b') else 'a'),str(output/(framework+'.so')),str(output/(consumer+'.so')),mode],capture_output=True,text=True,timeout=30)
         (output/(name+'.log')).write_text(result.stdout+result.stderr)
         if result.returncode:raise ValueError('Native game adapter check failed: '+name+'\n'+result.stdout+result.stderr)
         cases.append({'case':name,'success':True,'mode':mode,'profile':profile['id']})
@@ -91,6 +105,18 @@ def check(api, output):
     scenario('missing-v8-entry-no-legacy-fallback',profiles[0],mode='entry-missing',consumer='legacy-entry')
     scenario('wrong-runtime-marker',profiles[0],mode='entry-runtime',consumer='wrong-runtime')
     scenario('missing-runtime-marker',profiles[0],mode='entry-runtime',consumer='missing-runtime')
+    scale=time_scale_manifests(profiles[0]['hashes'])
+    for profile in profiles:
+        key=profile['id'].rsplit('-',1)[-1]
+        scenario('time-scale-only-'+key,profile,scale,mode='time-scale-only',framework='time-scale-consumer')
+        both=copy.deepcopy(scale);both['clock-framework']['requires_game']['unity.clock']={'abi':1,'min_size':16}
+        scenario('time-scale-both-'+key,profile,both,mode='time-scale-both',framework='time-scale-consumer')
+    scenario('time-scale-unadvertised-profile',profiles[0],scale,mode='time-scale-profile-reject')
+    for name,requirement in [('time-scale-wrong-abi',{'abi':2,'min_size':16}),
+                             ('time-scale-oversize',{'abi':1,'min_size':32}),
+                             ('time-scale-missing-limit',{'abi':1,'min_size':16,'limits':{'max_reads':1}})]:
+        records=copy.deepcopy(scale);records['clock-framework']['requires_game']['unity.time-scale']=requirement
+        scenario(name,profiles[0],records,mode='profile-reject')
     assert immutable=={name:hashlib.sha256((output/(name+'.so')).read_bytes()).hexdigest() for name in immutable},'Diagnostic modules changed during proof'
     receipt={'success':True,'cases':cases,'immutable_binaries':immutable,
              'compiler':compiler,'commands':commands,'profiles':profiles,

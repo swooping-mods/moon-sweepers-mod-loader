@@ -48,6 +48,21 @@ ABI/table size. Providers root targets, capture snapshots, restore while held
 and release only after successful restoration. Scene changes do not silently
 expire a live claim. Game-specific camera capture remains provider-owned.
 
+The API-owned inline session helper is pinned from API `8655b85` in both
+`vendored/api/include/moon_sweepers/camera.h` and
+`sdk/native/runtime/sdk/camera.h`, SHA256
+`4e658254786040fb7faf153b0abe81fdf7990bb5a3d1a760bbfeceef020a3f57`.
+Failed read-only capture plus refused release returns false while retaining
+API/owner/token; callers must finish/retry partial cleanup before another begin.
+Both snapshot file maps describe the exact bytes; the native SDK additionally
+records their camera source revision. No table layout or exported ABI changes.
+Matching consumer cleanup remains mandatory (Zoom `6b5b127`, Vehicle First Person
+`876ed47`, Courier `5b9878c`, Drone `ce1f58b`/`1343858`, Survey `0a4f4d0`).
+Workshop vehicle `14042b0` / construction `f02895c` contain the same shared
+helper repair and should be deduplicated during later integration. This source
+pin change rebuilds or activates no bundled mod. The owner regression C fixture,
+consumer fixtures, strict builds and game qualification remain deferred.
+
 `MoonLab_RuntimeState_v1` is a separate atomic query: Pending (0), Ready (1),
 Failed (2). Ready is released only after every selected native owner commits and
 `seal_updates` successfully installs the shared hooks. Missing providers,

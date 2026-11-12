@@ -21,6 +21,10 @@ FILES = ('GameAssembly.dll', 'MoonSweepers.exe', 'UnityPlayer.dll')
 NATIVE_FIELDS = ('domain_rva', 'domain_ready_offset', 'image_min_rva', 'image_max_rva',
                  'update_token', 'late_update_token', 'late_update_rva',
                  'vehicle_fixed_token', 'vehicle_fixed_rva')
+# Source candidates do not advertise support until added to a reviewed row.
+IMPLEMENTED_CAPABILITIES = {'unity.clock': {'abi': 1, 'size': 16, 'limits': {}},
+                          'unity.time-scale': {'abi': 1, 'size': 16, 'limits': {}}}
+CAPABILITY_BITS = {'unity.clock': 1, 'unity.time-scale': 2}
 
 
 def digest(profile):
@@ -57,7 +61,11 @@ def profiles(root=ROOT):
             raise ValueError('Unsupported native backend/layout family')
         if row['adapter'] != {'id':'moon-sweepers.native.il2cpp108/v1','abi':1,'layout':'steam105-unity6000.6/v1'} or type(row['adapter']['abi']) is not int:
             raise ValueError('Unsupported native adapter/layout family')
-        if row['capabilities'] != {'unity.clock':{'abi':1,'size':16,'limits':{}}} or type(row['capabilities']['unity.clock']['abi']) is not int or type(row['capabilities']['unity.clock']['size']) is not int:
+        caps = row['capabilities']
+        if (not isinstance(caps, dict) or 'unity.clock' not in caps
+                or any(name not in IMPLEMENTED_CAPABILITIES or cap != IMPLEMENTED_CAPABILITIES[name]
+                       or type(cap['abi']) is not int or type(cap['size']) is not int
+                       for name, cap in caps.items())):
             raise ValueError('Profile capability differs from implemented native tables')
         if not isinstance(row['version'],str) or len(row['version'])>32 or not re.fullmatch(r'[0-9]+(?:\.[0-9]+){1,3}',row['version']):
             raise ValueError('Invalid game version label')
@@ -89,7 +97,8 @@ def generate(root=ROOT):
     for row in rows:
         values = [json.dumps(row['id']), json.dumps(digest(row)),
                   '{'+','.join(json.dumps(row['hashes'][n]) for n in FILES)+'}',
-                  *[str(row['native'][n])+'u' for n in NATIVE_FIELDS]]
+                  *[str(row['native'][n])+'u' for n in NATIVE_FIELDS],
+                  str(sum(CAPABILITY_BITS[name] for name in row['capabilities']))+'u']
         out.append('    {'+','.join(values)+'},')
     out += ['};', '#define MOON_NATIVE_GAME_PROFILE_COUNT '+str(len(rows))+'u', '#endif', '']
     return '\n'.join(out)
