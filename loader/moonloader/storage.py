@@ -58,7 +58,35 @@ def process_birth(pid):
 
 def assert_inactive(root):
     record = load(Path(root) / 'active.json')
+    if record and record.get('state') in ('steam-starting', 'steam-unconfirmed', 'private-unconfirmed'):
+        raise ValueError('Game lifetime is unconfirmed. Close the game or confirm it did not start in the loader before changing files or launching again.')
     if record and record.get('state') == 'starting':
         raise ValueError('An interrupted launch record needs inspection before changing game files: active.json')
     if record and record.get('birth') is not None and process_birth(record['pid']) == record['birth']:
         raise ValueError('A modded game from this loader is still running. Close it normally before changing its files.')
+
+
+def pending_launch(root):
+    record = load(contained(root, 'active.json'), {})
+    if not isinstance(record, dict): raise ValueError('Invalid launch state: inspect active.json before launching')
+    return record if record.get('state') in ('steam-starting', 'steam-unconfirmed', 'private-unconfirmed') else None
+
+
+def acknowledge_launch_closed(root, run):
+    """Clear only the reviewed request, after a conservative no-game check."""
+    from . import public
+    with locked(root, 'session.lock'), locked(root):
+        record = pending_launch(root)
+        if not record or record.get('run') != run:
+            raise ValueError('Launch state changed; review the current request before continuing')
+        public.assert_stopped()
+        write(Path(root) / 'active.json', {'state':'closed', 'run':run})
+
+
+def retain_private_uncertainty(root, run):
+    """Called while the private process lease is still held, before releasing it."""
+    active = contained(root, 'active.json')
+    record = load(active, {})
+    if not isinstance(record, dict) or record.get('run') != run:
+        raise ValueError('Private launch state changed; inspect active.json before continuing')
+    write(active, {'state':'private-unconfirmed', 'run':run})

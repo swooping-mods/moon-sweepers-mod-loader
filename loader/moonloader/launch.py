@@ -175,7 +175,7 @@ def prepare_proton(record):
     prepare_profile_drive(record)
 
 
-def start(service, installation):
+def start(service, installation, progress=None):
     """Only a human Launch action should call this during the agent launch pause."""
     logger = diagnostics.start(service.root)
     logger.event('launch-request', 'Checking selected mods and launch setup')
@@ -184,18 +184,20 @@ def start(service, installation):
     try:
         lease.__enter__(); acquired = True
         assert_inactive(service.root)
-        return _start_locked(service, installation, lease)
+        return _start_locked(service, installation, lease, progress)
     except Exception as error:
         logger.exception('launch-error', error)
         if acquired: lease.__exit__(*sys.exc_info())
         raise
 
 
-def _start_locked(service, installation, lease):
+def _start_locked(service, installation, lease, progress=None):
+    if progress: progress('Checking selected mods and Steam setup…')
     record = plan(service, installation)
     logger = diagnostics.start(service.root)
     if record.get('mode') == 'installed' and record['order']:
         steam_options.require_ready(installation, record['platform'], record.get('managed', False))
+    if progress: progress('Applying selected mods automatically…')
     service.prepare(installation, _session_owner=True)
     previous, current = record.get('compatibility'), getattr(service, '_last_compatibility', None)
     if previous is not None and current is not None and any(previous.get(k) != current.get(k)
@@ -207,13 +209,25 @@ def _start_locked(service, installation, lease):
         write(run / 'launch.json', record)
         logger.event('steam-request-starting', 'Files prepared; requesting Steam launch. Game startup remains unconfirmed.', run=str(run), mods=record.get('order', []), platform=record.get('platform'))
         env = {k:v for k,v in os.environ.items() if not k.startswith('MOONLAB_')}
-        with (run / 'process.log').open('wb') as output:
-            process = subprocess.Popen(record['command'], cwd=record['cwd'], env=env,
-                                       stdout=output, stderr=subprocess.STDOUT)
+        # The request PID is not the game. Retain uncertainty across windows and
+        # restarts until observed game exit or explicit user acknowledgement.
+        active = service.root / 'active.json'
+        write(active, {'state':'steam-starting', 'run':str(run)})
+        if progress: progress('Files ready · handing launch to Steam…')
+        try:
+            with (run / 'process.log').open('wb') as output:
+                process = subprocess.Popen(record['command'], cwd=record['cwd'], env=env,
+                                           stdout=output, stderr=subprocess.STDOUT)
+        except Exception:
+            write(active, {'state':'failed', 'run':str(run)})
+            raise
+        try: write(active, {'state':'steam-unconfirmed', 'run':str(run)})
+        except (ValueError, OSError) as error: record['diagnostic_error'] = str(error)
         # Steam owns the real game, whose lifetime is independent of this
         # short request process. Never record the client as our game PID.
         lease.__exit__(None, None, None)
         return process, record
+    if progress: progress('Files ready · preparing the private launch…')
     if record['platform'] == 'linux': prepare_proton(record)
     run = Path(record['run']); contained(service.root, run.relative_to(service.root).as_posix()).mkdir(parents=True)
     diagnostics.prepare_run(service.root, record)

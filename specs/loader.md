@@ -25,6 +25,59 @@ Doorstop can fail before `BepInEx/LogOutput.log` or the adapter exists, writing 
 
 For an installed deployment whose current receipt explicitly declares `managed: true`, the collector also retains fresh `adapter-ready.json`, `adapter-failed.json` and `adapter-failure.txt` sidecars from those same generation-attributed native run directories. Only these three known names are read, each bounded to a 64 KiB tail; stale/aliased files and sidecars without the matching native deployment event are excluded. `adapter-failure.txt` is the adapter's fatal Exit(23) report, including failures before its normal logger exists. Fresh failure sidecars set `adapter-failed` and ERROR regardless of the short Steam request's zero exit code; the request result remains separately recorded and game lifetime remains unverified. The current owned game's `BepInEx/LogOutput.log` is retained only for such managed receipts, with the matching live ownership marker, pre-launch baseline/fingerprint and a fresh changed modification time. Unchanged old output and stale timestamps are excluded. Private owned-run summaries retain the same known adapter sidecars and failure classification.
 
+### Desktop launch feedback and lifetime
+
+Launch automatically checks setup and applies selected mods before requesting
+Steam or starting the private runner. **Prepare files** remains optional. Worker
+progress reports checking, applying and handoff stages. Normal notices use neutral
+styling; failures use the error treatment. **Launch diagnostics** is collapsed by
+default and contains the observed process type, exit code and local log path.
+Neither a successful Steam request nor a private runner PID proves mod startup.
+
+Installed requests journal `steam-starting` before spawn and `steam-unconfirmed`
+after spawn in the loader data's `active.json`. A spawn failure marks that journal
+failed; after a successful spawn, exit zero, request failure or elapsed time never
+unlocks a second launch. The journal also blocks prepare, enable/disable and
+uninstall through service admission, surviving a loader restart. Private runner
+exit transfers its lease to a `private-unconfirmed` journal before release rather
+than treating runner completion as confirmed game exit. Closing the window does
+not stop any process.
+
+`game_process.py` passively samples bounded process identity. Linux requires the
+exact game basename in argv[0], the matching kernel command name and an unchanged
+PID birth token; names only in a Steam/Proton/wine argument do not count. Windows
+requires exact Toolhelp executable names and stable birth tokens across two
+snapshots. Read errors, incomplete/capped scans and inaccessible identities are
+unavailable evidence. Detection says that Moon Sweepers is running, without
+attributing that process to an installation, selected mods or a successful loaded
+world. An absent sample unlocks only after a game was observed running and the
+existing conservative stopped-game check also passes. Otherwise the user must
+choose **Game closed / did not start…** after checking Steam and the game. That
+acknowledgement rechecks that no game is running under session/operation locks and
+clears only the same reviewed request; it never stops a process. A delayed Steam
+launch after explicit acknowledgement remains outside the loader's process
+ownership. Failed/incomplete private starting journals retain their prior manual
+inspection policy.
+
+Source-phase checks are `tests/test_launch_feedback.py` and
+`tests/test_game_process.py` (synthetic process data, no game or subprocess farm).
+`tests/test_launch_feedback_ui.py` authors real Qt interaction gates for neutral
+handoff, collapsed technical details, duplicate suppression, observed running/exit,
+and restart uncertainty. `tools/check.py --host-only` explicitly excludes these
+Qt checks along with the existing three. No Qt, game, package/build or full suite
+qualification was run during the workstation-use implementation pass.
+
+Deferred gates, when workstation testing is authorized: run the two pure test
+modules, `QT_QPA_PLATFORM=offscreen python -m unittest discover -s tests -p test_launch_feedback_ui.py`, then the existing
+`python tools/check.py` full host/Qt checks and platform packaging checks. Review
+expanded/collapsed status at 1190×760 and 700×540 with keyboard navigation and long
+paths. In a separately authorized real Steam replay, verify slow first managed
+startup, zero/nonzero short request exit, no detected game, running game,
+unreadable identity, game exit, loader restart, duplicate clicks and explicit
+acknowledgement; preserve Steam configuration and selections. These are gates,
+not results of this source pass. Gamescope teardown has a separate
+[static ownership/evidence design](../design/gamescope-teardown.md).
+
 `tests/test_diagnostics.py` covers information/error tracebacks, rotation, unavailable/aliased storage, early CLI failures, an actual isolated Python abort, spawn failure/lease cleanup, private crash-tail collection, current-only managed output, ownership rejection and Steam request uncertainty. Qt worker/warning/Open logs behavior is also exercised in the private offscreen UI check; no game is needed for those checks.
 
 `loader/moonloader/discovery.py` owns Steam discovery (app 5335510); `game_profiles.json` owns reviewed exact-hash game identities and adapter capabilities. `compatibility.py` composes those with the actual runtime and selected framework contracts. The initial adapter targets Steam Windows x64 IL2CPP 1.0.5. Manual discovery does not establish support for other storefront runtimes. Installed mode requests Steam launch using its selected compatibility runtime on Linux or native game on Windows. Private mode retains installed Proton Experimental and its separate launch route.
