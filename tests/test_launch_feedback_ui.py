@@ -49,6 +49,34 @@ class LaunchFeedbackUiChecks(unittest.TestCase):
         with patch('moonloader.ui.launch.start') as start:
             window.start_game(); start.assert_not_called()
 
+    def test_ui_launch_failed_status_resolves_error_foreground(self):
+        from moonloader.theme import COLORS
+        window = self.window()
+
+        def assert_foreground(color):
+            # Check Qt's resolved palette rather than just the severity property:
+            # an object-name color can otherwise outrank the error selector.
+            window.launch_status.ensurePolished()
+            self.assertEqual(window.launch_status.palette().color(
+                window.launch_status.foregroundRole()).name(), color)
+
+        window.feedback.requested(); window.feedback.request_finished(0)
+        window.show_launch_feedback()
+        assert_foreground(COLORS['muted'])
+        self.assertTrue(window.launch_blocked())
+
+        window.feedback.request_finished(1); window.show_launch_feedback()
+        self.assertEqual(window.feedback.phase, 'failed')
+        self.assertEqual(window.launch_status.property('severity'), 'error')
+        assert_foreground(COLORS['danger'])
+        self.assertTrue(window.launch_blocked())
+
+        window.feedback.observe('running'); window.show_launch_feedback()
+        self.assertEqual(window.launch_button.text(), 'Game running')
+        self.assertEqual(window.launch_status.property('severity'), 'info')
+        assert_foreground(COLORS['muted'])
+        self.assertTrue(window.launch_blocked())
+
     def test_ui_launch_running_observation_and_closed_release(self):
         from moonloader import storage
         window = self.window()

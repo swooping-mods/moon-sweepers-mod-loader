@@ -222,7 +222,7 @@ class Window(QMainWindow):
         self.remove_button = QPushButton('Remove from library'); self.remove_button.clicked.connect(self.remove_mod); details.addWidget(self.remove_button); panes.addWidget(self.details); layout.addWidget(self.workspace, 1)
         self.message = label('', 'message'); self.message.setWordWrap(True); self.message.hide(); layout.addWidget(self.message)
         launch_status, status_layout = frame('launchStatus', margins=(16, 8, 16, 8))
-        self.launch_status = label('', 'muted'); self.launch_status.setWordWrap(True)
+        self.launch_status = label('', 'launchStatusText'); self.launch_status.setWordWrap(True)
         self.launch_status.setTextFormat(Qt.TextFormat.PlainText); status_layout.addWidget(self.launch_status)
         status_row = QHBoxLayout()
         self.launch_details_button = QPushButton('Launch diagnostics ▸'); self.launch_details_button.setCheckable(True)

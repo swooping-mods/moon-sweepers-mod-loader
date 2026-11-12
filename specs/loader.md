@@ -40,7 +40,11 @@ matching allowance nor hide valid siblings.
 Launch automatically checks setup and applies selected mods before requesting
 Steam or starting the private runner. **Prepare files** remains optional. Worker
 progress reports checking, applying and handoff stages. Normal notices use neutral
-styling; failures use the error treatment. **Launch diagnostics** is collapsed by
+styling; failures use the error treatment. The launch status has its own
+`launchStatusText` object selector with an explicit error-state override so its neutral
+foreground cannot mask a failed request. The deferred Qt gate asserts the
+resolved palette foreground through handoff, failed request and observed-running
+transitions, while retaining duplicate-launch guards. **Launch diagnostics** is collapsed by
 default and contains the observed process type, exit code and local log path.
 Neither a successful Steam request nor a private runner PID proves mod startup.
 
