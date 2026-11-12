@@ -13,7 +13,7 @@
     "runtime/native/interaction_unity.h": "edc1c5a61d8daf2485b7d8e6eb474e91ad6e6c91e8a88de14bb50bda854b192c",
     "runtime/native/local_actor.h": "d16cbfeef20df121d4bffb53b6a0f7da91ee664f070c4a2af0e0da70145b40e5",
     "runtime/native/services.h": "1178e09c77f30f53bbccbfbacf8771e5faad1cf79753703d90dfd0a1e0fbadeb",
-    "runtime/sdk/camera.h": "2a889ad15396b0aaafae640447f9d173fee7f42b966b9177cbbabc3b742e82b3",
+    "runtime/sdk/camera.h": "4e658254786040fb7faf153b0abe81fdf7990bb5a3d1a760bbfeceef020a3f57",
     "runtime/sdk/camera_host.h": "6d4886166c7ea02bc71de69f99a043a8a55b26d88bf06d02b9fcd335d519dda5",
     "runtime/sdk/camera_registry.h": "0428ed4a1bd5029115166c39629a46bbb6fd796244d50a7600c14ec14cce30ce",
     "runtime/sdk/context.h": "6c84145cc761550c4943aa10c52242a538e92243f79a1b20c65b6a4ef9e82605",
@@ -84,5 +84,10 @@
     "source": "moon-sweepers-api/include/moon_sweepers/game_adapter.h",
     "api_version": "0.7.0",
     "source_revision": "3ad355d"
+  },
+  "camera_contract": {
+    "source": "moon-sweepers-api/include/moon_sweepers/camera.h",
+    "source_revision": "8655b85",
+    "abi": 1
   }
 }

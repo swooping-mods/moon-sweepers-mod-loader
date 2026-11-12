@@ -71,6 +71,15 @@ resources. `moon_camera_finish` restores while ownership is exclusive, then
 releases. If restoration fails, retain the rooted targets/session and retry.
 Never discard a live claim merely because a scene changed.
 
+`moon_camera_begin` records its API, owner and token immediately after a claim.
+If read-only capture fails, it attempts release and clears those fields only
+after acknowledged release. A false return with a nonzero session token means
+cleanup is still owed: call `moon_camera_finish` and retry until it succeeds,
+before another begin or context adoption. The restore callback must recognize
+an incomplete snapshot and avoid writes from uncaptured values. Existing ABI1
+tables and session layouts are unchanged; recompile consumers with their matching
+cleanup paths. Updating the header does not change an already built DLL.
+
 The runtime retains modules and API tables until exit. The optional [C# consumer client](managed-services.md) binds these tables after
 native readiness; each framework owns its domain wrapper and call admission.
 Managed publication, hot unload and automatic save/network conversion are not
