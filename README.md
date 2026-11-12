@@ -69,6 +69,11 @@ PySide6. GitHub's automatic source-code archives require a [native build](#devel
 5. Click **Launch via Steam**. It applies the selected mods before requesting
    launch; resolve any reported dependency or compatibility problems first.
    **Prepare files** can apply them separately without starting the game.
+   Launch progress explains automatic preparation and Steam handoff. A short
+   Steam request finishing does not confirm game startup. The loader keeps launch
+   blocked while starting, running or unconfirmed; if no game starts or it closes
+   before detection, check Steam and use **Game closed / did not start…**.
+   Expand **Launch diagnostics** for technical exit codes and log paths.
 
 Search covers names, descriptions, categories and tags. Grid, Details and Text
 views share the same filters and selections. Importing packages and preparing

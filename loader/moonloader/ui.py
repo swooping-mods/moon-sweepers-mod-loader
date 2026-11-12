@@ -12,7 +12,9 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QFrame, QLabe
 from . import discovery, launch, packages, steam_options, diagnostics, compatibility
 from .catalog import CATEGORIES, description as catalog_description, matches
 from .theme import STYLE, COLORS
-from .storage import load
+from .storage import load, pending_launch, acknowledge_launch_closed, retain_private_uncertainty
+from .launch_feedback import LaunchFeedback
+from . import game_process
 
 
 def frame(name, horizontal=False, margins=(16, 12, 16, 12)):
@@ -29,9 +31,11 @@ def label(text, name=''):
 class Job(QThread):
     finished_value = Signal(object)
     failed = Signal(str)
-    def __init__(self, action, parent): super().__init__(parent); self.action = action
+    progress = Signal(str)
+    def __init__(self, action, parent, staged=False):
+        super().__init__(parent); self.action = action; self.staged = staged
     def run(self):
-        try: self.finished_value.emit(self.action())
+        try: self.finished_value.emit(self.action(self.progress.emit) if self.staged else self.action())
         except Exception as error:
             self.parent().diagnostics.exception('worker-error', error)
             self.failed.emit(str(error))
@@ -144,6 +148,17 @@ class Window(QMainWindow):
         self.view = service.state.get('view', 'grid'); self.mods = {}; self.installations = []; self.inspection = None
         self.compatibility_report = None
         self.job = None; self.process = None; self._busy = False; self._validation = ''
+        self.feedback = LaunchFeedback(); self.launch_record = None
+        self._launch_guard_error = ''; self._launch_job = False
+        try:
+            pending = pending_launch(service.root)
+            if pending:
+                self.feedback.phase = 'unconfirmed'
+                self.feedback.installed = pending['state'].startswith('steam-')
+                self.launch_record = {'mode':'installed' if self.feedback.installed else 'private', 'run':pending.get('run', '')}
+        except (ValueError, OSError) as error:
+            self._launch_guard_error = 'Could not read launch state. Open logs and inspect active.json before launching.'
+            self.diagnostics.exception('launch-state-error', error)
         self.setWindowTitle('Moon Sweepers · Mod Loader'); self.resize(1190, 760); self.setMinimumSize(700, 540)
         self.setAcceptDrops(True)
         self.setStyleSheet(STYLE)
@@ -206,6 +221,17 @@ class Window(QMainWindow):
         self.more = QPushButton('Package details…'); self.more.clicked.connect(lambda: self.details_dialog(self.current_mod())); details.addWidget(self.more)
         self.remove_button = QPushButton('Remove from library'); self.remove_button.clicked.connect(self.remove_mod); details.addWidget(self.remove_button); panes.addWidget(self.details); layout.addWidget(self.workspace, 1)
         self.message = label('', 'message'); self.message.setWordWrap(True); self.message.hide(); layout.addWidget(self.message)
+        launch_status, status_layout = frame('launchStatus', margins=(16, 8, 16, 8))
+        self.launch_status = label('', 'launchStatusText'); self.launch_status.setWordWrap(True)
+        self.launch_status.setTextFormat(Qt.TextFormat.PlainText); status_layout.addWidget(self.launch_status)
+        status_row = QHBoxLayout()
+        self.launch_details_button = QPushButton('Launch diagnostics ▸'); self.launch_details_button.setCheckable(True)
+        self.launch_details_button.toggled.connect(self.toggle_launch_details); status_row.addWidget(self.launch_details_button)
+        self.launch_reset_button = QPushButton('Game closed / did not start…'); self.launch_reset_button.clicked.connect(self.reset_launch)
+        self.launch_reset_button.hide(); status_row.addWidget(self.launch_reset_button); status_row.addStretch(); status_layout.addLayout(status_row)
+        self.launch_details = QPlainTextEdit(); self.launch_details.setReadOnly(True); self.launch_details.setMaximumHeight(110)
+        self.launch_details.setMaximumBlockCount(80); self.launch_details.hide(); status_layout.addWidget(self.launch_details)
+        layout.addWidget(launch_status)
         footer, foot = frame('footer', True)
         facts = QVBoxLayout(); facts.setSpacing(3); self.count = label('0 selected'); facts.addWidget(self.count); self.save_info = label('Fresh private saves', 'muted'); self.save_info.setWordWrap(True); facts.addWidget(self.save_info); foot.addLayout(facts, 1)
         actions = QVBoxLayout(); actions.setSpacing(4); self.plan_button = QPushButton('View launch plan'); self.plan_button.clicked.connect(self.show_plan); actions.addWidget(self.plan_button)
@@ -213,6 +239,9 @@ class Window(QMainWindow):
         self.launch_button = QPushButton('Launch modded game'); self.launch_button.setObjectName('launch'); self.launch_button.clicked.connect(self.start_game); foot.addWidget(self.launch_button); layout.addWidget(footer)
         self.timer = QTimer(self); self.timer.timeout.connect(self.poll_process)
         self.scan(); self.refresh_library(); self.set_view(self.view)
+        if self.feedback.blocked:
+            self.set_launch_details(); self.show_launch_feedback(); self.timer.start(2000)
+        if self._launch_guard_error: self.notice(self._launch_guard_error, 'error')
 
     def current_installation(self):
         index = self.game.currentIndex(); return self.installations[index] if 0 <= index < len(self.installations) else None
@@ -220,17 +249,22 @@ class Window(QMainWindow):
     def current_mod(self):
         item = self.list.currentItem(); return item.data(Qt.ItemDataRole.UserRole) if item else None
 
-    def notice(self, text):
+    def notice(self, text, severity='info'):
+        self.message.setProperty('severity', severity)
+        self.message.style().unpolish(self.message); self.message.style().polish(self.message)
         if text and text != self.message.text(): self.diagnostics.event('notice', text)
         self.message.setText(text); self.message.setVisible(bool(text))
 
     def report_error(self, error):
         self.diagnostics.exception('operation-error', error)
-        self.notice(str(error))
+        self.notice(str(error), 'error')
 
     def open_logs(self):
         installation = self.current_installation()
-        if installation: diagnostics.collect_selected_installed(self.service, installation)
+        if installation:
+            result = diagnostics.collect_selected_installed(self.service, installation)
+            if result and (result.get('status') == 'adapter-failed' or result.get('preloader_logs')):
+                self.notice('Game startup failed. Open the collected logs for the failure report.', 'error')
         self.diagnostics.event('logs-opened', 'Opening local loader diagnostics')
         if self.diagnostics.error:
             self.notice('Could not save logs: '+self.diagnostics.error); return
@@ -306,18 +340,18 @@ class Window(QMainWindow):
             except (ValueError, OSError) as error: self.report_error(error)
 
     def import_package(self):
-        if self._busy or self.process is not None: return
+        if self.launch_blocked(): return
         paths, _ = QFileDialog.getOpenFileNames(self, 'Add downloaded mods', '', 'Mod downloads (*.msmod *.zip);;All files (*)')
         if paths: self.add_mod_paths(paths)
 
     def import_folder(self):
-        if self._busy or self.process is not None: return
+        if self.launch_blocked(): return
         path = QFileDialog.getExistingDirectory(self, 'Choose a downloaded mod folder')
         if path: self.add_mod_paths([path])
 
     def dragEnterEvent(self, event):
         urls = event.mimeData().urls()
-        if not self._busy and self.process is None and urls and all(url.isLocalFile() for url in urls):
+        if not self.launch_blocked() and urls and all(url.isLocalFile() for url in urls):
             event.acceptProposedAction()
         else: event.ignore()
 
@@ -329,7 +363,7 @@ class Window(QMainWindow):
             self.add_mod_paths([url.toLocalFile() for url in event.mimeData().urls()])
 
     def add_mod_paths(self, paths):
-        if self._busy or self.process is not None: return
+        if self.launch_blocked(): return
         self.work('Adding downloaded mods…', lambda: self.service.import_downloads(paths), self.mods_added)
 
     def mods_added(self, result):
@@ -378,7 +412,7 @@ class Window(QMainWindow):
         if self.filter.currentIndex() == 1: QTimer.singleShot(0, self.render)
 
     def set_all_checked(self, enabled):
-        if self._busy or self.process is not None: return
+        if self.launch_blocked(): return
         # Act on the library rather than visible rows so filters cannot leave
         # hidden mods enabled. Companion tools never participate in game startup.
         previous = self.service.state['selected']
@@ -459,22 +493,26 @@ class Window(QMainWindow):
                 self.game_status.setText(summary if summary.casefold().startswith(status.casefold()) else summary + ' · ' + status)
             except (ValueError, OSError) as error: reason = str(error)
         ready = bool(self.compatibility_report and self.compatibility_report['allowed'] and (selected or installed))
-        active = self._busy or self.process is not None
+        active = self.launch_blocked()
         self.compatibility_button.setEnabled(bool(installation) and not active)
         native = {name for name,(mod,_) in self.mods.items() if packages.game_mod(mod)}
         self.select_all_button.setEnabled(not active and bool(native - set(selected)))
         self.deselect_all_button.setEnabled(not active and bool(selected))
         self.launch_button.setEnabled(ready and not active and not self.no_launch)
-        self.launch_button.setText('Launch via Steam' if installed else 'Launch modded game')
+        launch_title = {'waiting':'Starting…', 'running':'Game running', 'unconfirmed':'Launch unconfirmed', 'failed':'Launch needs attention', 'finishing':'Finishing launch…'}.get(self.feedback.phase)
+        self.launch_button.setText('Preparing…' if self._launch_job and self._busy else launch_title or ('Launch via Steam' if installed else 'Launch modded game'))
         self.prepare_button.setEnabled(ready and not active); self.plan_button.setEnabled(ready and not active)
-        self.launch_button.setToolTip('Game starts are disabled in this UI inspection session.' if self.no_launch else reason or ('Apply mods to the installed game and request Steam launch.' if installed else 'Prepare a private game copy and launch the checked mods.'))
+        self.launch_button.setToolTip('Game starts are disabled in this UI inspection session.' if self.no_launch else reason or ('Launch automatically applies selected mods, then requests Steam launch. Prepare files is optional.' if installed else 'Prepare a private game copy and launch the checked mods.'))
         self.save_info.setText('Normal Steam saves · back up before save-affecting mods' if installed else 'Fresh private saves')
         self.proton_hint.setVisible(installed and sys.platform == 'linux')
         self.steam_setup_button.setVisible(installed and sys.platform == 'linux'); self.steam_setup_button.setEnabled(not active)
         if installed and sys.platform == 'linux': self.proton_hint.setText(steam_options.inspect(installation, managed=any(self.mods[name][0]['kind'] == packages.MANAGED_KIND for name in self.service.state['selected'] if name in self.mods))['message'])
         for widget in [self.disable_button, self.enable_button, self.uninstall_button]: widget.setVisible(installed); widget.setEnabled(not active)
         for widget in [self.game,self.browse,self.rescan,self.import_button,self.import_folder_button,self.list,self.remove_button,self.deployment_mode]: widget.setEnabled(not active)
-        if reason or self._validation and self.message.text() == self._validation: self.notice(reason)
+        if not active and (reason or self._validation and self.message.text() == self._validation): self.notice(reason, 'warning' if reason else 'info')
+        self.launch_details_button.setEnabled(self.launch_record is not None)
+        self.launch_reset_button.setVisible(self.feedback.blocked and self.launch_record is not None)
+        self.launch_reset_button.setEnabled(not self._busy and self.process is None and self.feedback.phase != 'running')
         self._validation = reason
 
     def show_compatibility(self):
@@ -491,14 +529,16 @@ class Window(QMainWindow):
             self.text_dialog('Launch plan · no game started', json.dumps(record, indent=2))
         except (ValueError,OSError) as error: self.report_error(error)
 
-    def work(self, text, action, done):
+    def work(self, text, action, done, staged=False, failed=None):
+        if self._busy: return
         self.diagnostics.event('operation-start', text)
-        self._busy=True; self.notice(text); self.update_actions(); self.job=Job(action,self)
-        self.job.finished_value.connect(done); self.job.failed.connect(self.notice); self.job.finished.connect(self.job_done); self.job.start()
+        self._busy=True; self.notice(text); self.update_actions(); self.job=Job(action,self,staged)
+        self.job.finished_value.connect(done); self.job.failed.connect(failed or (lambda text:self.notice(text, 'error'))); self.job.progress.connect(self.notice); self.job.finished.connect(self.job_done); self.job.start()
 
-    def job_done(self): self._busy=False; self.update_actions(); self.job.deleteLater(); self.job=None
+    def job_done(self): self._busy=False; self._launch_job=False; self.update_actions(); self.job.deleteLater(); self.job=None
 
     def prepare_files(self):
+        if self.launch_blocked(): return
         installation=self.current_installation()
         if not self.confirm_save_policy(installation): return
         installed = self.service.mode(installation) == 'installed'
@@ -530,27 +570,105 @@ class Window(QMainWindow):
         apply.clicked.connect(apply_options); dialog.exec()
 
     def start_game(self):
-        if self.no_launch: return
+        if self.no_launch or self.launch_blocked(): return
         installation=self.current_installation()
         if self.service.mode(installation) == 'installed' and self.service.state['selected']:
             status = steam_options.inspect(installation, managed=any(self.mods[name][0]['kind'] == packages.MANAGED_KIND for name in self.service.state['selected'] if name in self.mods))
             if status['status'] not in ('ready', 'not-required'):
                 self.steam_setup(); return
         if not self.confirm_save_policy(installation): return
-        self.work('Preparing selected mods and starting the game…', lambda:launch.start(self.service,installation), self.started)
+        self.launch_record = None; self._launch_job = True
+        self.work('Applying selected mods automatically before launch…', lambda progress:launch.start(self.service,installation,progress), self.started, staged=True, failed=self.launch_failed)
+
+    def launch_blocked(self):
+        return self._busy or self.process is not None or self.feedback.blocked or bool(self._launch_guard_error)
+
+    def toggle_launch_details(self, expanded):
+        self.launch_details.setVisible(expanded)
+        self.launch_details_button.setText('Launch diagnostics ▾' if expanded else 'Launch diagnostics ▸')
+
+    def show_launch_feedback(self):
+        self.launch_status.setText(self.feedback.message)
+        self.launch_status.setProperty('severity', 'error' if self.feedback.phase == 'failed' else 'info')
+        self.launch_status.style().unpolish(self.launch_status); self.launch_status.style().polish(self.launch_status)
+        self.update_actions()
+
+    def set_launch_details(self, code=None, detail=''):
+        record = self.launch_record or {}
+        lines = ['Observed process: ' + ('Steam launch request' if record.get('mode') == 'installed' else 'Private launch process'),
+                 'Game startup/mod loading: not established by the launch request',
+                 'Logs: ' + record.get('run', '(unavailable)')]
+        if code is not None: lines.append('Request/process exit code: ' + str(code))
+        if detail: lines.append(detail)
+        if record.get('diagnostic_error'): lines.append('Diagnostic write error: ' + record['diagnostic_error'])
+        self.launch_details.setPlainText('\n'.join(lines)[:16384])
+
+    def launch_failed(self, text):
+        try:
+            pending = pending_launch(self.service.root)
+            if pending:
+                self.feedback.installed = pending['state'].startswith('steam-')
+                self.launch_record = {'mode':'installed' if self.feedback.installed else 'private', 'run':pending.get('run', '')}
+                self.feedback.phase = 'unconfirmed'; self.timer.start(2000)
+                self.show_launch_feedback(); self.set_launch_details(detail=text)
+        except (ValueError, OSError) as error:
+            self._launch_guard_error = str(error)
+        self.notice(text, 'error')
 
     def started(self, result):
-        self.process,self.launch_record=result; self.timer.start(1000)
-        self.notice('Steam launch requested; game startup is not yet confirmed.' if self.launch_record.get('mode') == 'installed' else 'Game running · '+self.launch_record['runtime']+' · close it normally with Save & Quit.' + (' Log error: '+self.launch_record['diagnostic_error'] if self.launch_record.get('diagnostic_error') else ''))
+        self.process,self.launch_record=result
+        self.feedback.requested(self.launch_record.get('mode') == 'installed')
+        self.timer.start(2000); self.set_launch_details(); self.show_launch_feedback()
+        self.notice('Files applied. Launch requested through Steam.' if self.feedback.installed else 'Files applied. Starting the private game; startup is unconfirmed.')
+
+    def reset_launch(self):
+        if self._busy or self.process is not None or not self.launch_record: return
+        if QMessageBox.question(self, 'Confirm game is closed',
+                'Confirm Moon Sweepers is closed or did not start. If Steam still says Launching or Running, wait or close the game normally first. This only clears the loader’s launch guard; it does not stop anything.') != QMessageBox.StandardButton.Yes: return
+        run = self.launch_record['run']
+        def cleared(_):
+            self.feedback = LaunchFeedback(); self._launch_guard_error = ''; self.timer.stop(); self.launch_status.setText('Launch guard cleared after your confirmation. Launch will apply selected mods automatically.')
+            self.diagnostics.event('launch-acknowledged-closed', 'User confirmed game closed or did not start', run=run)
+        self.work('Checking that Moon Sweepers is closed…', lambda:acknowledge_launch_closed(self.service.root, run), cleared)
 
     def poll_process(self):
+        previous_phase = self.feedback.phase
+        request_finished = False
         if self.process and self.process.poll() is not None:
-            code=self.process.returncode; self.timer.stop()
-            if hasattr(self.process,'_moon_lease'): self.process._moon_lease.__exit__(None,None,None)
+            code=self.process.returncode; request_finished = True
+            if hasattr(self.process,'_moon_lease'):
+                try: retain_private_uncertainty(self.service.root, self.launch_record['run'])
+                except (ValueError, OSError) as error:
+                    self._launch_guard_error = 'Could not retain launch state; inspect active.json before another launch.'
+                    self.diagnostics.exception('launch-state-error', error)
+                self.process._moon_lease.__exit__(None,None,None)
             self.process=None
             detail=launch.failure_detail(self.launch_record)
-            diagnostics.finish_run(self.service.root, self.launch_record, code, detail)
-            self.notice(('Steam request finished; Steam owns the game process. ' if self.launch_record.get('mode') == 'installed' else detail+'. ' if detail else 'Game closed. ')+'Exit code '+str(code)+'. Logs: '+self.launch_record['run']); self.update_actions()
+            summary = diagnostics.finish_run(self.service.root, self.launch_record, code, detail)
+            self.set_launch_details(code, detail)
+            if self.feedback.installed:
+                self.feedback.request_finished(code)
+                if summary.get('status') in ('preloader-failed', 'adapter-failed'):
+                    self.notice('Game startup failed. Expand launch diagnostics or open logs for the failure report.', 'error')
+            else:
+                self.feedback.request_finished(code)
+                self.notice(detail or 'Private launch process finished; game lifetime needs confirmation. See launch diagnostics.', 'error' if detail or code else 'info')
+        if self.launch_record and (self.feedback.blocked or request_finished):
+            observation = game_process.observe()
+            previous = self.feedback.phase
+            self.feedback.observe(observation['status'])
+            if self.feedback.phase == 'closed' and self.process is not None:
+                self.feedback.phase = 'finishing'  # The request outlived the observed game.
+            if self.feedback.phase == 'closed' and self.process is None:
+                try:
+                    acknowledge_launch_closed(self.service.root, self.launch_record['run'])
+                    self._launch_guard_error = ''; self.timer.stop()
+                except (ValueError, OSError):
+                    # An uncertain scan or still-active runner never unlocks launch.
+                    self.feedback.phase = 'unconfirmed'
+            if previous != self.feedback.phase:
+                self.diagnostics.event('launch-lifetime', self.feedback.message, state=self.feedback.phase)
+        if request_finished or self.feedback.phase != previous_phase: self.show_launch_feedback()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)

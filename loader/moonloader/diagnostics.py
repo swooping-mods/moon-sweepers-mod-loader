@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from contextlib import contextmanager
 import faulthandler
 import hashlib
+from itertools import islice
 import json
 import os
 from pathlib import Path
@@ -17,6 +18,9 @@ import uuid
 MAX_BYTES = 2 * 1024 * 1024
 BACKUPS = 4
 TAIL_BYTES = 64 * 1024
+CONTROL_BYTES = 2 * 1024 * 1024
+SCAN_ENTRIES = 4096
+COLLECT_LOGS = 16
 _PRELOADER = re.compile(r'preloader_(\d{8}_\d{6})_\d{3}\.log')
 _current = None
 
@@ -192,22 +196,66 @@ def _preloader_name(name):
     return True
 
 
+def _directory_entries(folder, limit=SCAN_ENTRIES):
+    # Path.iterdir() can enumerate eagerly before islice applies its limit.
+    with os.scandir(folder) as entries:
+        return [Path(entry.path) for entry in islice(entries, limit)]
+
+
+@contextmanager
+def _input_file(path):
+    def independent(info):
+        if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+            raise ValueError('Diagnostics input is not an independent regular file')
+    independent(path.stat())
+    # Avoid blocking on a FIFO if a regular file changes between stat and open.
+    flags = os.O_RDONLY | getattr(os, 'O_BINARY', 0) | getattr(os, 'O_NONBLOCK', 0) | getattr(os, 'O_NOFOLLOW', 0)
+    with os.fdopen(os.open(path, flags), 'rb') as stream:
+        independent(os.fstat(stream.fileno()))
+        yield stream
+
+
+def _load_json(path, default=None):
+    try:
+        with _input_file(path) as stream:
+            if os.fstat(stream.fileno()).st_size > CONTROL_BYTES:
+                raise ValueError('Diagnostics control file exceeds its size limit')
+            content = stream.read(CONTROL_BYTES+1)
+    except FileNotFoundError:
+        return default
+    if len(content) > CONTROL_BYTES:
+        raise ValueError('Diagnostics control file exceeds its size limit')
+    return json.loads(content.decode('utf-8'))
+
+
+def _receipt(data, installation):
+    from . import public
+    from .storage import contained
+    # Retain the deployment owner's complete validator. Its storage reader has
+    # no byte cap, so reject oversized inputs before invoking it.
+    try:
+        with _input_file(contained(data, 'deployment.json')) as stream:
+            if os.fstat(stream.fileno()).st_size > CONTROL_BYTES:
+                raise ValueError('Diagnostics deployment receipt exceeds its size limit')
+    except FileNotFoundError:
+        pass
+    return public.receipt(data, installation)
+
+
 def _preloader_snapshot(game):
-    from itertools import islice
-    entries = list(islice(game.iterdir(), 4097))
-    return {'names': [item.name for item in entries[:4096] if _preloader_name(item.name)],
-            'complete': len(entries) <= 4096, 'since_ns': time.time_ns()}
+    entries = _directory_entries(game, SCAN_ENTRIES+1)
+    return {'names': [item.name for item in entries[:SCAN_ENTRIES] if _preloader_name(item.name)],
+            'complete': len(entries) <= SCAN_ENTRIES, 'since_ns': time.time_ns()}
 
 
 def _preloader_logs(game, baseline):
     """Doorstop writes these before either the normal host log or adapter exists."""
-    from itertools import islice
     from .storage import contained
     if not isinstance(baseline, dict) or baseline.get('complete') is not True: return []
     since = baseline.get('since_ns')
     if not isinstance(since, int) or since < 1: return []
     previous = set(baseline.get('names', [])); candidates = []
-    for entry in islice(game.iterdir(), 4096):
+    for entry in _directory_entries(game):
         if not _preloader_name(entry.name) or entry.name in previous: continue
         try:
             path = contained(game, entry.name); info = path.stat()
@@ -215,10 +263,11 @@ def _preloader_logs(game, baseline):
             candidates.append((info.st_mtime_ns, path))
         except (OSError, ValueError): continue
     result = []
-    for _, path in sorted(candidates, reverse=True)[:16]:
+    for _, path in sorted(candidates, reverse=True)[:COLLECT_LOGS]:
         try:
             path = contained(game, path.name)
-            with path.open('rb') as stream:
+            with _input_file(path) as stream:
+                if os.fstat(stream.fileno()).st_mtime_ns < since: continue
                 stream.seek(0, 2); size = stream.tell(); stream.seek(max(0, size-TAIL_BYTES))
                 tail = stream.read(TAIL_BYTES).decode('utf-8', errors='replace')
             if tail:
@@ -236,7 +285,9 @@ def _managed_snapshot(game):
     if info and info.st_nlink != 1: raise ValueError('Aliased managed log refused')
     prefix = b''
     if info:
-        with path.open('rb') as stream: prefix = stream.read(min(info.st_size, TAIL_BYTES))
+        with _input_file(path) as stream:
+            info = os.fstat(stream.fileno())
+            prefix = stream.read(min(info.st_size, TAIL_BYTES))
     return {'path':str(path), 'before':[info.st_ino, info.st_size, info.st_mtime_ns] if info else None,
             'prefix_bytes':len(prefix), 'prefix_sha256':hashlib.sha256(prefix).hexdigest(), 'since_ns':time.time_ns()}
 
@@ -252,7 +303,7 @@ def _managed_log(game, baseline, since=0):
     count = baseline['prefix_bytes']
     if not isinstance(count, int) or not 0 <= count <= TAIL_BYTES: raise ValueError('Invalid managed log baseline')
     offset = before[1] if before and info.st_ino == before[0] and info.st_size > before[1] else 0
-    with path.open('rb') as stream:
+    with _input_file(path) as stream:
         prefix = stream.read(count)
         if hashlib.sha256(prefix).hexdigest() != baseline['prefix_sha256']: offset = 0
         stream.seek(max(offset, info.st_size-TAIL_BYTES)); tail = stream.read(TAIL_BYTES).decode('utf-8', errors='replace')
@@ -276,10 +327,9 @@ def prepare_run(root, record):
 def prepare_installed(service, installation, record):
     """Remember the exact deployed generation before the short Steam request."""
     try:
-        from . import public
         from .storage import contained, write
         data = service.install_root(installation)
-        deployed = public.receipt(data, installation)
+        deployed = _receipt(data, installation)
         watch = {'mode': 'installed', 'cwd': installation.path, 'run': record['run'],
                  'installed_log_watch': {'installation': installation.record(),
                      'generation': deployed['generation'], 'data': str(data), 'since_ns': time.time_ns(),
@@ -300,7 +350,7 @@ def collect_installed(root, record):
     try:
         from . import public
         from .discovery import Installation
-        from .storage import contained, load, write
+        from .storage import contained, write
         meta = record['installed_log_watch']; installation = Installation(**meta['installation'])
         data = Path(meta['data']).absolute()
         data = contained(session.root, data.relative_to(session.root).as_posix())
@@ -309,9 +359,9 @@ def collect_installed(root, record):
         contained(data, run.relative_to(data).as_posix())
         game = Path(installation.path).absolute()
         if record['cwd'] != installation.path: raise ValueError('Installed diagnostic watch changed its game')
-        owner = load(contained(game, 'MoonLab/owner.json'), {})
+        owner = _load_json(contained(game, 'MoonLab/owner.json'), {})
         if owner != {'schema': public.SCHEMA, 'data': str(data)}: raise ValueError('Installed log ownership changed')
-        deployed = public.receipt(data, installation)
+        deployed = _receipt(data, installation)
         generation = meta['generation']
         if not re.fullmatch('[a-f0-9]{32}', generation) or deployed['generation'] != generation:
             raise ValueError('Installed diagnostic generation changed')
@@ -324,37 +374,44 @@ def collect_installed(root, record):
             if managed_log: result['managed_log'] = managed_log
         folder = contained(game, 'MoonLab/logs')
         if folder.is_dir():
-            from itertools import islice
             candidates = []
-            for item in islice(folder.iterdir(), 4096):
+            for item in _directory_entries(folder):
                 if not re.fullmatch(r'run-[a-f0-9]{16}-[a-f0-9]{8}', item.name): continue
-                path = contained(game, 'MoonLab/logs/'+item.name+'/loader.jsonl')
-                if path.is_file() and path.stat().st_mtime_ns >= since: candidates.append(path)
-            for path in sorted(candidates, key=lambda p: p.stat().st_mtime_ns, reverse=True)[:16]:
-                with path.open('rb') as stream:
-                    head = stream.read(16384)
-                    stream.seek(0, 2); size = stream.tell(); stream.seek(max(0, size-TAIL_BYTES))
-                    tail = stream.read(TAIL_BYTES).decode('utf-8', errors='replace')
-                attributed = False
-                for line in head.splitlines():
-                    try: event = json.loads(line)
-                    except (ValueError, UnicodeError): continue
-                    if isinstance(event, dict) and event.get('case') == 'deployment' and event.get('success') is True and event.get('installation') == installation.identity and event.get('generation') == generation:
-                        attributed = True; break
-                if attributed:
-                    result['logs'].append({'run': path.parent.name, 'path': str(path), 'bytes': size,
-                                           'tail': tail, 'truncated': size > TAIL_BYTES})
-                    if deployed.get('managed') is not True: continue
-                    for name in ('adapter-ready.json', 'adapter-failed.json', 'adapter-failure.txt'):
-                        try:
-                            sidecar = contained(game, 'MoonLab/logs/'+path.parent.name+'/'+name)
-                            info = sidecar.stat()
-                            if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or info.st_mtime_ns < since or not info.st_size: continue
-                            with sidecar.open('rb') as stream:
-                                stream.seek(max(0, info.st_size-TAIL_BYTES)); tail = stream.read(TAIL_BYTES).decode('utf-8', errors='replace')
-                            result['adapter_logs'].append({'run':path.parent.name, 'name':name, 'path':str(sidecar),
-                                'bytes':info.st_size, 'tail':tail, 'truncated':info.st_size > TAIL_BYTES})
-                        except (OSError, ValueError): continue
+                try:
+                    path = contained(game, 'MoonLab/logs/'+item.name+'/loader.jsonl'); info = path.stat()
+                    if stat.S_ISREG(info.st_mode) and info.st_nlink == 1 and info.st_mtime_ns >= since:
+                        candidates.append((info.st_mtime_ns, path))
+                except (OSError, ValueError): continue
+            for _, path in sorted(candidates, reverse=True):
+                if len(result['logs']) >= COLLECT_LOGS: break
+                try:
+                    path = contained(game, 'MoonLab/logs/'+path.parent.name+'/loader.jsonl')
+                    with _input_file(path) as stream:
+                        if os.fstat(stream.fileno()).st_mtime_ns < since: continue
+                        head = stream.read(16384)
+                        attributed = False
+                        for line in head.splitlines():
+                            try: event = json.loads(line)
+                            except (ValueError, UnicodeError): continue
+                            if isinstance(event, dict) and event.get('case') == 'deployment' and event.get('success') is True and event.get('installation') == installation.identity and event.get('generation') == generation:
+                                attributed = True; break
+                        if not attributed: continue
+                        stream.seek(0, 2); size = stream.tell(); stream.seek(max(0, size-TAIL_BYTES))
+                        tail = stream.read(TAIL_BYTES).decode('utf-8', errors='replace')
+                except (OSError, ValueError): continue
+                result['logs'].append({'run': path.parent.name, 'path': str(path), 'bytes': size,
+                                       'tail': tail, 'truncated': size > TAIL_BYTES})
+                if deployed.get('managed') is not True: continue
+                for name in ('adapter-ready.json', 'adapter-failed.json', 'adapter-failure.txt'):
+                    try:
+                        sidecar = contained(game, 'MoonLab/logs/'+path.parent.name+'/'+name)
+                        with _input_file(sidecar) as stream:
+                            info = os.fstat(stream.fileno())
+                            if info.st_mtime_ns < since or not info.st_size: continue
+                            stream.seek(max(0, info.st_size-TAIL_BYTES)); tail = stream.read(TAIL_BYTES).decode('utf-8', errors='replace')
+                        result['adapter_logs'].append({'run':path.parent.name, 'name':name, 'path':str(sidecar),
+                            'bytes':info.st_size, 'tail':tail, 'truncated':info.st_size > TAIL_BYTES})
+                    except (OSError, ValueError): continue
         adapter_failed = any(row['name'] != 'adapter-ready.json' for row in result['adapter_logs'])
         result.update(installation=installation.identity, generation=generation,
                       status='preloader-failed' if result['preloader_logs'] else 'adapter-failed' if adapter_failed else 'bootstrap-observed' if result['logs'] else 'no-attributed-bootstrap-log-yet')
@@ -373,14 +430,14 @@ def collect_installed(root, record):
 def collect_selected_installed(service, installation):
     """Open logs refresh, including a preloader failure blocked on its dialog."""
     try:
-        from .storage import contained, load, write
+        from .storage import contained, write
         if service.mode(installation) != 'installed':
-            active = load(contained(service.root, 'active.json'), {})
+            active = _load_json(contained(service.root, 'active.json'), {})
             if not active.get('run'): return
             data = service.install_root(installation); run = Path(active['run']).absolute()
             if run.parent != data/'runs': return
             run = contained(service.root, run.relative_to(service.root).as_posix())
-            record = load(contained(run, 'launch.json'), {})
+            record = _load_json(contained(run, 'launch.json'), {})
             if record.get('run') != str(run) or record.get('cwd') != str(data/'game'): return
             game = contained(service.root, (data/'game').relative_to(service.root).as_posix())
             logs = _preloader_logs(game, record.get('diagnostic_preloader_logs'))
@@ -390,7 +447,7 @@ def collect_selected_installed(service, installation):
             write(_log_path(service.root, 'private-preloader.json'), result)
             if logs: start(service.root).event('private-preloader-failed', 'BepInEx preloader failed before adapter startup', 'ERROR', logs=len(logs), run=str(run))
             return result
-        record = load(contained(service.install_root(installation), 'diagnostics-watch.json'))
+        record = _load_json(contained(service.install_root(installation), 'diagnostics-watch.json'))
         if record: return collect_installed(service.root, record)
     except Exception as error:
         start(service.root).exception('installed-log-collection-failed', error)
@@ -400,10 +457,15 @@ def finish_run(root, record, code, detail=''):
     """Summarize only a loader-owned current run, without guessing Steam lifetime."""
     session = start(root)
     installed = record.get('mode') == 'installed'
+    direct_game = not installed and record.get('platform') == 'win32'
+    runner = not installed and not direct_game
     status = ('steam-request-failed' if code else 'startup-unconfirmed') if installed else ('failed' if code or detail else 'closed')
+    if runner: status = 'runner-failed' if code or detail else 'lifetime-unconfirmed'
     summary = {'schema': 'moon-loader-run-diagnostics/v1', 'status': status,
                'exit_code': code, 'mode': record.get('mode', 'private'),
-               'game_startup_confirmed': False if installed else None,
+               'game_startup_confirmed': False if installed or runner else None,
+               'process_role': 'steam-request' if installed else 'game' if direct_game else 'private-runner',
+               'game_lifetime': 'unverified' if installed or runner else 'direct-process-exit',
                'message': detail, 'tails': {}}
     try:
         from .storage import contained, write
@@ -413,11 +475,13 @@ def finish_run(root, record, code, detail=''):
         run = contained(session.root, relative)
         if not run.is_dir(): raise ValueError('Current run directory is missing')
         for name in ('process.log', 'Player.log', 'loader.jsonl', 'bepinex.jsonl', 'adapter-ready.json', 'adapter-failed.json', 'adapter-failure.txt'):
-            path = contained(run, name)
-            if not path.is_file(): continue
-            with path.open('rb') as stream:
-                stream.seek(0, 2); size = stream.tell(); stream.seek(max(0, size-TAIL_BYTES))
-                tail = stream.read(TAIL_BYTES).decode('utf-8', errors='replace')
+            try:
+                path = contained(run, name)
+                with _input_file(path) as stream:
+                    stream.seek(0, 2); size = stream.tell(); stream.seek(max(0, size-TAIL_BYTES))
+                    tail = stream.read(TAIL_BYTES).decode('utf-8', errors='replace')
+                if not tail: continue
+            except (OSError, ValueError): continue
             summary['tails'][name] = {'bytes': size, 'tail': tail, 'truncated': size > TAIL_BYTES}
         managed = record.get('diagnostic_managed_log') if not installed else None
         if managed:
@@ -429,7 +493,7 @@ def finish_run(root, record, code, detail=''):
             player = summary['tails'].get('Player.log', {}).get('tail', '')
             if any(marker in player for marker in ('Crash!!!', 'Native Crash Reporting', 'Received signal ', 'FATAL ERROR:')):
                 summary['status'] = status = 'crashed'
-            elif code < 0 or code >= 0x80000000:
+            elif direct_game and (code < 0 or code >= 0x80000000):
                 summary['status'] = status = 'crashed'
             if any(name in summary['tails'] for name in ('adapter-failed.json', 'adapter-failure.txt')):
                 summary['status'] = status = 'adapter-failed'

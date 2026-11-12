@@ -170,6 +170,52 @@ class DiagnosticsChecks(unittest.TestCase):
         self.assertFalse((outside/'diagnostics.json').exists())
         self.assertEqual(result['tails'], {})
 
+    def test_directory_scan_consumes_only_its_limit_and_closes_handle(self):
+        consumed = []
+        def entries():
+            for index in range(4):
+                consumed.append(index)
+                yield SimpleNamespace(path=str(self.root/f'entry-{index}'))
+        handle = Mock()
+        handle.__enter__ = Mock(return_value=entries())
+        handle.__exit__ = Mock(return_value=False)
+        with patch.object(diagnostics.os, 'scandir', return_value=handle), patch.object(Path, 'iterdir', side_effect=AssertionError('eager enumeration')):
+            paths = diagnostics._directory_entries(self.root, 3)
+        self.assertEqual(consumed, [0, 1, 2])
+        self.assertEqual([path.name for path in paths], ['entry-0', 'entry-1', 'entry-2'])
+        handle.__exit__.assert_called_once()
+
+    def test_control_json_rejects_oversize_and_hardlinked_files(self):
+        path = self.root/'control.json'
+        path.write_text('{}'+' '*62)
+        with patch.object(diagnostics, 'CONTROL_BYTES', 64):
+            self.assertEqual(diagnostics._load_json(path), {})
+            with path.open('ab') as stream: stream.write(b' ')
+            with self.assertRaisesRegex(ValueError, 'size limit'): diagnostics._load_json(path)
+        path.write_text('{}'); (self.root/'linked.json').hardlink_to(path)
+        with self.assertRaisesRegex(ValueError, 'independent regular file'): diagnostics._load_json(path)
+
+    @unittest.skipUnless(hasattr(os, 'mkfifo'), 'FIFO creation is unavailable')
+    def test_nonregular_input_is_rejected_before_open_can_block(self):
+        path = self.root/'fifo.log'; os.mkfifo(path)
+        with patch.object(diagnostics.os, 'open', side_effect=AssertionError('must not open FIFO')) as opened:
+            with self.assertRaisesRegex(ValueError, 'independent regular file'):
+                with diagnostics._input_file(path): self.fail('FIFO accepted')
+        opened.assert_not_called()
+
+    def test_private_aliases_do_not_hide_valid_sibling_logs(self):
+        run = self.root/'runs/fixture'; run.mkdir(parents=True)
+        outside = self.root/'outside.log'; outside.write_text('Crash!!! private data')
+        (run/'process.log').symlink_to(outside)
+        (run/'Player.log').hardlink_to(outside)
+        (run/'adapter-failure.txt').mkdir()
+        (run/'loader.jsonl').write_text('current bootstrap evidence')
+        result = diagnostics.finish_run(self.root, {'run':str(run)}, 0)
+        self.assertEqual(result['status'], 'lifetime-unconfirmed')
+        self.assertEqual(set(result['tails']), {'loader.jsonl'})
+        self.assertTrue((run/'diagnostics.json').is_file())
+        self.assertEqual(outside.read_text(), 'Crash!!! private data')
+
     def installed_fixture(self, managed=False, previous_log=None):
         from moonloader import public
         from moonloader.discovery import Installation
@@ -208,6 +254,69 @@ class DiagnosticsChecks(unittest.TestCase):
         self.assertEqual(result['game_process_lifetime'],'unverified')
         self.assertEqual(result['game_crash'],'not established')
         self.assertIn('mod-start-failed',result['logs'][0]['tail'])
+
+    def test_installed_aliases_do_not_hide_valid_sibling_logs(self):
+        service,installation,record,_ = self.installed_fixture()
+        fresh = self.bootstrap(installation, 'run-0000000000000001-00000001')
+        outside = self.root/'outside.log'; outside.write_text(fresh.read_text())
+        folder = fresh.parent.parent
+        for index, alias in ((2, 'symlink'), (3, 'hardlink')):
+            path = folder/f'run-{index:016x}-00000001'/'loader.jsonl'; path.parent.mkdir()
+            if alias == 'symlink': path.symlink_to(outside)
+            else: path.hardlink_to(outside)
+        result = diagnostics.collect_installed(service.root, record)
+        self.assertEqual(result['status'], 'bootstrap-observed')
+        self.assertEqual([row['path'] for row in result['logs']], [str(fresh)])
+
+    def test_foreign_bootstrap_candidates_do_not_consume_matching_log_limit(self):
+        service,installation,record,_ = self.installed_fixture()
+        fresh = self.bootstrap(installation, 'run-0000000000000001-00000001')
+        since = record['installed_log_watch']['since_ns']
+        os.utime(fresh, ns=(since+1, since+1))
+        for index in range(2, 18):
+            foreign = self.bootstrap(installation, f'run-{index:016x}-00000001', generation='b'*32)
+            os.utime(foreign, ns=(since+index, since+index))
+        result = diagnostics.collect_installed(service.root, record)
+        self.assertEqual([row['path'] for row in result['logs']], [str(fresh)])
+
+    def test_installed_matching_bootstrap_logs_remain_count_and_byte_bounded(self):
+        service,installation,record,_ = self.installed_fixture()
+        with patch.object(diagnostics, 'TAIL_BYTES', 64):
+            for index in range(18):
+                path = self.bootstrap(installation, f'run-{index:016x}-00000001')
+                with path.open('a') as stream: stream.write('x'*65)
+            result = diagnostics.collect_installed(service.root, record)
+        self.assertEqual(len(result['logs']), diagnostics.COLLECT_LOGS)
+        self.assertTrue(all(row['truncated'] and len(row['tail'].encode()) <= 64 for row in result['logs']))
+
+    def test_oversized_owned_control_files_make_collection_unavailable(self):
+        service,installation,record,_ = self.installed_fixture()
+        owner = Path(installation.path)/'MoonLab/owner.json'
+        with owner.open('wb') as stream: stream.truncate(diagnostics.CONTROL_BYTES+1)
+        result = diagnostics.collect_installed(service.root, record)
+        self.assertEqual(result['status'], 'collection-unavailable')
+        self.assertIn('size limit', result['message'])
+        self.assertEqual(result['logs'], [])
+
+    def test_oversized_receipt_is_rejected_before_public_validation(self):
+        from moonloader import public
+        service,installation,record,_ = self.installed_fixture()
+        path = service.install_root(installation)/'deployment.json'
+        with path.open('wb') as stream: stream.truncate(diagnostics.CONTROL_BYTES+1)
+        with patch.object(public, 'receipt') as receipt:
+            result = diagnostics.collect_installed(service.root, record)
+        receipt.assert_not_called()
+        self.assertEqual(result['status'], 'collection-unavailable')
+        self.assertIn('size limit', result['message'])
+
+    def test_diagnostic_receipt_keeps_complete_public_payload_validation(self):
+        from moonloader.storage import write
+        service,installation,record,deployed = self.installed_fixture()
+        deployed['files'] = {'MoonSweepers.exe':'a'*64}
+        write(service.install_root(installation)/'deployment.json', deployed)
+        result = diagnostics.collect_installed(service.root, record)
+        self.assertEqual(result['status'], 'collection-unavailable')
+        self.assertIn('Invalid owned payload path', result['message'])
 
     def test_open_logs_can_refresh_late_bootstrap_after_request_exit(self):
         service,installation,record,_ = self.installed_fixture()
@@ -351,6 +460,26 @@ class DiagnosticsChecks(unittest.TestCase):
         result = diagnostics.finish_run(self.root,{'run':str(run)},0)
         self.assertEqual(result['status'],'adapter-failed')
         self.assertEqual(next(row for row in self.rows() if row['event']=='launch-finished')['level'],'ERROR')
+
+
+class RunnerAttributionChecks(unittest.TestCase):
+    def test_private_linux_runner_result_never_establishes_game_exit_or_crash(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary); run = root / 'runs/fixture'; run.mkdir(parents=True)
+            for code in (0, 1, -11, 0xc0000005):
+                result = diagnostics.finish_run(root, {'run':str(run), 'platform':'linux'}, code)
+                self.assertEqual(result['status'], 'runner-failed' if code else 'lifetime-unconfirmed')
+                self.assertEqual(result['process_role'], 'private-runner')
+                self.assertEqual(result['game_lifetime'], 'unverified')
+                self.assertIs(result['game_startup_confirmed'], False)
+
+    def test_direct_windows_game_fatal_code_and_player_crash_remain_evidence(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary); run = root / 'runs/fixture'; run.mkdir(parents=True)
+            record = {'run':str(run), 'platform':'win32'}
+            self.assertEqual(diagnostics.finish_run(root, record, 0xc0000005)['status'], 'crashed')
+            (run / 'Player.log').write_text('Crash!!! current run\n')
+            self.assertEqual(diagnostics.finish_run(root, {**record, 'platform':'linux'}, 0)['status'], 'crashed')
 
 
 if __name__ == '__main__': unittest.main()

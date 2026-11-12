@@ -39,6 +39,11 @@ def main():
             "test_gui_checkboxes_views_filter_and_no_launch",
             "test_grid_wheel_travel_ignores_global_lines_and_preserves_precise_input",
             "test_ui_categories_tags_and_enabled_combine_in_every_view",
+            "test_ui_launch_handoff_is_neutral_collapsed_and_blocks_duplicates",
+            "test_ui_launch_failed_status_resolves_error_foreground",
+            "test_ui_launch_running_observation_and_closed_release",
+            "test_ui_launch_request_outliving_game_does_not_claim_running",
+            "test_ui_launch_restart_restores_uncertainty_and_inspection_cannot_start",
         ):
             excluded.append(test.id())
         else:

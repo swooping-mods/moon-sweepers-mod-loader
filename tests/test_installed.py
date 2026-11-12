@@ -216,7 +216,7 @@ class InstalledChecks(unittest.TestCase):
         record = launch.plan(service, installation, platform='win32', check_client=False)
         with patch('moonloader.launch.plan', return_value=record), patch.object(service, 'prepare'), patch('subprocess.Popen', return_value=process):
             observed, _ = launch.start(service, installation)
-        self.assertIs(observed, process); self.assertFalse((service.root/'active.json').exists())
+        self.assertIs(observed, process); self.assertEqual(load(service.root/'active.json')['state'], 'steam-unconfirmed')
         self.assertFalse(hasattr(process, '_moon_lease'))
         with locked(service.root, 'session.lock'): pass
 

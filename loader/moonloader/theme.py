@@ -8,9 +8,12 @@ QWidget { background: #1b1b1b; color: #ececec; font-family: "Noto Sans", "Segoe 
 QMainWindow, QFrame#workspace { background: #1e1e1e; }
 QLabel { background: transparent; }
 QLabel#title { font-size: 20px; font-weight: 600; }
-QLabel#muted, QLabel#path { color: #a6a6a6; }
+QLabel#muted, QLabel#path, QLabel#launchStatusText { color: #a6a6a6; }
 QLabel#section { font-size: 15px; font-weight: 600; }
-QLabel#message { color: #dfba7c; padding: 8px 16px; border-top: 1px solid #333333; }
+QLabel#message { color: #a6a6a6; padding: 8px 16px; border-top: 1px solid #333333; }
+QLabel#message[severity="warning"], QLabel[severity="warning"] { color: #dfba7c; }
+QLabel#message[severity="error"], QLabel#launchStatusText[severity="error"], QLabel[severity="error"] { color: #ee8f89; }
+QFrame#launchStatus { border-top: 1px solid #333333; }
 QFrame#header, QFrame#toolbar { border-bottom: 1px solid #333333; }
 QFrame#details { border-left: 1px solid #333333; background: #1e1e1e; }
 QFrame#footer { border-top: 1px solid #333333; }
