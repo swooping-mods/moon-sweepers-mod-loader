@@ -45,3 +45,10 @@ The exact reviewed Microsoft DOCX license texts are retained under
 This avoids an intermittent HTTP 403 from the publisher website during CI.
 Original publisher URLs and unchanged byte identities remain in the lock. These
 are inert notices already included by the portable Windows license payload.
+
+November 16 reuse: `vendored/appimage/zlib-1.3.2.tar.gz` preserves the existing
+AppImage corresponding-source input at SHA-256
+`bb329a0a2cd0274d05519d61c667c062e06990d72e125ee2dfa8de64f0119d16`.
+The publisher URL drifted; its replacement bytes were refused. The exact cached
+reviewed archive is used as inert corresponding-source payload, without building
+or executing it and without changing the dependency hash or version.

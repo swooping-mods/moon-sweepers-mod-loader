@@ -114,3 +114,9 @@ The checker and publisher share `QT_HOST_EXCLUSIONS` from `tools/check.py`.
 This exact list admits only the explicitly documented headless Qt methods;
 non-Qt exclusions, failed receipts and skipped checks still refuse publication.
 The failed 0.3.0 tag remains unchanged; the corrected release is 0.3.1.
+
+The zlib 1.3.2 AppImage corresponding-source archive is also vendored at its
+existing locked hash under `vendored/appimage/`; the publisher URL returned
+changed bytes during the 0.3.1 main check. CI reuses the exact earlier reviewed
+archive through `local_path`, without changing any dependency/version/hash. It
+remains source data for distribution, never an installed or executed build input.
