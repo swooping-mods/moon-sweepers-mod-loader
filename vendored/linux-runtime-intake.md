@@ -51,3 +51,24 @@ dependencies and copyright were inspected. ClamAV 1.5.4 (signatures 2026-10-19,
 detections. Static triage had 12 reviewed container/native/license-URL leads,
 zero gaps. These MIT runtime libraries support only headless CI Qt checks and
 are not delivered or used to qualify real graphics drivers. No ldconfig runs.
+
+## Complete offscreen CI suite
+
+November 16: the existing PySide6 Essentials 6.8.3 Linux wheel also supplies
+`PySide6/QtTest.abi3.so` (SHA-256
+`dad7a440dd93c550c0dca8e6d4e7a6046d5f8f75b304ca71b4e1563216346252`)
+and `PySide6/Qt/lib/libQt6Test.so.6` (SHA-256
+`cda690965ca0b18b20b9c280eb3c55a8e05cd1ad7e49fa6dbe462406b03b57dd`).
+Their ELF dependencies and library-relative paths use the existing reviewed
+Qt/PySide/Shiboken and system library closure. Matching QtBase testlib event
+helpers/environment handling and PySide QtTest binding imports were inspected.
+ClamAV 1.5.4, database 28179 dated November 10 (six days old), scanned both
+materialized files with zero detections; static triage found two expected ELF
+leads and zero gaps. No signatures were refreshed.
+
+Eligible use: load these exact members only in the disposable extracted Linux
+runtime to run the project's complete offscreen host/Qt tests with temporary
+application data and no game. The wheel lock and downloadable runtime selection
+are unchanged; QtTest is not shipped, installed or resolved as a new dependency.
+Private scan/review receipts remain under ignored `.local/`. Native provenance
+is not an independent reproducible-build proof.

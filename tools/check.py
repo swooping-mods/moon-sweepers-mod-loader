@@ -9,29 +9,9 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 
-QT_HOST_EXCLUSIONS = frozenset({
-    "test_gui_checkboxes_views_filter_and_no_launch",
-    "test_grid_wheel_travel_ignores_global_lines_and_preserves_precise_input",
-    "test_ui_categories_tags_and_enabled_combine_in_every_view",
-    "test_ui_unknown_build_still_explains_compatibility_without_starting",
-    "test_ui_launch_handoff_is_neutral_collapsed_and_blocks_duplicates",
-    "test_ui_launch_failed_status_resolves_error_foreground",
-    "test_ui_launch_running_observation_and_closed_release",
-    "test_ui_launch_request_outliving_game_does_not_claim_running",
-    "test_ui_launch_restart_restores_uncertainty_and_inspection_cannot_start",
-})
-
-def flatten(suite):
-    for test in suite:
-        if isinstance(test, unittest.TestSuite):
-            yield from flatten(test)
-        else:
-            yield test
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--host-only", action="store_true", help="Skip Qt integration checks explicitly")
-    args = parser.parse_args()
+    parser.parse_args()
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     sys.path.insert(0, str(ROOT / "tools"))
     if (ROOT / "tools/check_snapshot.py").exists():
@@ -44,18 +24,11 @@ def main():
     from mod_bundle import payload
     payload()
     suite = unittest.defaultTestLoader.discover(str(ROOT / "tests"))
-    excluded = []
-    included = []
-    for test in flatten(suite):
-        if args.host_only and test._testMethodName in QT_HOST_EXCLUSIONS:
-            excluded.append(test.id())
-        else:
-            included.append(test)
-    result = unittest.TextTestRunner(verbosity=2).run(unittest.TestSuite(included))
+    result = unittest.TextTestRunner(verbosity=2).run(suite)
     receipt = {"success": result.wasSuccessful(), "tests_run": result.testsRun,
                "failures": len(result.failures), "errors": len(result.errors),
                "skipped": [(t.id(), why) for t, why in result.skipped],
-               "excluded": excluded, "game_started": False,
+               "excluded": [], "game_started": False,
                "limits": ["No game, Wine, native Windows or co-op execution", "No Nexus/GitHub publication"]}
     out = ROOT / "artifacts"
     out.mkdir(exist_ok=True)

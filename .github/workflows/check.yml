@@ -29,8 +29,6 @@ jobs:
           echo /usr/lib/llvm-18/bin >> "$GITHUB_PATH"
           export PATH="/usr/lib/llvm-18/bin:$PATH"
           python3 -c 'import sys; sys.path.insert(0, "tools"); import build; print(build.find_tools())'
-      - name: Focused host checks
-        run: python3 tools/check.py --host-only
       - name: Stage exact reviewed runtime inputs
         run: |
           python3 tools/fetch_windows_inputs.py --output local/windows-inputs
@@ -46,10 +44,10 @@ jobs:
           python3 tools/fetch_windows_inputs.py --lock vendored/linux-runtime.lock.json --output local/linux-inputs
           python3 tools/stage_linux_tools.py --inputs local/linux-inputs --output local/linux-tools
           python3 tools/build_linux.py --inputs local/linux-inputs
-      - name: Check Linux archive, bundled Python, Qt and mod library
+      - name: Check Linux archive and run complete host/Qt suite with bundled runtime
         run: |
           export LD_LIBRARY_PATH="$PWD/local/linux-tools/usr/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-          python3 tools/check_linux_bundle.py --gui
+          python3 tools/check_linux_bundle.py --suite-inputs local/linux-inputs
       - name: Build Linux single-file launchers offline
         run: |
           export LD_LIBRARY_PATH="$PWD/local/linux-tools/usr/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"

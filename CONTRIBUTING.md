@@ -6,8 +6,11 @@ includes a content-pinned [API SDK](https://github.com/swooping-mods/moon-sweepe
 snapshot used by the loader. Gameplay mods and their assets belong with their authors.
 
 Use installed Python 3.11+, LLVM cross tools and PySide6 6.x. Run
-`python3 tools/check.py` for the complete host suite. `--host-only` explicitly
-excludes the three Qt interaction checks when PySide6 is unavailable.
+`python3 tools/check.py` for the complete host/Qt suite; no tests are excluded.
+CI runs the same suite with its reviewed bundled Python/PySide6 runtime after
+building the Linux archive. QtTest is staged only in the disposable test copy.
+To reproduce it, run `python3 tools/check_linux_bundle.py --suite-inputs /path/to/reviewed-linux-inputs`
+against the built archive (use `--output` for a nondefault artifact directory).
 Stage the reviewed managed inputs explicitly with
 `tools/fetch_windows_inputs.py --lock vendored/managed-runtime.lock.json --output local/managed-inputs`
 and the same command with `vendored/modern-harmony.lock.json`. Then

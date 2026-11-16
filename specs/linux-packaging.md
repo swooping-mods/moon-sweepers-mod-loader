@@ -33,7 +33,12 @@ members and inconsistent inventories/digests. It materializes files in a private
 temporary directory with spaces, runs the actual launcher with --help and isolates
 XDG data. `--gui` additionally runs the same Qt/SVG/no-launch smoke check used on
 Windows, with bundled PySide6 and temporary data. Child-process output remains visible in
-CI so runtime or host-library failures can be diagnosed. No game starts.
+CI so runtime or host-library failures can be diagnosed. `--suite-inputs PATH`
+also verifies the reviewed input lock, adds the two QtTest binaries from the
+existing wheel only to this temporary runtime, and runs the complete host/Qt
+suite with its isolated interpreter and offscreen platform. A failed suite
+aborts checking; success sets `full_suite_passed` in the Linux receipt and
+retains `checks.json` in the project's artifacts directory. No game starts.
 
 The root launcher is the only application entry point in the extracted folder.
 Runtime files stay under `.runtime/`. Small XCB/XKB helper libraries are taken

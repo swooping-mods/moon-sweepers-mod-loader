@@ -6,9 +6,10 @@ immutable pins; checkout does not persist credentials. Build/test jobs have
 read-only permissions. Same-ref runs within each caller workflow cancel older
 unfinished runs; ordinary checks, candidates and releases do not cancel one another.
 
-The Ubuntu 24.04 job uses installed Python/LLVM, runs focused host checks, stages
-exact hash-locked publisher inputs, and calls the offline Windows/Linux builders and
-package verifiers. Wheels are copied as selected files, never installed. Build-only
+The Ubuntu 24.04 job uses installed Python/LLVM to stage exact hash-locked
+publisher inputs and call the offline Windows/Linux builders and package
+verifiers. After building the Linux archive, it runs the complete host/Qt suite
+with that archive's isolated Python/PySide6 runtime. Wheels are copied as selected files, never installed. Build-only
 SquashFS packages are extracted without maintainer scripts. No package resolver,
 Python installer or system package install runs.
 `vendored/runtime-intake.md` records dependency review and scan limits.
@@ -28,10 +29,14 @@ The reviewed Microsoft license DOCX inputs are vendored at unchanged hashes
 because their publisher intermittently denies CI requests. Other downloads retry
 transport errors up to three attempts; permission errors and changed hashes fail.
 
-Host-only checks explicitly exclude the Qt interaction methods listed in
-`tools/check.py`, including unknown-build compatibility inspection. The full
-suite retains those methods and requires installed PySide6; missing Qt is not
-silently skipped. A downstream Windows Server 2022 job checks the Windows
+`tools/check_linux_bundle.py --suite-inputs local/linux-inputs` adds only
+`PySide6/QtTest.abi3.so` and `PySide6/Qt/lib/libQt6Test.so.6` from the existing
+hash-locked wheel to its disposable extracted runtime, then runs
+`tools/check.py` with `QT_QPA_PLATFORM=offscreen` and temporary XDG data. The
+complete host/Qt suite has a five-minute timeout and produces `checks.json`;
+missing Qt, failures or exclusions cannot satisfy publication. QtTest is never
+added to the shipped archives. No dependency installer or new input is needed.
+A downstream Windows Server 2022 job checks the Windows
 ZIP digest, extracts into a path containing spaces, runs the bundled Python/Qt/SVG
 smoke test, then runs `Mod Loader.exe --smoke-test`. Temporary application data is
 used; no game starts. Only the artifact download step receives a read-only token.
@@ -51,8 +56,8 @@ workflow reuses both build and Windows smoke jobs without publishing.
 Linux bundles its checked Python/PySide6 and desktop helper libraries. Ubuntu CI
 executes the real archive launcher and both single-file formats with isolated
 temporary data, verifies the bundled Qt/SVG and starter library, and exercises
-AppImage without FUSE. Host-only checks exclude the explicit system-PySide6
-interaction methods; the local complete suite covers them. See [Linux packaging](linux-packaging.md).
+AppImage without FUSE. Both local checks and CI retain every Qt interaction
+method. See [Linux packaging](linux-packaging.md).
 
 ## GitHub prereleases
 
@@ -64,8 +69,9 @@ Windows checker and `tools/release.py`.
 
 The publishing job downloads this run's tested artifact without rebuilding.
 `tools/release.py` checks build versions/filenames, the exact five-artifact
-checksum set, all archive digests and successful host/Windows/Linux package receipts. Only
-the documented Qt host exclusions are allowed. Native Windows execution is gated
+checksum set, all archive digests and successful host/Windows/Linux package receipts.
+Host receipts must have no exclusions or skips, and Linux verification must
+record that the full suite ran with the bundled runtime. Native Windows execution is gated
 by the reusable job result, not inferred from static receipts.
 
 Only the publishing job receives `contents: write`. It uses installed `gh` and
@@ -110,10 +116,10 @@ promoted explicitly; it is checked against its own tag and publishing evidence,
 not the current source version. Local maintainer commands and README/channel
 upkeep remain in ignored `.local/release-flow.md`.
 
-The checker and publisher share `QT_HOST_EXCLUSIONS` from `tools/check.py`.
-This exact list admits only the explicitly documented headless Qt methods;
-non-Qt exclusions, failed receipts and skipped checks still refuse publication.
-The failed 0.3.0 tag remains unchanged; the corrected release is 0.3.1.
+The old host-only exclusion mode and release allowlist have been removed.
+Release validation rejects any excluded test, including previously admitted Qt
+methods. Existing published tags remain unchanged; these stronger gates apply
+to subsequent checks and releases.
 
 The zlib 1.3.2 AppImage corresponding-source archive is also vendored at its
 existing locked hash under `vendored/appimage/`; the publisher URL returned

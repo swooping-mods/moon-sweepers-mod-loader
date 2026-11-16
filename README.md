@@ -249,9 +249,9 @@ python3 tools/check_windows_bundle.py
 ```
 
 Builders download nothing. Build outputs and verification receipts go under
-ignored `artifacts/`. The full host check includes Qt interactions;
-`python3 tools/check.py --host-only` explicitly excludes three Qt tests on runners
-without PySide6. CI builds Windows and all three Linux formats, checks their real
+ignored `artifacts/`. The full host check includes all Qt interactions with no
+exclusions. CI runs it using the reviewed bundled Python/Qt runtime in offscreen
+mode. CI builds Windows and all three Linux formats, checks their real
 entry points and bundled Qt, and runs the actual EXE on Windows. Version tags run the
 same gates before publishing prerelease assets. Full releases promote those
 checked files without rebuilding them.

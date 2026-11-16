@@ -53,10 +53,8 @@ def verify_artifacts(folder, tag):
         if check.get('success') is not True or check.get('failures', 0) or check.get('errors', 0) or check.get('skipped'):
             raise ValueError('Unsuccessful verification receipt: ' + name)
     host = json.loads((folder / 'checks.json').read_text())
-    from check import QT_HOST_EXCLUSIONS
-    allowed = QT_HOST_EXCLUSIONS
-    if not host.get('tests_run') or any(t.rsplit('.', 1)[-1] not in allowed for t in host.get('excluded', [])):
-        raise ValueError('Missing host checks or unexpected exclusions')
+    if not host.get('tests_run') or host.get('excluded') != []:
+        raise ValueError('Missing host checks or excluded tests')
     windows = json.loads((folder / 'windows-checks.json').read_text())
     if windows.get('managed_coreclr_version') != coreclr:
         raise ValueError('Windows managed runtime package was not verified')
@@ -66,7 +64,8 @@ def verify_artifacts(folder, tag):
     if linux.get('managed_coreclr_version') != coreclr:
         raise ValueError('Linux managed runtime package was not verified')
     if (linux.get('sha256') != checksums[names[2]] or not linux.get('actual_launcher_cli_passed')
-            or not linux.get('gui_smoke_passed') or not linux.get('portable_desktop_libraries_passed')):
+            or not linux.get('gui_smoke_passed') or not linux.get('portable_desktop_libraries_passed')
+            or linux.get('full_suite_passed') is not True):
         raise ValueError('Linux launcher check belongs to a different archive or did not run')
     linux_build = json.loads((folder/'linux-build-receipt.json').read_text())
     fmt = json.loads((folder/'linux-formats-receipt.json').read_text())

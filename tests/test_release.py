@@ -5,7 +5,6 @@ from pathlib import Path
 import tempfile
 import unittest
 from release import VERSION, validate_tag, verify_artifacts, release_notes
-from check import QT_HOST_EXCLUSIONS
 
 
 class ReleaseChecks(unittest.TestCase):
@@ -29,9 +28,9 @@ class ReleaseChecks(unittest.TestCase):
         (root/'linux-formats-receipt.json').write_text(json.dumps({'version':VERSION,'source_archive_sha256':identities['linux-x64'],'files':formats}))
         (root/'linux-formats-checks.json').write_text(json.dumps({'success':True,'version':VERSION,'files':{n:{'sha256':sha,'actual_cli_passed':True,'bundled_gui_smoke_passed':True} for n,sha in formats.items()}}))
         (root / 'SHA256SUMS').write_text(''.join(sums))
-        (root / 'checks.json').write_text(json.dumps({'success': True, 'tests_run': 40, 'failures': 0, 'errors': 0, 'skipped': [], 'excluded': ['fixture.QtChecks.'+name for name in sorted(QT_HOST_EXCLUSIONS)]}))
+        (root / 'checks.json').write_text(json.dumps({'success': True, 'tests_run': 40, 'failures': 0, 'errors': 0, 'skipped': [], 'excluded': []}))
         (root / 'windows-checks.json').write_text(json.dumps({'success': True, 'sha256': identities['windows-x64'], 'managed_coreclr_version': coreclr}))
-        (root / 'linux-checks.json').write_text(json.dumps({'success': True, 'sha256': identities['linux-x64'], 'actual_launcher_cli_passed':True, 'gui_smoke_passed':True, 'portable_desktop_libraries_passed':True, 'managed_coreclr_version': coreclr}))
+        (root / 'linux-checks.json').write_text(json.dumps({'success': True, 'sha256': identities['linux-x64'], 'actual_launcher_cli_passed':True, 'gui_smoke_passed':True, 'portable_desktop_libraries_passed':True, 'full_suite_passed': True, 'managed_coreclr_version': coreclr}))
 
     def test_tag_must_match_package_version(self):
         validate_tag('v' + VERSION)
@@ -50,7 +49,7 @@ class ReleaseChecks(unittest.TestCase):
     def test_changed_payload_or_receipt_blocks_upload(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            for broken in ('zip', 'version', 'failed', 'excluded', 'extra', 'stale', 'linux-stale', 'linux-not-run', 'format-changed', 'format-not-run', 'managed-missing', 'managed-unverified'):
+            for broken in ('zip', 'version', 'failed', 'excluded', 'extra', 'stale', 'linux-stale', 'linux-not-run', 'linux-suite-not-run', 'format-changed', 'format-not-run', 'managed-missing', 'managed-unverified'):
                 self.candidate(root)
                 if broken == 'zip':
                     (root / f'moon-sweepers-mod-loader-{VERSION}-windows-x64.zip').write_bytes(b'changed')
@@ -71,6 +70,7 @@ class ReleaseChecks(unittest.TestCase):
                 elif broken.startswith('linux-'):
                     p=root/'linux-checks.json';r=json.loads(p.read_text())
                     if broken=='linux-stale':r['sha256']='0'*64
+                    elif broken=='linux-suite-not-run':r['full_suite_passed']=False
                     else:r['actual_launcher_cli_passed']=False
                     p.write_text(json.dumps(r))
                 elif broken == 'format-changed':
@@ -92,3 +92,18 @@ class ReleaseChecks(unittest.TestCase):
             path.write_text('# Changelog\n\n## 0.0.0\n\nOther release.\n')
             with self.assertRaisesRegex(ValueError,'Missing release changelog'):
                 release_notes('v'+VERSION,path)
+
+    def test_incomplete_gui_suite_blocks_upload(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.candidate(root)
+            path = root / 'checks.json'
+            original = json.loads(path.read_text())
+            for field, value in (
+                    ('excluded', ['test_loader.LoaderChecks.test_gui_checkboxes_views_filter_and_no_launch']),
+                    ('skipped', [['test_gui', 'Qt unavailable']]),
+                    ('tests_run', 0), ('failures', 1), ('errors', 1), ('excluded', None)):
+                with self.subTest(field=field, value=value):
+                    path.write_text(json.dumps({**original, field: value}))
+                    with self.assertRaises(ValueError):
+                        verify_artifacts(root, 'v' + VERSION)

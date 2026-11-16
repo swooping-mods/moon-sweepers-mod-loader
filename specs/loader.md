@@ -86,9 +86,9 @@ Source-phase checks are `tests/test_launch_feedback.py` and
 `tests/test_game_process.py` (synthetic process data, no game or subprocess farm).
 `tests/test_launch_feedback_ui.py` authors real Qt interaction gates for neutral
 handoff, collapsed technical details, duplicate suppression, observed running/exit,
-restart uncertainty and a request outliving an observed game. `tools/check.py --host-only` explicitly excludes these
-Qt checks along with the existing three. No Qt, game, package/build or full suite
-qualification was run during the workstation-use implementation pass.
+restart uncertainty and a request outliving an observed game. All of these Qt
+checks run in `tools/check.py` locally and in CI using the reviewed bundled
+runtime; the host-only exclusion mode has been removed.
 
 Deferred gates, when workstation testing is authorized: run the two pure test
 modules, `QT_QPA_PLATFORM=offscreen python -m unittest discover -s tests -p test_launch_feedback_ui.py`, then the existing
@@ -135,7 +135,7 @@ ABIs retain their existing admission rules.
 
 `tools/build.py` requires installed clang, lld-link and llvm-dlltool (unversioned or version-suffixed names). It compiles the original bootstrap and standalone diagnostic with warnings as errors, checks AMD64/export surfaces and creates a deterministic portable source ZIP plus SHA256SUMS. The ZIP retains `loader/` and `vendored/`, includes native binaries under `loader/runtime/` and the nine handpicked packages under `loader/packages/`. This source ZIP requires host Python/PySide6 and bundles no game files. `tools/build_windows.py` adds the separate fully bundled Windows portable ZIP; see [Windows packaging](windows-packaging.md).
 
-`tools/check.py` checks the API snapshot and runs the focused loader suite, including three compiled host-native programs and three Qt interaction cases. `--host-only` explicitly excludes those three Qt cases for runners without PySide6. Automated Qt verification uses a private headless Gamescope session. GitHub checks and manual candidate workflows have read-only repository permissions. The tag-triggered release workflow publishes checked artifacts to GitHub Releases; see [CI](ci.md). Hosted index consumption remains unimplemented. [Downloaded mod imports](download-imports.md) add file/folder pickers and local drag-and-drop for `.msmod`, unpacked packages, supported ZIPs and the reviewed MarsSweepers layout.
+`tools/check.py` checks the API snapshot and runs the complete loader suite, including compiled host-native programs and all Qt interaction cases. CI runs the suite offscreen using the reviewed bundled Python/Qt runtime; no tests are excluded. GitHub checks and manual candidate workflows have read-only repository permissions. The tag-triggered release workflow publishes checked artifacts to GitHub Releases; see [CI](ci.md). Hosted index consumption remains unimplemented. [Downloaded mod imports](download-imports.md) add file/folder pickers and local drag-and-drop for `.msmod`, unpacked packages, supported ZIPs and the reviewed MarsSweepers layout.
 
 
 `tools/check_public_wine.py` applies `tools/audio_policy.py` after building its

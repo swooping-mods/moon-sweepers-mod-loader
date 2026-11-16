@@ -148,8 +148,7 @@ receipts only after the following deferred gates pass:
    newly authored native cases have not been compiled or executed in the
    source-only workstation session.
 3. Pass the strict Windows AMD64 build/link/export gates in `tools/build.py`
-   and the required loader checks in `tools/check.py` (explicitly report any
-   host-only Qt exclusions). Rebuild runtime receipts and check their profile
+   and the complete loader/Qt checks in `tools/check.py` without exclusions. Rebuild runtime receipts and check their profile
    inventory against the catalog; old runtime binaries gain no capability.
 4. Qualify the actual reviewed 1.0.5 game binding on the supported deployment
    paths: getter metadata, direct icall availability, startup/failed/outside-
