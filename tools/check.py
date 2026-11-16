@@ -9,6 +9,18 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 
+QT_HOST_EXCLUSIONS = frozenset({
+    "test_gui_checkboxes_views_filter_and_no_launch",
+    "test_grid_wheel_travel_ignores_global_lines_and_preserves_precise_input",
+    "test_ui_categories_tags_and_enabled_combine_in_every_view",
+    "test_ui_unknown_build_still_explains_compatibility_without_starting",
+    "test_ui_launch_handoff_is_neutral_collapsed_and_blocks_duplicates",
+    "test_ui_launch_failed_status_resolves_error_foreground",
+    "test_ui_launch_running_observation_and_closed_release",
+    "test_ui_launch_request_outliving_game_does_not_claim_running",
+    "test_ui_launch_restart_restores_uncertainty_and_inspection_cannot_start",
+})
+
 def flatten(suite):
     for test in suite:
         if isinstance(test, unittest.TestSuite):
@@ -35,17 +47,7 @@ def main():
     excluded = []
     included = []
     for test in flatten(suite):
-        if args.host_only and test._testMethodName in (
-            "test_gui_checkboxes_views_filter_and_no_launch",
-            "test_grid_wheel_travel_ignores_global_lines_and_preserves_precise_input",
-            "test_ui_categories_tags_and_enabled_combine_in_every_view",
-            "test_ui_unknown_build_still_explains_compatibility_without_starting",
-            "test_ui_launch_handoff_is_neutral_collapsed_and_blocks_duplicates",
-            "test_ui_launch_failed_status_resolves_error_foreground",
-            "test_ui_launch_running_observation_and_closed_release",
-            "test_ui_launch_request_outliving_game_does_not_claim_running",
-            "test_ui_launch_restart_restores_uncertainty_and_inspection_cannot_start",
-        ):
+        if args.host_only and test._testMethodName in QT_HOST_EXCLUSIONS:
             excluded.append(test.id())
         else:
             included.append(test)

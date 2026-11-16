@@ -109,3 +109,8 @@ any remote operation. No released tag or binary changes. An older version may be
 promoted explicitly; it is checked against its own tag and publishing evidence,
 not the current source version. Local maintainer commands and README/channel
 upkeep remain in ignored `.local/release-flow.md`.
+
+The checker and publisher share `QT_HOST_EXCLUSIONS` from `tools/check.py`.
+This exact list admits only the explicitly documented headless Qt methods;
+non-Qt exclusions, failed receipts and skipped checks still refuse publication.
+The failed 0.3.0 tag remains unchanged; the corrected release is 0.3.1.

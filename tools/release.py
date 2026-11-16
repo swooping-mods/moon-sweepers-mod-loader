@@ -53,9 +53,8 @@ def verify_artifacts(folder, tag):
         if check.get('success') is not True or check.get('failures', 0) or check.get('errors', 0) or check.get('skipped'):
             raise ValueError('Unsuccessful verification receipt: ' + name)
     host = json.loads((folder / 'checks.json').read_text())
-    allowed = {'test_gui_checkboxes_views_filter_and_no_launch',
-               'test_grid_wheel_travel_ignores_global_lines_and_preserves_precise_input',
-               'test_ui_categories_tags_and_enabled_combine_in_every_view'}
+    from check import QT_HOST_EXCLUSIONS
+    allowed = QT_HOST_EXCLUSIONS
     if not host.get('tests_run') or any(t.rsplit('.', 1)[-1] not in allowed for t in host.get('excluded', [])):
         raise ValueError('Missing host checks or unexpected exclusions')
     windows = json.loads((folder / 'windows-checks.json').read_text())

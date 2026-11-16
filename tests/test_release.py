@@ -5,6 +5,7 @@ from pathlib import Path
 import tempfile
 import unittest
 from release import VERSION, validate_tag, verify_artifacts, release_notes
+from check import QT_HOST_EXCLUSIONS
 
 
 class ReleaseChecks(unittest.TestCase):
@@ -28,7 +29,7 @@ class ReleaseChecks(unittest.TestCase):
         (root/'linux-formats-receipt.json').write_text(json.dumps({'version':VERSION,'source_archive_sha256':identities['linux-x64'],'files':formats}))
         (root/'linux-formats-checks.json').write_text(json.dumps({'success':True,'version':VERSION,'files':{n:{'sha256':sha,'actual_cli_passed':True,'bundled_gui_smoke_passed':True} for n,sha in formats.items()}}))
         (root / 'SHA256SUMS').write_text(''.join(sums))
-        (root / 'checks.json').write_text(json.dumps({'success': True, 'tests_run': 40, 'failures': 0, 'errors': 0, 'skipped': [], 'excluded': ['test_loader.LoaderChecks.test_gui_checkboxes_views_filter_and_no_launch', 'test_loader.LoaderChecks.test_grid_wheel_travel_ignores_global_lines_and_preserves_precise_input', 'test_categories.CategoryChecks.test_ui_categories_tags_and_enabled_combine_in_every_view']}))
+        (root / 'checks.json').write_text(json.dumps({'success': True, 'tests_run': 40, 'failures': 0, 'errors': 0, 'skipped': [], 'excluded': ['fixture.QtChecks.'+name for name in sorted(QT_HOST_EXCLUSIONS)]}))
         (root / 'windows-checks.json').write_text(json.dumps({'success': True, 'sha256': identities['windows-x64'], 'managed_coreclr_version': coreclr}))
         (root / 'linux-checks.json').write_text(json.dumps({'success': True, 'sha256': identities['linux-x64'], 'actual_launcher_cli_passed':True, 'gui_smoke_passed':True, 'portable_desktop_libraries_passed':True, 'managed_coreclr_version': coreclr}))
 
