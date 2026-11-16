@@ -41,16 +41,45 @@ def failure_detail(record):
     return ''
 
 
-def host_pid(steam):
-    expected = str(Path(steam) / 'ubuntu12_32/steam')
+def host_pid(steam, *, proc_root=Path('/proc')):
+    expected = {str(Path(steam) / name) for name in ('ubuntu12_32/steam','steamrt64/steam')}
     matches = []
-    for path in Path('/proc').iterdir():
+    for path in proc_root.iterdir():
         if not path.name.isdigit(): continue
         try:
-            if (path / 'cmdline').read_bytes().split(b'\0')[0].decode() == expected: matches.append(int(path.name))
+            if (path / 'cmdline').read_bytes().split(b'\0')[0].decode() in expected: matches.append(int(path.name))
         except (OSError, UnicodeError): pass
-    if len(matches) != 1: raise ValueError('Open Steam and sign in before launching the modded game')
-    return matches[0]
+    witnessed=[];pidfile_seen=False
+    for pid in matches:
+        path=proc_root/str(pid)
+        try:
+            # Pressure Vessel may reparent its client to systemd, so ancestry
+            # alone cannot distinguish it from the persistent bootstrap. The
+            # client's own pidfile uses the innermost PID namespace.
+            pidfile=path/'root'/Path.home().relative_to('/')/'.steam/steam.pid'
+            if not pidfile.exists():continue
+            pidfile_seen=True;wanted=int(pidfile.read_text().strip())
+            namespaces=next(line.split()[1:] for line in (path/'status').read_text().splitlines() if line.startswith('NSpid:'))
+            if wanted>1 and namespaces and int(namespaces[-1])==wanted:witnessed.append(pid)
+        except (OSError,ValueError,StopIteration):pass
+    if pidfile_seen:
+        if len(witnessed)!=1:raise ValueError('Steam client PID namespace does not match one live signed-in client')
+        return witnessed[0]
+    # Current Steam keeps a same-executable bootstrap above its containerized
+    # client. Share the final client's namespace; two independent clients are
+    # still ambiguous and must never be selected by PID ordering.
+    ancestors=set()
+    for pid in matches:
+        visited={pid};parent=pid
+        for _ in range(128):
+            try:parent=int((proc_root/str(parent)/'stat').read_text().rsplit(') ',1)[1].split()[1])
+            except (OSError,ValueError,IndexError):break
+            if parent<=1 or parent in visited:break
+            visited.add(parent)
+            if parent in matches:ancestors.add(parent)
+    clients=[pid for pid in matches if pid not in ancestors]
+    if len(clients) != 1: raise ValueError('Open one Steam client and sign in before launching the modded game')
+    return clients[0]
 
 
 def plan(service, installation, platform=None, check_client=True):

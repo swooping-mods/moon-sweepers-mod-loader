@@ -439,11 +439,14 @@ class LoaderChecks(unittest.TestCase):
                 app.sendEvent(view,event);app.processEvents()
             # The former fix depended on Qt multiplying a scrollbar step by
             # the desktop's wheel-line preference; wheel travel must not.
+            # The contract caps one notch at the viewport height. Fonts and
+            # offscreen screen geometry can make the initial viewport shorter.
+            travel=min(384,window.list.viewport().height())
             bar.setSingleStep(1);bar.setValue(0);wheel(-120)
-            self.assertEqual(bar.value(),384)
+            self.assertEqual(bar.value(),travel)
             bar.setValue(0)
             for _ in range(120):wheel(-1)
-            self.assertEqual(bar.value(),384)
+            self.assertEqual(bar.value(),travel)
             wheel(120);self.assertEqual(bar.value(),0)
             wheel(120);self.assertEqual(bar.value(),0)
             wheel(pixel=-17);self.assertEqual(bar.value(),17)

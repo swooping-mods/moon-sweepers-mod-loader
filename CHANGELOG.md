@@ -1,7 +1,9 @@
 # Changelog
 
-## 0.3.0 — Unreleased
+## 0.3.0 — 2026-11-16
 
+- Recognize the current 64-bit Steam client for private Proton launches, including container PID namespaces, while rejecting ambiguous clients.
+- Refresh Squishy Plushie to 0.2.1 with its checked immutable visual renderer, together with Sound Framework 0.1.4, Pickup Hands 0.1.2 and Hints Framework 0.2.1. Directional squish and the rigid capsule retain their existing behavior.
 - Add a compatibility report for the selected game, mod requirements and framework providers, with explicit reasons for unknown or incompatible targets.
 - Introduce an opt-in native v8 game-adapter contract so new mods can use stable typed capabilities while build-specific bindings stay in the reviewed adapter.
 - Bind reviewed game profiles to native runtime support and preparation; preserve exact-build checks for existing native and managed packages.

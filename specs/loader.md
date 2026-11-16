@@ -4,6 +4,12 @@ The source repository is public. Versioned portable downloads are published thro
 
 The repository owns the Python/PySide6 desktop app, its native Windows AMD64 bootstrap, game-build compatibility pins and private deployment/profile boundaries. Gameplay source remains in owning projects; the [handpicked bundle](bundled-mods.md) vendors nine pinned prebuilt distribution inputs.
 
+Private Linux launches recognize both `ubuntu12_32/steam` and `steamrt64/steam`.
+The live client's namespace-local Steam pidfile must match its innermost `NSpid`;
+this handles Pressure Vessel reparenting without selecting its persistent
+bootstrap. Missing pidfiles use unique leaf ancestry, while stale, conflicting
+or ambiguous witnesses refuse launch. Installed-game Steam handoff is unchanged.
+
 The independent desktop includes the workshop's optional category/tag discovery.
 `moonloader/catalog.py` owns its presentation validation and matching. Search
 combines words across names, descriptions, categories and tags in Grid, Details

@@ -2,13 +2,13 @@
 
 | Package | Version | Role |
 |---|---|---|
-| Squishy Plushie | 0.2.0 | Handpicked toy |
+| Squishy Plushie | 0.2.1 | Handpicked toy; immutable visual renderer |
 | Futuristic Courier (`futuristic-car`) | 0.2.1 | Handpicked vehicle |
 | Power Poles (`manual-power-poles`) | 0.6.1 | Handpicked building |
 | Debug Menu | 0.1.1 | F4 test controls |
-| Sound Framework | 0.1.3 | Plushie dependency |
-| Pickup Hands | 0.1.1 | Plushie dependency |
-| Hints Framework | 0.2.0 | Plushie dependency |
+| Sound Framework | 0.1.4 | Plushie dependency |
+| Pickup Hands | 0.1.2 | Plushie dependency |
+| Hints Framework | 0.2.1 | Plushie dependency |
 | Vehicle Framework | 0.2.1 | Courier dependency |
 | Build Menu Framework | 0.2.2 | Power Poles dependency |
 

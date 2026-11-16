@@ -4,6 +4,12 @@ Squishy Plushie, Futuristic Courier, Power Poles, F4 Debug Menu and five require
 frameworks are included as pinned distribution packages. `vendored/mod-bundle.json`
 records versions, hashes, public source repositories and native entry hashes.
 
+The 0.3.0 loader refresh includes Plushie 0.2.1 (immutable visual transforms),
+Sound 0.1.4, Pickup Hands 0.1.2 and Hints 0.2.1. Their module bytes match the
+checked private loaded-world closure. The other five starter packages retain
+their exact identities. The full nine-mod combination, native Windows gameplay
+and real co-op retain their separate qualification limits.
+
 The nine prebuilt distribution inputs are deliberately vendored under
 `vendored/mod-bundle/packages/`. Gameplay source and asset authoring remain in
 their owning projects. No build resolves dependencies or downloads mods.
