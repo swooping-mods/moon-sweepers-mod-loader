@@ -332,6 +332,12 @@ def evaluate(manifests, selected, game_hashes, *, game_profile=None, game_adapte
     if verified:
         status = "verified"
     for item in mods.values():
+        # Selection admission is collective. Keep a mod's own assessment so a
+        # failed neighbor does not make a matching mod look broken to players.
+        item["assessment_status"] = ("incompatible" if item["reasons"] else
+                                     "unknown" if unknown else
+                                     "verified" if verified else "requirements-matched")
+        item["blocked_by_selection"] = not allowed and not item["reasons"]
         item["allowed"] = not item["reasons"] and allowed
         item["status"] = "incompatible" if item["reasons"] else status
     return {"status": status, "allowed": allowed, "profile": profile, "mods": mods,

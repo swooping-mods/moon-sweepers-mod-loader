@@ -25,12 +25,18 @@ def _blocked(result, item):
     result.setdefault('reasons', []).append(item)
     # The SDK evaluated declared contracts. A later loader/target integrity
     # failure invalidates admission for the entire proposed selection too.
-    for mod in result.get('mods', {}).values():
+    for name, mod in result.get('mods', {}).items():
+        individual = mod.get('assessment_status', mod.get('status', 'unknown'))
         mod['allowed'] = False
         mod['status'] = 'incompatible' if mod.get('status') == 'incompatible' or result['status'] == 'incompatible' else result['status']
+        if item.get('mod') and item['mod'] != name:
+            mod['blocked_by_selection'] = individual not in ('incompatible', 'unknown')
+            continue
         if not any(why.get('code') == item['code'] and why.get('message') == item['message']
                    for why in mod.setdefault('reasons', [])):
             mod['reasons'].append({**item, 'context': 'loader-admission'})
+        mod['assessment_status'] = ('incompatible' if individual == 'incompatible' else 'unknown') if item['code'] == 'unknown-game-profile' else 'incompatible'
+        mod['blocked_by_selection'] = False
 
 
 def runtime_adapter(receipt, profile):
@@ -83,6 +89,10 @@ def report(service, installation, selected=None, *, library=None, inspection=Non
                       'backend': profile.get('backend') if profile else None,
                       'architecture': profile.get('architecture') if profile else None}
     result['selected'] = chosen
+    for name, item in result.get('mods', {}).items():
+        manifest = manifests.get(name, {})
+        item['name'] = manifest.get('name', name)
+        item['version'] = manifest.get('version', '')
     result['runtime_receipt_digest'] = receipt_digest(receipt)
     result['qualification'] = 'Requirements matching does not verify gameplay, saves, performance or co-op.'
     if metadata_error: _blocked(result, reason('runtime-metadata', 'Loader runtime metadata is invalid; reinstall the loader.'))
@@ -111,6 +121,35 @@ def report(service, installation, selected=None, *, library=None, inspection=Non
             _blocked(result, item)
             result.setdefault('mods', {}).setdefault(name, {'status': 'incompatible', 'reasons': [], 'requirements': []})['reasons'].append(item)
     return result
+
+
+def compact(result):
+    """Bounded player rows, preserving each package's own failure attribution."""
+    rows = []
+    for name, item in result.get('mods', {}).items():
+        status = item.get('assessment_status', item.get('status', 'unknown'))
+        if status in ('requirements-matched', 'verified'):
+            continue
+        reasons = item.get('reasons', [])
+        codes = {why.get('code') for why in reasons}
+        if codes & {'game-pin-mismatch', 'legacy-runtime-profile-unavailable'}:
+            detail = 'Needs an update for this game build'
+        elif 'dependency-incompatible' in codes:
+            providers = sorted({why['provider'] for why in reasons if why.get('provider')})
+            detail = 'Required framework unavailable: ' + ', '.join(providers)
+        elif 'package-integrity' in codes:
+            detail = 'Package files changed or are missing'
+        elif codes & {'runtime-integrity', 'runtime-profile-unavailable', 'runtime-metadata'}:
+            detail = 'Loader adapter needs an update'
+        elif codes & {'unknown-game-profile', 'game-build-unknown'} or status == 'unknown':
+            detail = 'Not checked on this game build'
+        elif reasons:
+            detail = reasons[0]['message']
+        else:
+            detail = 'Selection requirements do not match'
+        rows.append({'id': name, 'name': item.get('name', name), 'version': item.get('version', ''),
+                     'status': 'Unverified' if status == 'unknown' else 'Blocked', 'reason': detail})
+    return rows
 
 
 def message(result):

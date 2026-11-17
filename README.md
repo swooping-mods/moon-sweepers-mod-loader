@@ -152,9 +152,15 @@ matching a version label does not bypass those checks.
 For a report without importing/preparing/starting mods, use
 `--compatibility --game PATH` (with your usual `--data`/`--bundle` if needed).
 
-The adapter targets the pinned Steam Windows x64 IL2CPP **1.0.5** build
-(app **5335510**). Exact executable hashes determine compatibility; the version
-label alone is insufficient. Other builds require a matching adapter.
+The adapter recognizes exact Steam Windows x64 IL2CPP **1.0.5** and **1.0.6**
+builds (app **5335510**). The 1.0.6 profile offers the clock broker to portable
+ABI 8 mods; existing native and managed mods remain restricted to 1.0.5.
+Exact executable hashes determine compatibility; other builds, including
+unqualified previews, need their own adapter profile.
+
+If selected mods cannot be admitted, **Review compatibility…** shows a compact
+list of affected mods and their reasons. Unverified mods have not been checked
+on that build. You can deselect affected mods explicitly, then try Launch again.
 
 **Existing Steam game** adds owned loader files and selected mods without copying
 the game or replacing original game DLLs. It uses normal Steam saves. Back up the

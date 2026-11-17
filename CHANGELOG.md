@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Show a compact preflight warning for incompatible or unverified mods, with optional details and explicit deselection.
+- Preserve individual mod assessments when another selected package blocks launch.
+- Add an exact 1.0.6 clock-broker profile for portable ABI 8 mods; legacy native and managed mods retain their 1.0.5 restrictions.
+
 ## 0.3.2 — 2026-11-17
 
 - Import each mod from a private validated snapshot so a replaced download cannot change its package identity during installation.

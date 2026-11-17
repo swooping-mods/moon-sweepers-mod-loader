@@ -1,5 +1,8 @@
 #ifndef MOON_LOADER_INTERACTION_H
 #define MOON_LOADER_INTERACTION_H
+#ifndef MOON_LOADER_LEGACY_HOST_AVAILABLE
+#define MOON_LOADER_LEGACY_HOST_AVAILABLE() 1
+#endif
 /* Game-specific interception stays outside the portable InputApiV1. The three
  * pinned ButtonControl readers cover native Binding.Keys (including inlined
  * calls), alternate keys and mouse input without suppressing a whole binding. */
@@ -96,6 +99,7 @@ static int moon_interaction_native(int id,Context *context){
     return 0;
 }
 static unsigned loader_interaction_register(const MoonInteractionActionV1 *spec){
+    if(!MOON_LOADER_LEGACY_HOST_AVAILABLE())return 0;
     if(!registration_thread_matches()||update_sealed||!registration_owner||!runtime_registration_id[0]||!spec||spec->size!=sizeof(*spec)||!spec->action)return 0;
     unsigned n=0;while(runtime_registration_id[n]){if(spec->action[n]!=runtime_registration_id[n])return 0;n++;}
     if(spec->action[n]!='.')return 0;
@@ -108,7 +112,7 @@ static int loader_interaction_take(unsigned handle,void *actor){
     if(!li.thread||li.thread!=GetCurrentThreadId())return 0;moon_interaction_pump();return li.frame_valid&&actor&&actor==li.actor&&mir_take(&loader_interactions,handle);
 }
 __declspec(dllexport) const MoonInteractionApiV1 *MoonLab_GetInteractionApi_v1(void){
-    static const MoonInteractionApiV1 api={sizeof(api),MOON_INTERACTION_ABI,loader_interaction_register,loader_interaction_sample,loader_interaction_take};return &api;
+    static const MoonInteractionApiV1 api={sizeof(api),MOON_INTERACTION_ABI,loader_interaction_register,loader_interaction_sample,loader_interaction_take};return MOON_LOADER_LEGACY_HOST_AVAILABLE()?&api:0;
 }
 static void moon_interaction_finish(int success){if(!success)mir_rollback(&loader_interactions,registration_owner);}
 static int moon_interaction_seal(void){

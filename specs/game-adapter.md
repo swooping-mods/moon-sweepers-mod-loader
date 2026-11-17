@@ -19,8 +19,9 @@ comparison establishes game compatibility.
 implemented table sizes, generates `runtime/loader/game_profiles.generated.h`,
 and checks that the committed header remains exact. `check()` returns the
 runtime receipt's `game_adapter` object; `legacy_profile_ids()` records the
-current build allowed to load legacy native binaries. Production has one real
-profile. There are no synthetic or speculative future-game rows in that catalog.
+current build allowed to load legacy native binaries. Production has exact
+1.0.5 and 1.0.6 profiles. There are no synthetic or speculative preview-game rows
+in that catalog.
 The generated native row also carries an explicit capability bit mask. Plan
 admission requires both an implemented table and that selected profile's bit;
 an otherwise valid hand-crafted plan cannot enable an unadvertised candidate.
@@ -44,6 +45,14 @@ addresses cannot acquire support from another profile's capability labels.
 Core input/camera/interaction assumptions remain part of the reviewed current
 adapter family. Adding a future profile requires qualifying that family or
 implementing another one, rather than copying a capability map.
+
+The 1.0.6 `steam106-broker-unity6000.6/v1` family offers only `unity.clock`
+through ABI 8. It uses independently inspected domain publication and method
+pointer producers, freshly observed gameplay tokens/RVAs and the unchanged
+UnityPlayer identity. Legacy input, interaction and camera entrypoints return
+null on this profile; their 1.0.5 bindings are neither inspected nor installed.
+Native v1–v7 and the current BepInEx host remain 1.0.5-only. A future preview
+executable remains unknown until its own profile is inspected and qualified.
 
 The three code hashes do not hash all assets, global metadata, third-party
 content or saved-world semantics. Descriptive metadata version 108 is a known

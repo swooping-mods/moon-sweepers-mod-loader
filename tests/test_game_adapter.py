@@ -30,7 +30,7 @@ class GameAdapterChecks(unittest.TestCase):
 
     def test_compiled_catalog_is_current_and_complete(self):
         result=check();rows=profiles()
-        self.assertEqual(len(rows),1)
+        self.assertEqual([row['version'] for row in rows],['1.0.5','1.0.6'])
         self.assertEqual(result['profiles'][rows[0]['id']]['digest'],digest(rows[0]))
         self.assertEqual(result['profiles'][rows[0]['id']]['capabilities'],{'unity.clock':{'abi':1,'size':16,'limits':{}}})
 
@@ -38,6 +38,15 @@ class GameAdapterChecks(unittest.TestCase):
         path=root/CATALOG;path.parent.mkdir(parents=True);path.write_text(json.dumps(document))
         header=root/HEADER;header.parent.mkdir(parents=True)
         return path,header
+
+    def test_new_profile_does_not_widen_legacy_admission_or_change_old_identity(self):
+        from game_profiles_native import legacy_profile_ids
+        old,new=profiles()
+        self.assertEqual(digest(old),'dd54f411d23a2c7a6f5600d296ab0be045b23f03dd4824d6876671533555dc61')
+        self.assertEqual(legacy_profile_ids(),[old['id']])
+        self.assertNotIn(new['id'],legacy_profile_ids())
+        self.assertEqual(new['adapter']['layout'],'steam106-broker-unity6000.6/v1')
+        self.assertEqual(set(new['capabilities']),{'unity.clock'})
 
     def test_catalog_changes_cannot_reuse_stale_compiled_identity(self):
         document=json.loads((ROOT/CATALOG).read_text())
@@ -59,7 +68,7 @@ class GameAdapterChecks(unittest.TestCase):
             document['profiles'][0]['capabilities']['unity.time-scale']={'abi':1,'size':16,'limits':{}}
             path.write_text(json.dumps(document))
             with self.assertRaisesRegex(ValueError,'Compiled native profiles'):check(root)
-            candidate=generate(root);self.assertRegex(candidate,r',3u\},\n\};')
+            candidate=generate(root);self.assertRegex(candidate,r',3u\},\n')
             header.write_text(candidate);result=check(root)
             self.assertNotEqual(original_digest,result['profiles'][document['profiles'][0]['id']]['digest'])
             self.assertEqual(document['profiles'][0]['hashes'],profiles()[0]['hashes'])

@@ -498,9 +498,10 @@ class Window(QMainWindow):
         native = {name for name,(mod,_) in self.mods.items() if packages.game_mod(mod)}
         self.select_all_button.setEnabled(not active and bool(native - set(selected)))
         self.deselect_all_button.setEnabled(not active and bool(selected))
-        self.launch_button.setEnabled(ready and not active and not self.no_launch)
+        can_review = bool(installation and self.compatibility_report and (selected or installed))
+        self.launch_button.setEnabled(can_review and not active and not self.no_launch)
         launch_title = {'waiting':'Starting…', 'running':'Game running', 'unconfirmed':'Launch unconfirmed', 'failed':'Launch needs attention', 'finishing':'Finishing launch…'}.get(self.feedback.phase)
-        self.launch_button.setText('Preparing…' if self._launch_job and self._busy else launch_title or ('Launch via Steam' if installed else 'Launch modded game'))
+        self.launch_button.setText('Preparing…' if self._launch_job and self._busy else launch_title or ('Review compatibility…' if can_review and not ready else 'Launch via Steam' if installed else 'Launch modded game'))
         self.prepare_button.setEnabled(ready and not active); self.plan_button.setEnabled(ready and not active)
         self.launch_button.setToolTip('Game starts are disabled in this UI inspection session.' if self.no_launch else reason or ('Launch automatically applies selected mods, then requests Steam launch. Prepare files is optional.' if installed else 'Prepare a private game copy and launch the checked mods.'))
         self.save_info.setText('Normal Steam saves · back up before save-affecting mods' if installed else 'Fresh private saves')
@@ -540,6 +541,7 @@ class Window(QMainWindow):
     def prepare_files(self):
         if self.launch_blocked(): return
         installation=self.current_installation()
+        if not self.compatibility_preflight(installation): return
         if not self.confirm_save_policy(installation): return
         installed = self.service.mode(installation) == 'installed'
         self.work('Applying selected mods…' if installed else 'Preparing private game files… This may take a few minutes.', lambda:self.service.prepare(installation), lambda root:self.notice('Installed mods ready. Normal Steam saves are in use.' if installed else 'Files ready. Private saves: '+str(root / 'profile/AppData/LocalLow/DragDropGames/MoonSweepers')))
@@ -572,6 +574,7 @@ class Window(QMainWindow):
     def start_game(self):
         if self.no_launch or self.launch_blocked(): return
         installation=self.current_installation()
+        if not self.compatibility_preflight(installation): return
         if self.service.mode(installation) == 'installed' and self.service.state['selected']:
             status = steam_options.inspect(installation, managed=any(self.mods[name][0]['kind'] == packages.MANAGED_KIND for name in self.service.state['selected'] if name in self.mods))
             if status['status'] not in ('ready', 'not-required'):
@@ -579,6 +582,24 @@ class Window(QMainWindow):
         if not self.confirm_save_policy(installation): return
         self.launch_record = None; self._launch_job = True
         self.work('Applying selected mods automatically before launch…', lambda progress:launch.start(self.service,installation,progress), self.started, staged=True, failed=self.launch_failed)
+
+    def compatibility_preflight(self, installation):
+        if installation is None: return False
+        try:
+            result = self.service.compatibility(installation)
+            if result['allowed']: return True
+            from .compatibility_dialog import CompatibilityDialog
+            dialog = CompatibilityDialog(result, self)
+            dialog.exec()
+            if dialog.excluded_ids:
+                excluded = set(dialog.excluded_ids)
+                self.service.state['selected'] = [name for name in self.service.state['selected'] if name not in excluded]
+                self.service.save()
+                self.refresh_library()
+            return False
+        except (ValueError, OSError) as error:
+            self.report_error(error)
+            return False
 
     def launch_blocked(self):
         return self._busy or self.process is not None or self.feedback.blocked or bool(self._launch_guard_error)

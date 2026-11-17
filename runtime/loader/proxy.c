@@ -34,12 +34,14 @@ static void moon_game_frame_leave(unsigned int,int);
 #define MOON_LOADER_GAME_FRAME_ENTER(hook) moon_game_frame_enter(hook)
 #define MOON_LOADER_GAME_FRAME_LEAVE(hook,entered) moon_game_frame_leave(hook,entered)
 #include "dispatch.h"
+static int legacy_host_available(void);
+#define MOON_LOADER_LEGACY_HOST_AVAILABLE() legacy_host_available()
 #include "interaction.h"
 int _fltused=0;
 __declspec(dllexport) DWORD MoonLab_LoaderAbi(void){return 1;}
-__declspec(dllexport) const MoonInputApiV1 *MoonLab_GetInputApi_v1(void){return moon_input_api_v1();}
+__declspec(dllexport) const MoonInputApiV1 *MoonLab_GetInputApi_v1(void){return legacy_host_available()?moon_input_api_v1():0;}
 __declspec(dllexport) const MoonCameraApiV1 *MoonLab_GetCameraApi_v1(unsigned int abi,unsigned int size){
-    return abi==MOON_CAMERA_ABI&&size==sizeof(MoonCameraApiV1)?moon_camera_api_v1():0;
+    return legacy_host_available()&&abi==MOON_CAMERA_ABI&&size==sizeof(MoonCameraApiV1)?moon_camera_api_v1():0;
 }
 static PTR log_file;
 static char active_mod[65];
@@ -73,6 +75,7 @@ static void read_service_plan(void){
 #include "public.h"
 #include "game_adapter.h"
 #include "mod_entry.h"
+static int legacy_host_available(void){return native_profile&&moon_profile_equal(native_profile->id,MOON_GAME_LEGACY_PROFILE_ID);}
 /* The managed patcher calls this before admitting any installed plug-in. */
 __declspec(dllexport) unsigned int MoonLab_InstalledManagedState_v1(void){
     unsigned int state=MoonLab_RuntimeState_v1();
@@ -167,7 +170,9 @@ static DWORD __stdcall worker(PTR unused){
         if(vehicle_address!=(char *)game+native_profile->vehicle_fixed_rva)fail("dispatch-vehicle-address");
     }
     if((U64)update_address<(U64)game+native_profile->image_min_rva||(U64)update_address>=(U64)game+native_profile->image_max_rva)fail("dispatch-update-address");
-    if(!moon_interaction_bind(domain,game))fail("interaction-bind-failed");
+    /* The later broker-only family has no legacy input/camera contracts.
+     * Do not inspect 1.0.5-specific input addresses on a newer game. */
+    if(legacy_host_available()&&!moon_interaction_bind(domain,game))fail("interaction-bind-failed");
     if(!game_clock_bind(domain,game)){
         if(game_clock_bind_failure)event(game_clock_bind_failure,0);
         fail("game-clock-binding");

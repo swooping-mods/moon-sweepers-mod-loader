@@ -58,12 +58,26 @@ Reports distinguish:
   the overall game build is unknown.
 
 The desktop's **Compatibility…** action remains available for unknown builds
-while Launch/Prepare stay disabled. It describes the selected closure and the
+while preparation stays disabled. A blocked Launch button reads **Review
+compatibility…** and opens the compact preflight dialog instead of launching.
+It describes the selected closure and the
 actual provider/game API needs. Per-mod details independently assess that mod,
 its required frameworks and selected optional integrations without changing any
 checkboxes; unrelated selected feature conflicts do not contaminate that
 individual assessment. Existing author notes are explicitly labeled separately.
 Normal enable/disable/uninstall actions retain their ownership/recovery rules.
+
+Launch and preparation obtain a fresh report before Steam setup, save prompts
+or mutation. The dialog lists only mods whose own `assessment_status` is
+incompatible or unknown, with name/version, Blocked/Unverified and a short
+reason. `status`/`allowed` still describe collective admission. Scrollable rows,
+tooltips and initially collapsed details keep long selections compact. The
+explicit **Deselect affected mods** action saves only those checkbox changes;
+it never launches automatically. The player must click Launch again, which
+reassesses the resulting dependency closure. Closing the dialog changes no
+selection. Integrity failures attributed to one package do not relabel an
+otherwise matching neighbor as broken; runtime-wide failures still apply to
+all affected modules. Unverified does not mean proven broken.
 
 CLI `--compatibility [--game PATH]` emits the structured report without seeding
 packages, saving an installation/selection, preparing files or launching a

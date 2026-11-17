@@ -59,7 +59,9 @@ def profiles(root=ROOT):
         seen.add(name)
         if type(row['metadata_version']) is not int or (row['backend'],row['metadata_version'],row['architecture']) != ('il2cpp',108,'win-x64'):
             raise ValueError('Unsupported native backend/layout family')
-        if row['adapter'] != {'id':'moon-sweepers.native.il2cpp108/v1','abi':1,'layout':'steam105-unity6000.6/v1'} or type(row['adapter']['abi']) is not int:
+        if (row['adapter'] not in [dict(id='moon-sweepers.native.il2cpp108/v1',abi=1,layout=layout)
+                                  for layout in ('steam105-unity6000.6/v1','steam106-broker-unity6000.6/v1')]
+                or type(row['adapter']['abi']) is not int):
             raise ValueError('Unsupported native adapter/layout family')
         caps = row['capabilities']
         if (not isinstance(caps, dict) or 'unity.clock' not in caps

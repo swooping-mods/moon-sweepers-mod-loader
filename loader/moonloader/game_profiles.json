@@ -18,7 +18,11 @@
         "layout": "steam105-unity6000.6/v1"
       },
       "capabilities": {
-        "unity.clock": {"abi": 1, "size": 16, "limits": {}}
+        "unity.clock": {
+          "abi": 1,
+          "size": 16,
+          "limits": {}
+        }
       },
       "native": {
         "domain_rva": 38745688,
@@ -30,6 +34,41 @@
         "late_update_rva": 6513680,
         "vehicle_fixed_token": 100669323,
         "vehicle_fixed_rva": 5049472
+      }
+    },
+    {
+      "id": "moon-sweepers.steam.1.0.6.il2cpp108.win-x64",
+      "version": "1.0.6",
+      "backend": "il2cpp",
+      "metadata_version": 108,
+      "architecture": "win-x64",
+      "hashes": {
+        "GameAssembly.dll": "106b28aa7deef1054639a5f48c2c3ae9623a309e0e49631d8b5dfa29a6d5b88f",
+        "MoonSweepers.exe": "50934313744c0b5aef7e16d8b9432c8b41ed8a5c9e2b0d32791a43ae49b03e8a",
+        "UnityPlayer.dll": "bfafc49b185eb8427ad75e3648bcba3bf5b07455567ca05ae2b2e23bc1646c0c"
+      },
+      "adapter": {
+        "id": "moon-sweepers.native.il2cpp108/v1",
+        "abi": 1,
+        "layout": "steam106-broker-unity6000.6/v1"
+      },
+      "capabilities": {
+        "unity.clock": {
+          "abi": 1,
+          "size": 16,
+          "limits": {}
+        }
+      },
+      "native": {
+        "domain_rva": 40559048,
+        "domain_ready_offset": 24,
+        "image_min_rva": 4096,
+        "image_max_rva": 33483212,
+        "update_token": 100672480,
+        "late_update_token": 100672488,
+        "late_update_rva": 7090384,
+        "vehicle_fixed_token": 100669946,
+        "vehicle_fixed_rva": 5444064
       }
     }
   ]
