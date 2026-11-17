@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.2 — 2026-11-17
+
+- Import each mod from a private validated snapshot so a replaced download cannot change its package identity during installation.
+- Stream package hashing and extraction to reduce peak memory when importing large mods, while retaining checksum, ZIP CRC and installed-file verification.
+- Report malformed package manifests as validation errors without changing the library.
+- Run the complete Qt interaction suite in release CI with the reviewed bundled runtime; no checks are excluded.
+
+Gameplay, native Windows game behavior and real co-op retain their existing qualification limits.
+
 ## 0.3.1 — 2026-11-16
 
 - Correct release validation for the documented headless Qt exclusions; unexpected exclusions and failed platform checks still reject publication.

@@ -1,6 +1,7 @@
 """Strict local package intake. Hashes establish integrity, not author identity."""
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import shutil
@@ -23,6 +24,7 @@ MAX_NATIVE_MODS = MAX_GAME_MODS  # Retained import name for existing loaders.
 
 
 def validate(manifest):
+    if not isinstance(manifest, dict): raise ValueError('Package manifest must be an object')
     if manifest.get('schema') != SCHEMA: raise ValueError('Unsupported mod package format')
     key(manifest.get('id'))
     version = manifest.get('version', '')
@@ -30,6 +32,7 @@ def validate(manifest):
     for field in ('name', 'summary', 'description', 'author'):
         if not isinstance(manifest.get(field), str) or not manifest[field].strip() or len(manifest[field]) > 8000: raise ValueError('Missing package ' + field)
     runtime = (manifest.get('kind'), manifest.get('abi'))
+    if not all(isinstance(value, str) for value in runtime): raise ValueError('Unsupported mod runtime')
     native_version = NATIVE_ABIS.index(runtime[1]) + 1 if runtime[0] == 'native' and runtime[1] in NATIVE_ABIS else 0
     files = manifest.get('files', {})
     if not isinstance(files, dict) or not files or len(files) > MAX_FILES: raise ValueError('Invalid package file table')
@@ -41,9 +44,9 @@ def validate(manifest):
         if not isinstance(digest, str) or not re.fullmatch('[a-f0-9]{64}', digest): raise ValueError('Invalid file digest')
     entry = manifest.get('entry', '')
     extension = '.dll' if game_mod(manifest) else '.pyz'
-    if entry not in files or not entry.lower().endswith(extension):
+    if not isinstance(entry, str) or entry not in files or not entry.lower().endswith(extension):
         raise ValueError('Missing native entry DLL' if extension == '.dll' else 'Missing companion Python ZIP application')
-    if manifest.get('icon') not in files: raise ValueError('Missing package icon')
+    if not isinstance(manifest.get('icon'), str) or manifest['icon'] not in files: raise ValueError('Missing package icon')
     # Only PNG artwork is decoded by Qt; package SVG/XML or HTML is never executed.
     if not manifest['icon'].endswith('.png'): raise ValueError('Package icons must be PNG')
     for field in ('conflicts', 'requires', 'claims'):
@@ -97,30 +100,57 @@ def examine(path):
     path = Path(path)
     if path.stat().st_size > MAX_BYTES: raise ValueError('Package exceeds 64 MiB')
     with zipfile.ZipFile(path) as archive:
-        infos = archive.infolist()
-        if len(infos) > MAX_FILES + 1: raise ValueError('Too many package files')
-        names = set(); total = 0
-        for info in infos:
-            relative(info.filename)
-            if info.filename.casefold() in names: raise ValueError('Duplicate package member')
-            names.add(info.filename.casefold())
-            mode = info.external_attr >> 16
-            if stat.S_ISLNK(mode) or info.is_dir() or (stat.S_IFMT(mode) not in (0, stat.S_IFREG)) or info.flag_bits & 1:
-                raise ValueError('Only unencrypted regular package files are accepted')
-            total += info.file_size
-            if total > MAX_BYTES: raise ValueError('Unpacked package exceeds 64 MiB')
-        if 'manifest.json' not in {info.filename for info in infos}: raise ValueError('Package has no manifest')
-        if archive.getinfo('manifest.json').file_size > 32 * 1024: raise ValueError('Manifest exceeds 32 KiB')
-        manifest = validate(json.loads(archive.read('manifest.json')))
-        if set(x.filename for x in infos) != set(manifest['files']) | {'manifest.json'}: raise ValueError('Unlisted or missing package files')
-        png_icon(archive.read(manifest['icon']))
-        for name, expected in manifest['files'].items():
-            if hashlib.sha256(archive.read(name)).hexdigest() != expected: raise ValueError('Package checksum mismatch: ' + name)
+        return _examine_archive(archive)
+
+
+def _examine_archive(archive):
+    infos = archive.infolist()
+    if len(infos) > MAX_FILES + 1: raise ValueError('Too many package files')
+    names = set(); total = 0
+    for info in infos:
+        relative(info.filename)
+        if info.filename.casefold() in names: raise ValueError('Duplicate package member')
+        names.add(info.filename.casefold())
+        mode = info.external_attr >> 16
+        if stat.S_ISLNK(mode) or info.is_dir() or (stat.S_IFMT(mode) not in (0, stat.S_IFREG)) or info.flag_bits & 1:
+            raise ValueError('Only unencrypted regular package files are accepted')
+        total += info.file_size
+        if total > MAX_BYTES: raise ValueError('Unpacked package exceeds 64 MiB')
+    if 'manifest.json' not in {info.filename for info in infos}: raise ValueError('Package has no manifest')
+    if archive.getinfo('manifest.json').file_size > 32 * 1024: raise ValueError('Manifest exceeds 32 KiB')
+    manifest = validate(json.loads(archive.read('manifest.json')))
+    if set(x.filename for x in infos) != set(manifest['files']) | {'manifest.json'}: raise ValueError('Unlisted or missing package files')
+    with archive.open(manifest['icon']) as icon:
+        png_icon(icon.read(24))
+    for name, expected in manifest['files'].items():
+        with archive.open(name) as member:
+            if hashlib.file_digest(member, 'sha256').hexdigest() != expected: raise ValueError('Package checksum mismatch: ' + name)
     return manifest
 
 
 def install(path, root):
-    root = Path(root); manifest = examine(path); archive_hash = sha(path)
+    # Validate and extract one private snapshot. Reopening the download pathname
+    # can otherwise install different bytes under the first manifest's identity.
+    # Nonblocking open permits rejecting a named pipe without waiting for a
+    # writer. Regular files retain normal blocking reads on both platforms.
+    with tempfile.TemporaryFile() as snapshot:
+        descriptor = os.open(path, os.O_RDONLY | getattr(os, 'O_BINARY', 0) | getattr(os, 'O_NONBLOCK', 0))
+        with os.fdopen(descriptor, 'rb') as source:
+            if not stat.S_ISREG(os.fstat(source.fileno()).st_mode): raise ValueError('Package must be a regular file')
+            digest = hashlib.sha256()
+            total = 0
+            for block in iter(lambda: source.read(1024 * 1024), b''):
+                total += len(block)
+                if total > MAX_BYTES: raise ValueError('Package exceeds 64 MiB')
+                digest.update(block)
+                snapshot.write(block)
+        snapshot.seek(0)
+        with zipfile.ZipFile(snapshot) as archive:
+            manifest = _examine_archive(archive)
+            return _install_archive(archive, Path(root), manifest, digest.hexdigest())
+
+
+def _install_archive(archive, root, manifest, archive_hash):
     name = manifest['id'] + '/' + manifest['version'] + '-' + archive_hash[:16]
     target = contained(root / 'library', name)
     if target.exists():
@@ -129,13 +159,11 @@ def install(path, root):
     target.parent.mkdir(parents=True, exist_ok=True)
     temporary = Path(tempfile.mkdtemp(prefix='.intake-', dir=target.parent))
     try:
-        with zipfile.ZipFile(path) as archive:
-            # Recheck the package actually read during extraction, not only a prior pathname.
-            if sha(path) != archive_hash: raise ValueError('Package changed during intake')
-            for info in archive.infolist():
-                output = contained(temporary, info.filename)
-                output.parent.mkdir(parents=True, exist_ok=True)
-                output.write_bytes(archive.read(info))
+        for info in archive.infolist():
+            output = contained(temporary, info.filename)
+            output.parent.mkdir(parents=True, exist_ok=True)
+            with archive.open(info) as member, output.open('wb') as destination:
+                shutil.copyfileobj(member, destination, length=1024 * 1024)
         installed(temporary)
         temporary.rename(target)
     finally:
@@ -150,7 +178,8 @@ def installed(folder):
     if actual != expected: raise ValueError('Installed package file set changed')
     for name, digest in manifest['files'].items():
         if sha(contained(folder, name)) != digest: raise ValueError('Installed package was changed: ' + name)
-    png_icon(contained(folder,manifest['icon']).read_bytes())
+    with contained(folder,manifest['icon']).open('rb') as icon:
+        png_icon(icon.read(24))
     return manifest
 
 

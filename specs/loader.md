@@ -137,6 +137,14 @@ ABIs retain their existing admission rules.
 
 `tools/check.py` checks the API snapshot and runs the complete loader suite, including compiled host-native programs and all Qt interaction cases. CI runs the suite offscreen using the reviewed bundled Python/Qt runtime; no tests are excluded. GitHub checks and manual candidate workflows have read-only repository permissions. The tag-triggered release workflow publishes checked artifacts to GitHub Releases; see [CI](ci.md). Hosted index consumption remains unimplemented. [Downloaded mod imports](download-imports.md) add file/folder pickers and local drag-and-drop for `.msmod`, unpacked packages, supported ZIPs and the reviewed MarsSweepers layout.
 
+The API 0.7.1 snapshot imports regular package files through a private, bounded
+temporary-file snapshot. Manifest validation, archive digest and extraction use
+the same bytes. Payload hashing/extraction stream members, keeping complete
+SHA-256/CRC checks and installed-tree verification; the temporary compressed
+snapshot costs at most 64 MiB of disk per import. Invalid JSON shapes fail as
+validation errors before library state is changed. Loader service regressions
+cover malformed roots and replacement of the download after validation.
+
 
 `tools/check_public_wine.py` applies `tools/audio_policy.py` after building its
 process environment. Non-game Wine/portable diagnostics disable Wine's Pulse,

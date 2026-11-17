@@ -79,6 +79,34 @@ class LoaderChecks(unittest.TestCase):
         installed=self.root/'data/library'/location;(installed/'mod.dll').write_bytes(b'changed')
         with self.assertRaises(ValueError): packages.installed(installed)
 
+    def test_import_rejects_malformed_json_without_changing_library(self):
+        service=Service(self.root/'data',self.root/'bundle')
+        path=self.root/'bad.msmod'
+        for value in (None,[],True,42,'manifest'):
+            with zipfile.ZipFile(path,'w') as archive:
+                archive.writestr('manifest.json',json.dumps(value))
+            with self.subTest(value=value),self.assertRaises(ValueError):
+                service.import_package(path)
+            self.assertEqual(service.state['library'],{})
+            self.assertEqual(service.library(),({},{}))
+
+    def test_import_pins_download_identity_before_library_update(self):
+        from moon_mod_api import packages as api_packages
+        service=Service(self.root/'data',self.root/'bundle')
+        path=self.root/'mod.msmod';expected=package(path,'original')
+        digest=hashlib.sha256(path.read_bytes()).hexdigest()
+        replacement=self.root/'replacement.msmod';package(replacement,'replacement',{'mod.dll':b'other'})
+        examine=api_packages._examine_archive
+        def replace_download(archive):
+            result=examine(archive);replacement.replace(path);return result
+        with patch.object(api_packages,'_examine_archive',side_effect=replace_download):
+            self.assertEqual(service.import_package(path),expected)
+        library,errors=service.library()
+        self.assertEqual(errors,{})
+        self.assertEqual(set(library),{'original'})
+        self.assertEqual(library['original'][0],expected)
+        self.assertEqual(service.state['library']['original'],'original/1.0.0-'+digest[:16])
+
     def test_unlisted_checksum_symlink_and_duplicate_intake(self):
         path=self.root/'mod.msmod';package(path)
         with zipfile.ZipFile(path,'a') as archive: archive.writestr('extra.txt','bad')
