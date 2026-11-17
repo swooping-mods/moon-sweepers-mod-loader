@@ -23,6 +23,13 @@ MAX_GAME_MODS = 64
 MAX_NATIVE_MODS = MAX_GAME_MODS  # Retained import name for existing loaders.
 
 
+class _SelectionError(ValueError):
+    """A selection failure with the package owners needed for player reports."""
+    def __init__(self, message, *owners):
+        super().__init__(message)
+        self.owners = tuple(dict.fromkeys(owners))
+
+
 def validate(manifest):
     if not isinstance(manifest, dict): raise ValueError('Package manifest must be an object')
     if manifest.get('schema') != SCHEMA: raise ValueError('Unsupported mod package format')
@@ -187,45 +194,50 @@ def resolve(manifests, selected, game_hashes, *, available_runtimes=None, runtim
             runtime_readiness_abi=None, host_capabilities=None, native_package_abis=None,
             game_profile=None, game_adapter=None, legacy_profile_ids=None):
     """Order selected game mods and reject conflicting runtime/API contracts."""
-    chosen = set(selected); ordered = []; visiting = set(); done = set(); claims = {}; shared_claims = {}; vehicle_roles = {}; late_override = []
+    chosen = set(selected); ordered = []; visiting = []; done = set(); claims = {}; shared_claims = {}; vehicle_roles = {}; late_override = []
     if not chosen: raise ValueError('Select at least one mod')
     if len(chosen) > MAX_GAME_MODS: raise ValueError('At most ' + str(MAX_GAME_MODS) + ' game mods can be loaded')
     validate_runtime_selection(manifests, chosen)
     api_dependencies = interface_selection(manifests, chosen)
     validate_build_selection(manifests, chosen)
     def visit(name):
-        if name in visiting: raise ValueError('Circular mod dependency: ' + name)
+        if name in visiting: raise _SelectionError('Circular mod dependency: ' + name, *visiting[visiting.index(name):])
         if name in done: return
         if name not in manifests: raise ValueError('Missing installed mod: ' + name)
         mod = manifests[name]
-        if not game_mod(mod): raise ValueError(mod['name'] + ' is a companion tool; open its folder instead of selecting it for a game launch')
-        require_available(mod, available_runtimes, runtime_api_abi, runtime_readiness_abi,
-                          host_capabilities, native_package_abis)
-        require_game(mod, game_hashes, game_profile, game_adapter, legacy_profile_ids)
+        if mod.get('id') != name: raise _SelectionError('Selected package key differs from its manifest identity', name)
+        if not game_mod(mod): raise _SelectionError(mod['name'] + ' is a companion tool; open its folder instead of selecting it for a game launch', name)
         for other in mod['conflicts']:
-            if other in chosen: raise ValueError(mod['name'] + ' conflicts with ' + other)
+            if other in chosen: raise _SelectionError(mod['name'] + ' conflicts with ' + other, name, other)
         for claim in mod['claims']:
-            if claim == 'MoonPrototypeVehicle.FixedUpdate' and vehicle_roles: raise ValueError('Exclusive vehicle hook conflicts with vehicle adapter')
-            if claim in shared_claims: raise ValueError(mod['name'] + ' exclusively owns shared hook ' + claim)
-            if claim in claims: raise ValueError(mod['name'] + ' and ' + claims[claim] + ' both own ' + claim)
-            claims[claim] = mod['name']
+            if claim == 'MoonPrototypeVehicle.FixedUpdate' and vehicle_roles: raise _SelectionError('Exclusive vehicle hook conflicts with vehicle adapter', name, *vehicle_roles.values())
+            if claim in shared_claims: raise _SelectionError(mod['name'] + ' exclusively owns shared hook ' + claim, name, *shared_claims[claim])
+            if claim in claims: raise _SelectionError(mod['name'] + ' and ' + manifests[claims[claim]]['name'] + ' both own ' + claim, name, claims[claim])
+            claims[claim] = name
         for claim in mod.get('shared_claims', []):
-            if claim in claims: raise ValueError(claim + ' is exclusively owned by ' + claims[claim])
-            shared_claims[claim] = mod['name']
+            if claim in claims: raise _SelectionError(claim + ' is exclusively owned by ' + manifests[claims[claim]]['name'], name, claims[claim])
+            shared_claims.setdefault(claim, []).append(name)
         role = mod.get('vehicle_hook')
         if role:
-            if 'MoonPrototypeVehicle.FixedUpdate' in claims: raise ValueError('Vehicle adapter conflicts with exclusive FixedUpdate')
-            if role in vehicle_roles: raise ValueError('Multiple vehicle ' + role + ' providers')
+            if 'MoonPrototypeVehicle.FixedUpdate' in claims: raise _SelectionError('Vehicle adapter conflicts with exclusive FixedUpdate', name, claims['MoonPrototypeVehicle.FixedUpdate'])
+            if role in vehicle_roles: raise _SelectionError('Multiple vehicle ' + role + ' providers', name, vehicle_roles[role])
             vehicle_roles[role] = name
         if mod.get('late_update_hook') == 'override':
-            if late_override: raise ValueError('Multiple LateUpdate override providers')
+            if late_override: raise _SelectionError('Multiple LateUpdate override providers', name, *late_override)
             late_override.append(name)
-        visiting.add(name)
+        visiting.append(name)
         for dependency in mod['requires']:
-            if dependency not in chosen: raise ValueError('Also select required mod: ' + dependency)
+            if dependency not in chosen: raise _SelectionError('Also select required mod: ' + dependency, name)
             visit(dependency)
         for dependency in api_dependencies.get(name, []):
             visit(dependency)
-        visiting.remove(name); done.add(name); ordered.append(name)
+        visiting.pop(); done.add(name); ordered.append(name)
     for name in sorted(chosen): visit(name)
+    # Structural failures are known even when the target build is unknown.
+    # Complete graph validation before checking any target-dependent contract.
+    for name in ordered:
+        mod = manifests[name]
+        require_available(mod, available_runtimes, runtime_api_abi, runtime_readiness_abi,
+                          host_capabilities, native_package_abis)
+        require_game(mod, game_hashes, game_profile, game_adapter, legacy_profile_ids)
     return ordered

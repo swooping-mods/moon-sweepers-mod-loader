@@ -15,6 +15,10 @@ MAX_TABLE_SIZE = 65536
 MAX_EVIDENCE = 128
 
 
+class _UnknownGameProfile(ValueError):
+    """Missing target knowledge, distinct from a definite selection failure."""
+
+
 def _positive(value, maximum=0xffffffff):
     return type(value) is int and 0 < value <= maximum
 
@@ -129,10 +133,10 @@ def require_game(manifest, game_hashes, game_profile=None, game_adapter=None, le
     modern = manifest.get("kind") == "native" and manifest.get("abi") == V8
     if modern:
         if game_profile is None:
-            raise ValueError("Unknown game build: a reviewed game adapter profile is required")
+            raise _UnknownGameProfile("Unknown game build: a reviewed game adapter profile is required")
         validate_profile(game_profile)
         if game_hashes != game_profile["hashes"]:
-            raise ValueError("Unknown game build: observed hashes do not match the reviewed profile")
+            raise _UnknownGameProfile("Unknown game build: observed hashes do not match the reviewed profile")
         offered = _adapter_capabilities(game_profile, game_adapter)
         for name, requirement in manifest["requires_game"].items():
             actual = offered.get(name)
@@ -201,6 +205,8 @@ def evaluate(manifests, selected, game_hashes, *, game_profile=None, game_adapte
         if name not in validation:
             try:
                 packages.validate(manifests.get(name))
+                if manifests[name]['id'] != name:
+                    raise ValueError('Selected package key differs from its manifest identity')
                 validation[name] = None
             except (ValueError, TypeError, KeyError, AttributeError) as error:
                 validation[name] = str(error)
@@ -229,8 +235,19 @@ def evaluate(manifests, selected, game_hashes, *, game_profile=None, game_adapte
             item["reasons"].append(_reason("package-invalid", invalid, package=name))
             continue
         valid.add(name)
+        for dependency in mod.get('requires', []):
+            if dependency not in chosen:
+                item['reasons'].append(_reason('dependency-missing', 'Required framework is not selected.', package=name, provider=dependency))
+        try:
+            packages.require_available(mod, available_runtimes, runtime_api_abi,
+                                       runtime_readiness_abi, host_capabilities, native_package_abis)
+        except (ValueError, TypeError) as error:
+            item['reasons'].append(_reason('runtime-unavailable', str(error), package=name))
         if mod.get("runtime_api_abi") is not None and runtime_api_abi != mod["runtime_api_abi"]:
             item["reasons"].append(_reason("runtime-api-unavailable", "Required public runtime API ABI is unavailable.", package=name))
+        if (mod.get('kind') == 'bepinex-il2cpp' and mod.get('runtime_api_abi') is not None
+                and (type(runtime_readiness_abi) is not int or runtime_readiness_abi != 1)):
+            item['reasons'].append(_reason('runtime-readiness-unavailable', 'Required native runtime readiness ABI is unavailable.', package=name))
         if mod.get("kind") == "native" and mod.get("abi") == V8:
             supported = (isinstance(native_package_abis, (tuple, list, set, frozenset))
                          and V8 in native_package_abis)
@@ -278,8 +295,22 @@ def evaluate(manifests, selected, game_hashes, *, game_profile=None, game_adapte
                 "optional": False, "available": actual is not None})
             if not matched:
                 item["reasons"].append(_reason("host-capability-unavailable", "Required host adapter capability is unavailable.", package=name, api=capability))
-    # Explain an incompatible provider through every selected dependent, even
-    # when the consumer itself uses no vanilla game capability.
+    order = []
+    try:
+        order = packages.resolve(manifests, chosen, game_hashes,
+            available_runtimes=available_runtimes, runtime_api_abi=runtime_api_abi,
+            runtime_readiness_abi=runtime_readiness_abi, host_capabilities=host_capabilities,
+            native_package_abis=native_package_abis, game_profile=game_profile,
+            game_adapter=game_adapter, legacy_profile_ids=legacy_profile_ids)
+    except _UnknownGameProfile:
+        pass  # The unknown target has already been reported above.
+    except (ValueError, TypeError, KeyError, AttributeError) as error:
+        reasons.append(_reason("selection-incompatible", str(error)))
+        for name in getattr(error, 'owners', ()):
+            if name in mods:
+                mods[name]['reasons'].append(_reason('selection-incompatible', str(error), package=name))
+    # Resolver-owned cycles/conflicts and unavailable runtimes must propagate
+    # through consumers just like missing game or framework APIs.
     for _ in chosen:
         changed = False
         for name in chosen:
@@ -297,18 +328,6 @@ def evaluate(manifests, selected, game_hashes, *, game_profile=None, game_adapte
                     changed = True
         if not changed:
             break
-    order = []
-    try:
-        order = packages.resolve(manifests, chosen, game_hashes,
-            available_runtimes=available_runtimes, runtime_api_abi=runtime_api_abi,
-            runtime_readiness_abi=runtime_readiness_abi, host_capabilities=host_capabilities,
-            native_package_abis=native_package_abis, game_profile=game_profile,
-            game_adapter=game_adapter, legacy_profile_ids=legacy_profile_ids)
-    except (ValueError, TypeError, KeyError, AttributeError) as error:
-        # The unknown profile is already reported accurately above; do not
-        # reclassify that one missing target as an incompatibility.
-        if not unknown or any(item["reasons"] for item in mods.values()):
-            reasons.append(_reason("selection-incompatible", str(error)))
     incompatible = bool(reasons or any(item["reasons"] for item in mods.values()))
     status = "incompatible" if incompatible else "unknown" if unknown else "requirements-matched"
     allowed = status == "requirements-matched"

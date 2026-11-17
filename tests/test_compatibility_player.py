@@ -22,6 +22,18 @@ class CompatibilityPlayerChecks(unittest.TestCase):
     setUp = test_loader.LoaderChecks.setUp
     prepared_fixture = test_loader.LoaderChecks.prepared_fixture
 
+    def test_broker_only_profile_does_not_advertise_legacy_interaction(self):
+        service,first=self.fixture();second=self.add_profile(service)
+        self.add_mod(service,'interaction-feature',requires_host={'interaction':1})
+        receipt=load(service.bundle/'runtime/receipt.json')
+        receipt['host_capabilities']={'interaction':1};write(service.bundle/'runtime/receipt.json',receipt)
+        service.state['selected']=['interaction-feature']
+        self.assertTrue(service.compatibility(first)['allowed'])
+        result=service.compatibility(second)
+        self.assertFalse(result['allowed'])
+        self.assertIn('host-capability-unavailable',[r['code'] for r in result['mods']['interaction-feature']['reasons']])
+        self.assertEqual(compatibility.host_capabilities(receipt,None),{})
+
     def add_mod(self, service, name='portable-feature', **fields):
         manifest = test_loader.descriptor(name)
         if fields.get('abi', 'MoonLab_ModStart/v8') == 'MoonLab_ModStart/v8':

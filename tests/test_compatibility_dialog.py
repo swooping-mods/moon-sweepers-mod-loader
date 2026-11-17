@@ -19,6 +19,20 @@ class CompatibilityDialogChecks(unittest.TestCase):
     fixture = test_compatibility_player.CompatibilityPlayerChecks.fixture
     add_mod = test_compatibility_player.CompatibilityPlayerChecks.add_mod
 
+    def test_missing_framework_names_only_the_affected_mod(self):
+        service,installation=self.fixture()
+        self.add_mod(service,'needs-framework',requires=['absent-framework'])
+        service.state['selected']=['portable-feature','needs-framework']
+        result=service.compatibility(installation)
+        self.assertFalse(result['allowed'])
+        rows=compatibility.compact(result)
+        self.assertEqual([row['id'] for row in rows],['needs-framework'])
+        self.assertEqual(rows[0]['reason'],'Required framework unavailable: absent-framework')
+        app=QApplication.instance() or QApplication([])
+        dialog=CompatibilityDialog(result);self.addCleanup(dialog.close)
+        dialog.show();app.processEvents()
+        self.assertEqual(dialog.table.topLevelItemCount(),1)
+
     def test_compact_rows_do_not_blame_a_matching_neighbor(self):
         result = {'status':'incompatible','selected':['good','old','future'], 'mods':{
             'good':{'status':'incompatible','assessment_status':'requirements-matched'},

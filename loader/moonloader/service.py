@@ -254,7 +254,7 @@ class Service:
                 raise ValueError('Loader runtime is missing or changed; rebuild the distribution')
             inspection = self.inspect(installation)
             if not inspection.get('profile'): raise ValueError('Unknown game build; update the loader adapter')
-            from .compatibility import receipt_digest, message
+            from .compatibility import receipt_digest, message, host_capabilities
             assessment = self.compatibility(installation, library=library, inspection=inspection)
             if not assessment['allowed']: raise ValueError(message(assessment))
             if assessment['runtime_receipt_digest'] != receipt_digest(runtime_receipt):
@@ -268,7 +268,7 @@ class Service:
             for name in order:
                 packages.require_available(library[name][0], self.available_runtimes(installation),
                                            runtime_receipt.get('runtime_api_abi', 0), runtime_receipt.get('runtime_readiness_abi', 0),
-                                           runtime_receipt.get('host_capabilities') or {}, native_package_abis=native_abis)
+                                           host_capabilities(runtime_receipt, inspection.get('profile')), native_package_abis=native_abis)
             if any(library[name][0].get('shared_claims') for name in order) and runtime_receipt.get('shared_update_abi') != 1:
                 raise ValueError('Selected mods require the shared Update runtime; rebuild the distribution')
             if any(library[name][0].get('vehicle_hook') for name in order) and runtime_receipt.get('vehicle_dispatch_abi') != 1:

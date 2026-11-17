@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Attribute missing frameworks, runtime failures and dependency cycles to affected mods even on unknown builds; keep legacy interaction offers scoped to their supported profile.
 - Show a compact preflight warning for incompatible or unverified mods, with optional details and explicit deselection.
 - Preserve individual mod assessments when another selected package blocks launch.
 - Add an exact 1.0.6 clock-broker profile for portable ABI 8 mods; legacy native and managed mods retain their 1.0.5 restrictions.

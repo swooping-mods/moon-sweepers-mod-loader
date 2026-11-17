@@ -43,6 +43,13 @@ access, game API ABI 1, `requires_game` and advertised native package ABI 8.
 Optional package game hashes are additional restrictions. Required framework
 APIs, ABI/table sizes/capacities, dependencies and conflicts remain mandatory.
 An unavailable optional integration is reported without inventing a provider.
+Legacy host capabilities from the runtime receipt apply only to the legacy
+current profile. Broker-only later profiles expose no legacy interaction table;
+both assessment and preparation use that same profile-scoped offer.
+API 0.7.3 reports missing selected dependencies and runtime failures on their
+owners and propagates them to consumers, including on unknown game builds.
+Cycles and hook conflicts are checked before target admission. The compact
+warning names an absent required framework without blaming unrelated mods.
 
 Reports distinguish:
 
@@ -115,3 +122,11 @@ build receipts are separate gates; actual game/world/platform observations
 belong to their existing verification records. No future game build, arbitrary
 third-party binary or mod that embeds old addresses becomes compatible merely
 because its version number or API names look similar.
+
+The 2026-11-17 review gate passes **286 tests** with no skips/exclusions via
+`tools/check.py` and the existing reviewed `MOON_API_DOTNET` SDK. The pinned
+41-file API 0.7.3 export verifies. New inert fixtures check the broker-only
+profile's absent interaction offer and the actual Qt warning for a missing
+framework beside a matching mod. Results: `artifacts/checks.json` and
+`artifacts/review-loader-final.log`. This pass does not rebuild an installable
+release or qualify additional game/world/co-op behavior.

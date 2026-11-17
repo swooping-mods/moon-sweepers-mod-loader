@@ -50,6 +50,13 @@ def runtime_adapter(receipt, profile):
     return None
 
 
+def host_capabilities(receipt, profile):
+    """Legacy host tables are absent from the later broker-only adapter."""
+    if not profile or profile.get('id') != game_profiles.CURRENT_PROFILE_ID:
+        return {}
+    return receipt.get('host_capabilities') or {}
+
+
 def report(service, installation, selected=None, *, library=None, inspection=None):
     from moon_mod_api.compatibility import evaluate
     chosen = list(service.state['selected'] if selected is None else selected)
@@ -73,7 +80,7 @@ def report(service, installation, selected=None, *, library=None, inspection=Non
                'available_runtimes': service.available_runtimes(installation),
                'runtime_api_abi': receipt.get('runtime_api_abi', 0),
                'runtime_readiness_abi': receipt.get('runtime_readiness_abi', 0),
-               'host_capabilities': receipt.get('host_capabilities') or {},
+               'host_capabilities': host_capabilities(receipt, profile),
                'native_package_abis': native_abis, 'runtime_sha256': receipt.get('sha256'),
                'legacy_profile_ids': {'native': [game_profiles.CURRENT_PROFILE_ID],
                                       'bepinex-il2cpp': [game_profiles.CURRENT_PROFILE_ID]}}
@@ -134,7 +141,7 @@ def compact(result):
         codes = {why.get('code') for why in reasons}
         if codes & {'game-pin-mismatch', 'legacy-runtime-profile-unavailable'}:
             detail = 'Needs an update for this game build'
-        elif 'dependency-incompatible' in codes:
+        elif codes & {'dependency-incompatible', 'dependency-missing'}:
             providers = sorted({why['provider'] for why in reasons if why.get('provider')})
             detail = 'Required framework unavailable: ' + ', '.join(providers)
         elif 'package-integrity' in codes:
